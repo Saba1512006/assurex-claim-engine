@@ -110,8 +110,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 1.25rem 0; }
 .right { text-align: right; } .center { text-align: center; } .nowrap { white-space: nowrap; }
 .mt-0 { margin-top: 0; } .mt-1 { margin-top: 6px; } .mt-2 { margin-top: 12px; } .mt-3 { margin-top: 20px; } .mb-0 { margin-bottom: 0; }
 .hidden { display: none !important; }
-@media (max-width: 1080px) { .split, .split-wide { grid-template-columns: 1fr; } .sticky { position: static; } .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 760px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } h1 { font-size: 1.45rem; } .wrap { padding: 0 16px; } .page { padding-top: 20px; } }
+@media (max-width: 1080px) { .split, .split-wide { grid-template-columns: minmax(0, 1fr); } .sticky { position: static; } .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 1.45rem; } .wrap { padding: 0 16px; } .page { padding-top: 20px; } }
 
 /* ------------------------------------------------------------------ top bar */
 .topbar { position: sticky; top: 0; z-index: 40; background: var(--nav); color: var(--nav-ink); border-bottom: 1px solid rgba(255,255,255,.06); }
@@ -240,7 +240,7 @@ a.stat:hover { background: var(--surface-2); text-decoration: none; }
 .role--customer { color: #2563eb; } .role--service_center_staff { color: #7c3aed; } .role--claim_reviewer { color: #c2410c; } .role--administrator { color: #0f766e; }
 
 /* ------------------------------------------------------------------ tables */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; position: relative; }
 .table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .table th { text-align: left; font-weight: 600; font-size: .76rem; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .table td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
@@ -336,7 +336,7 @@ a.stat:hover { background: var(--surface-2); text-decoration: none; }
 .stage.done { color: var(--ink-2); } .stage.done::before { background: var(--brand); color: #fff; content: "✓"; }
 .stage.done::after, .stage.now::after { background: var(--brand); }
 .stage.now { color: var(--ink); } .stage.now::before { background: var(--surface); color: var(--brand); box-shadow: 0 0 0 2px var(--brand), 0 0 0 6px var(--brand-soft); }
-.stage.skip { opacity: .45; }
+.stage.todo { opacity: .45; }
 @media (max-width: 860px) { .stages { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 18px; } .stage:nth-child(5)::after { display: none; } }
 .steps { display: flex; gap: 8px; flex-wrap: wrap; }
 .steps button { flex: 1; min-width: 130px; display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: 600 .84rem var(--font); cursor: pointer; text-align: left; }
@@ -469,3 +469,13 @@ a.stat:hover { background: var(--surface-2); text-decoration: none; }
 /* print */
 @media print { .topbar, .footer, .no-print, .btn { display: none !important; } body { background: #fff; } .card { box-shadow: none; break-inside: avoid; } }
 @media (max-width: 600px) { .hide-sm { display: none; } }
+/* small-screen overflow guards */
+.kv .id, .hint .id, .card-h .id { white-space: normal; word-break: break-all; }
+.seg { flex-wrap: wrap; max-width: 100%; }
+.card-split { display: grid; gap: 18px; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); align-items: start; }
+@media (max-width: 600px) { .card-split { grid-template-columns: 1fr; } .summary-card-img { max-width: 100%; } }
+
+.unavailable, .alert, .callout { overflow-wrap: anywhere; }
+.blog-layout { display: grid; gap: 20px; grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
+@media (max-width: 900px) { .blog-layout { grid-template-columns: minmax(0, 1fr); } .blog-layout > aside { display: none; } }
+@media (max-width: 480px) { .tb-actions .hide-xs { display: none; } .brand small { display: none; } }

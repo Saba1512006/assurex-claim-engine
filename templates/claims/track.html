@@ -3,7 +3,6 @@
 {% block title %}Track {{ claim.claim_id }}{% endblock %}
 {% block content %}
 {% set reached = claim.status_history|map(attribute='new_status')|list %}
-{% set order = stages.index(claim.status) %}
 <div class="page-head">
   <div>
     <div class="crumbs"><a href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}"><span class="id">{{ claim.claim_id }}</span></a><i class="bi bi-chevron-right"></i><span>Tracking</span></div>
@@ -15,7 +14,7 @@
 
 <section class="card"><div class="card-b" style="padding: 28px 24px">
   <ol class="stages" aria-label="Claim progress">
-    {% for s in stages %}<li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'skip') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>{% endfor %}
+    {% for s in stages %}<li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'todo') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>{% endfor %}
   </ol>
 </div></section>
 

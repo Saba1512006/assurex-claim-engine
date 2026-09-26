@@ -31,7 +31,7 @@ def _upload_dir() -> Path:
 
 def submit(claim, actor) -> Outcome:
     """Draft / Additional-Information-Required -> Submitted -> Under Evaluation -> routed status."""
-    first = claim.claim_submission_date is None
+    first = not any(h.new_status == Config.STATUS_SUBMITTED for h in claim.status_history)
     claim.claim_submission_date = claim.claim_submission_date or date.today()
     claim.transition_status(Config.STATUS_SUBMITTED, actor.id,
                             "Claim submitted" if first else "Claim resubmitted with additional information")

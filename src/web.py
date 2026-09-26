@@ -75,9 +75,16 @@ def register_template_helpers(app) -> None:
         return (Notification.query.filter_by(user_id=user.id, is_read=False)
                 .order_by(Notification.id.desc()).limit(20).all())
 
+    def asset(filename: str) -> str:
+        """Static URL with the file's modification time, so browsers fetch new CSS/JS after a deploy."""
+        from pathlib import Path
+        path = Path(app.static_folder) / filename
+        version = int(path.stat().st_mtime) if path.exists() else 0
+        return url_for("static", filename=filename, v=version)
+
     # globals (not a context processor) so imported macros can use them too
     app.jinja_env.globals.update(
-        tone=tone, url_with=url_with, unread_notifications=unread_notifications,
+        tone=tone, url_with=url_with, unread_notifications=unread_notifications, asset=asset,
         doc_label=lambda t: DOCUMENT_LABELS.get(t, t.replace("_", " ").title()),
         notif_icon=lambda kind: NOTIF_ICON.get(kind, "bi-bell"))
 

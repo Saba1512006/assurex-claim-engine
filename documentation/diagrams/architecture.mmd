@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph Web["Flask web application"]
+    UI["Jinja UI<br/>customer · staff · reviewer · admin"]
+    SEC["RBAC guards<br/>permission → scope → constraints"]
+    API["Blueprints<br/>auth · products · claims · reviewer · admin"]
+  end
+  subgraph Core["Evaluation pipeline"]
+    DOC["Document service<br/>magic bytes · SHA-256 · OCR"]
+    DET["Contradiction &amp; duplicate detectors"]
+    FEAT["Feature builder<br/>(same columns as training)"]
+    RULES["Warranty rule engine<br/>policies/*.json"]
+    PY["Python model<br/>calibrated HistGradientBoosting"]
+    CARD["Claim Summary Card<br/>600×600, facts only"]
+    GTM["Google Teachable Machine<br/>TFLite export"]
+    CMP["Consistency status<br/>|Δ top confidence|"]
+    DT["Decision table<br/>config/decision_policy.json"]
+  end
+  DB[("SQLite / SQL database<br/>claims · evaluations · audit")]
+  FS[("Upload store<br/>documents · cards")]
+  UI --> SEC --> API
+  API --> DOC --> FS
+  API --> DET --> FEAT
+  FEAT --> RULES --> DT
+  FEAT --> PY --> CMP
+  FEAT --> CARD --> GTM --> CMP
+  CARD --> FS
+  CMP --> DT --> API
+  API --> DB

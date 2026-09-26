@@ -1,166 +1,97 @@
-# AssureX Claim Engine — Installation & Deployment Manual
+# Installation & execution (SRS deliverables 9–10)
 
-**Standard:** AssureX Claim Engine NextWave AI and ML SRS (Section 3.3, Pages 31–32)  
-**Target Operating Systems:** Windows 10/11, Ubuntu 22.04 LTS+, macOS Sonoma+  
-**Target Python Version:** Python 3.10 – 3.14  
+## Prerequisites
 
----
+| Item | Requirement |
+|---|---|
+| Operating system | Windows 10/11, macOS 12+, Ubuntu 20.04+ (any OS with Python) |
+| Python | 3.10, 3.11 or 3.12 (3.11 recommended; `scikit-learn==1.9.1` is pinned so the saved model loads) |
+| Git | any recent version |
+| Optional | Tesseract OCR (reads *image* receipts); Chromium via Playwright (only to re-render report diagrams) |
 
-## 1. Prerequisites & Environment
+## Setup
 
-Ensure the following foundational software packages are installed on your workstation:
-
-| Prerequisite | Recommended Version | Verification Command |
-|:---|:---|:---|
-| **Python** | 3.10.x to 3.14.x | `python --version` |
-| **pip** | 24.0+ | `pip --version` |
-| **Git** | 2.40+ | `git --version` |
-| **Tesseract OCR (Optional)** | 5.0+ | `tesseract --version` *(optional fallback engine included)* |
-
----
-
-## 2. Step-by-Step Installation
-
-### Step 1: Clone Repository
 ```bash
-git clone https://github.com/sami2515/assurex-claim-engine.git
+git clone https://github.com/Saba1512006/assurex-claim-engine.git
 cd assurex-claim-engine
-```
-
-### Step 2: Virtual Environment Creation
-Create an isolated Python virtual environment to avoid dependency collisions:
-
-**Windows (PowerShell):**
-```powershell
 python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-
-**Linux / macOS (Bash):**
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### Step 3: Dependency Installation
-Install all required libraries including Flask, scikit-learn, ReportLab, pandas, and Pillow:
-```bash
+# Windows (PowerShell): .\venv\Scripts\Activate.ps1      macOS/Linux: source venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Step 4: Environment Variables (Optional)
-The system operates out-of-the-box with production-ready defaults in `config/config.py`. To configure custom secret keys or ports, create a `.env` file in the project root:
-```env
-SECRET_KEY=your-secure-random-secret-key-here
-FLASK_ENV=development
-MIN_CONFIDENCE_THRESHOLD=0.60
-STRONG_MATCH_DIFF=0.15
-ACCEPTABLE_MATCH_DIFF=0.30
-```
+## Environment variables
 
-### Step 5: Database Initialization & Seeding
-Create the SQLite database schema and seed the baseline users, warranty policies, sample equipment, and past claims:
+`python database/seed.py` creates a `.env` file with a random `SECRET_KEY` the first time it runs. You can
+also set these yourself (in `.env` or the environment):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SECRET_KEY` | *(required)* | Signs sessions and CSRF tokens. The app refuses to start without it. |
+| `DATABASE_URL` | `sqlite:///database/assurex.db` | Any SQLAlchemy URL, e.g. PostgreSQL |
+| `UPLOAD_DIR` | `data/uploads` | Where documents and Claim Summary Cards are stored |
+| `WARRANTY_EXPIRY_ALERT_DAYS` | `30` | Initial alert window (admins change it in the app) |
+| `RATELIMIT_STORAGE_URI` | `memory://` | Use `redis://…` when running several workers |
+| `FLASK_DEBUG` | `0` | `1` for the debug server |
+
+## Database
+
 ```bash
-python database/seed.py
-```
-*Expected Output:*
-```text
--> Initializing database tables...
--> Database tables created.
--> Seeding core users...
--> Seeding warranty policies...
--> Seeding products and warranties...
--> Seeding sample claims and documents...
-[✓] AssureX Claim Engine database seeded successfully!
+python database/seed.py              # drop + recreate tables, add demo users, products and 12 evaluated claims
+python database/seed.py --if-empty   # only seed an empty database (used on deploy)
 ```
 
----
+Tables are created from the SQLAlchemy models (`src/models/entities.py`). The seed prints the status mix
+it produced. The **default administrator** is `admin@assurex.local` / `AdminPass123!` — change the
+password from *Profile* after the first sign-in on any shared deployment, and invite real users from
+*Access*.
 
-## 3. Machine Learning Models Placement
+## Models
 
-The system models are pre-packaged and pre-trained in the repository:
+| Model | Location | How it gets there |
+|---|---|---|
+| Python classification model | `model/python_model/claim_classifier_v2.joblib` + `model_card_v2.json` | Included. Rebuild with `python notebooks/train_python_v2.py` |
+| Google Teachable Machine | `model/teachable_machine/model_unquant.tflite` + `labels.txt` | Train in the browser on `data/summary_cards/train/`, export *Tensorflow Lite → Floating point*, then upload in Admin › Models (or copy the two files into the folder). Run the evaluation afterwards. |
 
-1. **Python Tabular Model:**
-   - Preprocessor: `model/python_model/preprocessor.joblib`
-   - Benchmark Model: `model/python_model/best_model.joblib`
-   - Benchmark Results: `model/python_model/benchmark_results.json`
+`labels.txt` may use the canonical names (`0 Valid Claim`) or the folder names (`0 valid`, `2 manual_review`).
 
-2. **Google Teachable Machine Model:**
-   - Architecture JSON: `model/teachable_machine/model.json`
-   - Metadata JSON: `model/teachable_machine/metadata.json`
-   - Labels File: `model/teachable_machine/labels.txt`
-   - Weights Binary: `model/teachable_machine/weights.bin`
-   - Standalone Classifier: `model/teachable_machine/gtm_classifier.joblib`
+## OCR
 
-*Note: If models need to be retrained from scratch at any time, run:*
+PDF receipts with a text layer are read by `pdfplumber` (installed from requirements). To read photos
+and scans, install Tesseract:
+
+* Windows: install from the UB Mannheim build, keep the default path `C:\Program Files\Tesseract-OCR\`, and add it to `PATH`.
+* macOS: `brew install tesseract` · Ubuntu/Debian: `sudo apt install tesseract-ocr`
+
+Without Tesseract, image receipts are still accepted and the user types the details (the app says so).
+
+## Run
+
 ```bash
-python -c "from src.core.card_generator import generate_all_cards; generate_all_cards()"
-python -c "from src.core.preprocessor import train_and_save_python_model; train_and_save_python_model()"
+python src/app.py                     # development server: http://127.0.0.1:5000
+gunicorn wsgi:app --workers 2         # production (Linux/macOS)
+python -m pytest -q                   # 192 automated tests
 ```
 
----
+PythonAnywhere: point the WSGI file at the project and `from wsgi import application`; set `SECRET_KEY`
+in the WSGI file or a `.env`, then run `python database/seed.py --if-empty` once in a console.
+Render: `render.yaml` builds, seeds an empty database and generates `SECRET_KEY` automatically.
 
-## 4. Running the Application
+## Folder setup
 
-Launch the Flask web server:
-```bash
-python src/app.py
-```
+Everything needed is in the repository. Created at runtime: `data/uploads/` (documents, cards),
+`database/assurex.db`, `.env`. None of them are committed.
 
-*Expected Terminal Output:*
-```text
- * Serving Flask app 'app'
- * Debug mode: on
- * Running on http://127.0.0.1:5000
-```
+## Troubleshooting
 
-Open **`http://127.0.0.1:5000`** in any web browser.
-
----
-
-## 5. Evaluator User Accounts
-
-The login interface features **1-Click Quick Fill** buttons for immediate evaluator testing:
-
-| Role | Email | Password | Access Scope |
-|:---|:---|:---|:---|
-| **System Administrator** | `admin@assurex.local` | `AdminPass123!` | Executive dashboard, dynamic JSON policy editor, audit trail |
-| **Claims Reviewer** | `reviewer@assurex.local` | `ReviewerPass123!` | Multi-filter review queue, adjudication workbench, decision override |
-| **Customer** | `customer@assurex.local` | `CustomerPass123!` | Self-service claims portal, product fleet, 5-step intake wizard |
-| **Service Staff** | `staff@assurex.local` | `StaffPass123!` | Service center maintenance and repair record logs |
-
----
-
-## 6. Verification & Automated Test Execution
-
-Execute the full verification suite (all 38 tests):
-```bash
-python -m unittest discover tests
-```
-
-Execute the 18 SRS Category verification test suite:
-```bash
-python -m unittest tests/test_srs_18_categories.py
-```
-
-Execute the 11 Mandatory Demonstration Cases:
-```bash
-python -m unittest tests/test_srs_demonstration_cases.py
-```
-
-Re-generate the 21-column Model Comparison Report on 36 unseen claims:
-```bash
-python reports/generate_comparison_report.py
-```
-
----
-
-## 7. Troubleshooting & FAQ
-
-- **Port 5000 Already in Use:**
-  In `src/app.py`, change line 75: `app.run(port=5001)` or run `flask run --port 5001`.
-- **PowerShell Script Execution Policy Error:**
-  If `.\venv\Scripts\Activate.ps1` gives an execution policy error, run:
-  `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-- **Missing OCR Tesseract Binary:**
-  The `DocumentProcessor` includes a built-in pure-Python fallback extraction engine that parses text, receipts, and invoices even without the native Tesseract binary installed.
+| Symptom | Fix |
+|---|---|
+| `RuntimeError: SECRET_KEY is not set` | Run `python database/seed.py` once, or set `SECRET_KEY` |
+| Sign-in works but you're immediately signed out (local http) | Use `python src/app.py` (it disables the secure-cookie flag for http). Behind https nothing needs changing. |
+| “Python model could not be loaded” | Install the pinned `scikit-learn==1.9.1`, or retrain with `python notebooks/train_python_v2.py` |
+| Every claim ends in Manual Review | The Teachable Machine model isn't installed yet (Admin › Models shows the status) |
+| “No TensorFlow Lite runtime installed” | `pip install ai-edge-litert` (or `tflite-runtime` / `tensorflow`) |
+| Receipt photo: “no text found” | Install Tesseract or upload a PDF; you can also enter the details by hand |
+| `sqlite3.OperationalError: no such column` after pulling | The schema changed: `python database/seed.py` (demo) or migrate your data (see `src/security/MIGRATION.md`) |
+| “This form expired” | The CSRF token is tied to your session — reload the page and submit again |
+| Too many attempts / account locked | Wait 15 minutes, or an admin uses *Sign out* on the Access page to clear the lock |

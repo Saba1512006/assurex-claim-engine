@@ -52,7 +52,7 @@
 <section class="card mt-3"><div class="card-b">
   <ol class="stages" aria-label="Claim progress">
     {% for s in stages %}
-      <li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'skip') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>
+      <li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'todo') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>
     {% endfor %}
   </ol>
 </div></section>
@@ -101,7 +101,7 @@
         </div>
       </div>
       <div class="card-b" style="border-top:1px solid var(--line)">
-        <div class="grid" style="grid-template-columns: minmax(0, 260px) 1fr; align-items:start">
+        <div class="card-split">
           <figure style="margin:0">
             <img class="summary-card-img" src="{{ url_for('claims.summary_card', claim_id=claim.claim_id, evaluation=ev.evaluation_id) }}" alt="Claim Summary Card given to the Teachable Machine model" width="600" height="600" loading="lazy">
             <figcaption class="tiny muted mt-1">Claim Summary Card (input to Teachable Machine). Facts only — no prediction or decision on it.</figcaption>
@@ -157,7 +157,7 @@
         {% for r in fired %}
           <div class="rule {{ r.severity }}">
             <span class="ic"><i class="bi {{ 'bi-x-lg' if r.severity == 'hard_fail' else ('bi-exclamation' if r.severity == 'manual_review' else 'bi-info') }}"></i></span>
-            <div><div class="t">{{ r.title }}</div><div class="m">{{ r.message }}</div></div>
+            <div><div class="t">{{ r.description or r.title }}</div><div class="m">{{ r.message }}</div></div>
             <span class="badge plain {{ tone('severity', r.severity) }}">{{ r.severity|replace('_', ' ') }}</span>
           </div>
         {% endfor %}

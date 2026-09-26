@@ -18,10 +18,11 @@ SEVERITY_OF_LIST = {"hard_fail_rules": "hard_fail", "manual_review_rules": "manu
 @dataclass
 class RuleResult:
     rule_id: str
-    title: str
+    title: str             # neutral check name, e.g. "Warranty in force"
     severity: str          # hard_fail | manual_review | warning
     fired: bool
     message: str
+    description: str = ""  # what it means when the rule fires, e.g. "Claim filed after the warranty ... ended"
 
 
 @dataclass
@@ -218,5 +219,6 @@ def evaluate(facts: dict) -> RuleReport:
     for list_name, severity in SEVERITY_OF_LIST.items():
         for rule_id in policy.get(list_name, []):
             fired, message = CHECKS[rule_id](facts, policy)
-            report.results.append(RuleResult(rule_id, RULE_NAMES[rule_id], severity, bool(fired), message))
+            report.results.append(RuleResult(rule_id, RULE_NAMES[rule_id], severity, bool(fired), message,
+                                              RULE_CATALOG[rule_id]))
     return report

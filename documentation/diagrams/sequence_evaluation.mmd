@@ -1,0 +1,31 @@
+sequenceDiagram
+  autonumber
+  actor U as Customer
+  participant W as Claims blueprint
+  participant G as RBAC guards
+  participant D as Document service
+  participant P as Pipeline
+  participant R as Rule engine
+  participant M as Python model
+  participant T as Teachable Machine
+  participant Q as Decision table
+  participant DB as Database
+  U->>W: POST /claims/new (form + files)
+  W->>G: require("claim.create"), authorize_object(product)
+  G-->>W: allowed (own product)
+  W->>D: validate magic bytes, store, SHA-256, OCR
+  D-->>W: documents + confirmed values
+  W->>P: evaluate_claim(claim)
+  P->>P: contradictions, duplicates, feature record
+  P->>R: evaluate(facts)
+  R-->>P: hard fails / review rules / warnings
+  P->>M: predict_proba(record)
+  M-->>P: class + 3 confidences + version
+  P->>P: render Claim Summary Card (no prediction on it)
+  P->>T: predict(card)
+  T-->>P: class + 3 confidences + version (or unavailable)
+  P->>Q: decide(counts, consistency, classes)
+  Q-->>P: decision, rule id, trace
+  P->>DB: ModelEvaluation + RuleValidationLog (immutable)
+  W->>DB: status history, notifications, audit rows
+  W-->>U: redirect to claim page with explanation

@@ -1,0 +1,49 @@
+erDiagram
+  SERVICE_CENTER ||--o{ USER : "employs (staff)"
+  SERVICE_CENTER ||--o{ PRODUCT : services
+  USER ||--o{ PRODUCT : owns
+  USER ||--o{ CLAIM : files
+  USER ||--o{ NOTIFICATION : receives
+  USER ||--o{ AUDIT_LOG : acts
+  PRODUCT ||--|| PRODUCT_WARRANTY : has
+  WARRANTY_POLICY ||--o{ PRODUCT_WARRANTY : "issued under"
+  PRODUCT ||--o{ CLAIM : "claimed on"
+  PRODUCT ||--o{ REPAIR_HISTORY : "repaired"
+  PRODUCT ||--o{ CLAIM_DOCUMENT : "product files"
+  CLAIM ||--o{ CLAIM_DOCUMENT : evidence
+  CLAIM ||--o{ MODEL_EVALUATION : "evaluated (immutable)"
+  CLAIM ||--o{ RULE_VALIDATION_LOG : "rules run"
+  CLAIM ||--o{ CLAIM_STATUS_HISTORY : "moves through"
+  CLAIM ||--o{ REVIEWER_ACTION : "decided by"
+  USER {
+    string user_id
+    string email
+    string role
+    int session_version
+    int failed_logins
+    int service_center_id
+  }
+  CLAIM {
+    string claim_id
+    string status
+    string final_decision
+    string decision_rule_id
+    float diagnostic_confidence
+    string damage_type
+  }
+  MODEL_EVALUATION {
+    string evaluation_id
+    string python_model_version
+    string gtm_model_version
+    string python_predicted_class
+    string gtm_predicted_class
+    float top_confidence_difference
+    string model_consistency_status
+    string summary_card_sha256
+  }
+  CLAIM_DOCUMENT {
+    string document_id
+    string document_type
+    string file_hash_sha256
+    string ocr_status
+  }

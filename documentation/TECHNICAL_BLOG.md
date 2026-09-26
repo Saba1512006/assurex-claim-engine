@@ -1,520 +1,271 @@
-# Building AssureX: A Dual-Model Warranty Claim Evaluation System
+# Building AssureX: two models, one rulebook, and why our first 100% was a bug
+
+*How we built a warranty-claim engine that combines a Python classifier, a Google Teachable Machine image
+model and a configurable rule engine — and what we learned when our first version scored suspiciously well.*
 
-*Technical overview of machine learning, OCR, visual classification, and configurable warranty rules*
+## The business problem
+
+A warranty claim looks simple: a customer says a product broke, the manufacturer pays for the repair.
+Behind that sentence is a checklist that service centers run by hand thousands of times a month. Was the
+product bought when the customer says? Is the warranty still active, or inside its grace period? Is the
+fault covered, or is it water damage the policy excludes? Does the serial number on the unit match the
+receipt? Has someone already claimed on this invoice? Was the product opened by an unauthorised repair
+shop?
+
+Every one of those checks is easy on its own. Together they are slow, and different people apply them
+differently. The same claim can be approved on Monday and rejected on Tuesday. Fraud slips through when a
+receipt is reused for a second unit. Honest customers wait days for a decision that could have taken
+seconds. AssureX automates the first pass, explains every recommendation, and sends a claim to a human
+whenever the evidence is not clear.
+
+## Background and why it matters
+
+Warranty cost goes straight to a manufacturer's bottom line, and a badly handled claim costs a customer.
+Two properties matter more than raw accuracy: **consistency** (the same facts always get the same
+answer) and **accountability** (anyone can see why an answer was given, and who changed it). That pushed us
+towards a design where machine learning supports decisions but a readable policy stays in charge, and
+where nothing happens without leaving a record.
+
+## The proposed solution
+
+A customer — or a service-center employee helping a walk-in customer — registers a product with its
+receipt, then files a claim in four steps: pick the product, describe what happened, attach evidence,
+review. While they type, a checklist tells them what is missing, whether the reporting deadline is close,
+and whether the cause they chose is excluded for that product category.
 
-> **Engineering Whitepaper**: An architectural deep dive exploring machine learning adjudication, dual-model consensus, OCR document intelligence, and automated warranty governance across enterprise workflows.
+On submission the claim is evaluated twice, independently:
 
----
+* a **Python classification model** reads the structured claim record;
+* a **Google Teachable Machine** image model reads a picture of the same claim — the *Claim Summary Card*.
 
-## Table of Contents
-
-1. [Business Problem](#1-business-problem)
-2. [Background and Necessity](#2-background-and-necessity)
-3. [Proposed Solution](#3-proposed-solution)
-4. [Application Architecture](#4-application-architecture)
-5. [Dataset Creation](#5-dataset-creation)
-6. [Dataset Challenges](#6-dataset-challenges)
-7. [Python Model Development](#7-python-model-development)
-8. [Algorithms Compared](#8-algorithms-compared)
-9. [Google Teachable Machine Training](#9-google-teachable-machine-training)
-10. [Claim Summary Card Generation](#10-claim-summary-card-generation)
-11. [Python Integration](#11-python-integration)
-12. [Model Prediction Comparison](#12-model-prediction-comparison)
-13. [Confidence-Score Comparison](#13-confidence-score-comparison)
-14. [Warranty-Rule Design](#14-warranty-rule-design)
-15. [OCR and Document Processing](#15-ocr-and-document-processing)
-16. [Difficulties Encountered](#16-difficulties-encountered)
-17. [Model Errors](#17-model-errors)
-18. [Model Disagreement Cases](#18-model-disagreement-cases)
-19. [Testing Results](#19-testing-results)
-20. [Security Considerations](#20-security-considerations)
-21. [Limitations](#21-limitations)
-22. [Lessons Learned](#22-lessons-learned)
-23. [Future Enhancements](#23-future-enhancements)
-
----
-
-AssureX Claim Engine is a web-based system for evaluating warranty claims using structured claim data, document processing, two independent model paths, and configurable warranty rules. The project was developed around the requirements of the AssureX Software Requirements Specification. It includes three claim classes: **Valid Claim, Invalid Claim, and Manual Review**. It also compares the outputs of a Python machine learning model and a Google Teachable Machine model before applying warranty policies and making the final application decision. This article explains how the system was designed, how the dataset and models were prepared, the main problems encountered during development, and how the completed application was tested.
-
----
-
-## 1. Business Problem
-
-Warranty claim processing involves several manual steps. A support or warranty team may need to inspect invoices, verify product serial numbers, check warranty dates, review repair history, and determine whether the reported fault is covered by the policy. This process becomes more difficult when claims contain incomplete documents, inconsistent information, duplicate submissions, or cases that are close to a warranty boundary.
-
-Three common problems were identified during the design of AssureX:
-
-### 1. Manual claim processing
-A reviewer may have to inspect receipts, warranty cards, serial numbers, repair records, and other documents before reaching a decision. Repeating these checks for a large number of claims increases the amount of manual work and creates backlog delays.
-
-### 2. Inconsistent decisions
-Two claims with similar information may not always be handled in the same way when different reviewers interpret the available evidence differently. A system that follows the same validation process can help make the evaluation more consistent across different service hubs.
-
-### 3. Duplicate and policy-violating claims
-Warranty systems also need to handle repeated submissions, expired warranties, unauthorized repairs, serial mismatches, and other policy-related issues. Submitting the same invoice multiple times or claiming damage caused by uncertified third-party workshops are recurring operational issues.
-
-AssureX was designed to address these problems by combining structured data processing, machine learning, OCR, configurable rules, and human manual review.
-
----
-
-## 2. Background and Necessity
-
-A warranty system based only on fixed business rules can handle clear cases well, but it may struggle with claims that contain several variables at the same time. For example, a claim may have:
-- an active warranty,
-- a high repair cost,
-- a previous repair,
-- a missing document,
-- or information that does not completely agree across different records.
-
-On the other hand, a machine learning model can identify patterns in structured data, but it should not be the only source of the final decision. Relying solely on a black-box model creates risk when ambiguous edge cases arise.
-
-This led to the design of a **Dual-Model Consensus Architecture** in AssureX. The system uses two model paths:
-- A **Python tabular classification model** works with structured claim information.
-- A **Google Teachable Machine model** works with visual Claim Summary Cards.
-
-The system then compares the two model outputs. Warranty policies and validation checks are applied after the model comparison. Claims that do not satisfy the required conditions or show model disagreement can be routed to manual review. This approach keeps machine learning and deterministic business rules as separate parts of the overall workflow.
-
----
-
-## 3. Proposed Solution
-
-The AssureX application is built around several connected components:
-
-### 1. Document ingestion and OCR
-Users can upload invoices, warranty documents, repair records, and supporting evidence. OCR and document parsing are used to extract information such as invoice numbers, purchase dates, and serial codes so they can be checked by the application.
-
-### 2. Dual-model classification
-The application uses two independent model paths:
-- **Branch A:** Python tabular classifier (Random Forest)
-- **Branch B:** Google Teachable Machine visual classifier (MobileNet vision transfer learning)
-
-Both models classify the claim into the same three classes:
-- **Valid Claim**
-- **Invalid Claim**
-- **Manual Review**
-
-### 3. Configurable warranty policies
-Warranty rules are stored separately from application code in JSON policy files. Policies can define:
-- warranty duration,
-- grace periods,
-- reporting windows,
-- covered faults,
-- exclusions,
-- repair requirements,
-- replacement conditions,
-- mandatory documents,
-- and review triggers.
-
-### 4. Human review workbench
-Claims that require manual handling are placed in a reviewer queue. Reviewers can inspect the evidence, see the model comparison and confidence delta, and record an override decision together with an audit reason.
-
-### 5. Claim lifecycle tracking
-The application tracks claims through eight lifecycle stages:
-1. Draft
-2. Submitted
-3. Under Evaluation
-4. Additional Information Required
-5. Manual Review
-6. Approved
-7. Rejected
-8. Closed
-
-The system also generates a downloadable PDF adjudication certificate containing the decision information, cryptographic QR verification, and rule breakdown.
-
----
-
-## 4. Application Architecture
-
-The application follows a modular processing pipeline based directly on the official system architecture diagram.
-
-![Figure 1: Official 9-Stage System Architecture & Dual-Branch Consensus Pipeline (Aptech NextWave SRS Page 5)](/static/img/page-05-architecture-diagram.jpg)
-
-*Figure 1: Official 9-Stage System Architecture & Dual-Branch Consensus Pipeline (Aptech NextWave SRS Page 5).*
-
-The main idea is to keep data extraction, machine learning, model comparison, policy validation, and final decision handling as separate modules:
-1. **Intake Tier**: Captures claim attributes, product selection, and uploaded documents.
-2. **Extraction & Card Generation Tier**: Parses receipt text with regex while simultaneously generating a standardized 640x420 neutral Claim Summary Card.
-3. **Dual Model Inference Tier**: Executes Branch A (tabular model) and Branch B (Teachable Machine) concurrently.
-4. **Comparison & Rules Tier**: Evaluates prediction agreement, computes absolute confidence delta $|\Delta_{\text{conf}}|$, and verifies category JSON policy rules.
-5. **Master Decision Tier**: Assigns the final outcome (Likely Valid, Likely Invalid, or Manual Review) and directs claims to the appropriate role workbench.
-
----
-
-## 5. Dataset Creation
-
-The project uses a synthetic warranty claims dataset containing **1,500 unique records** generated using `dataset_generator/generate_dataset.py`.
-
-The dataset is balanced across the three claim classes:
-
-### 500 Valid Claim records
-- covered faults,
-- valid purchase dates within warranty terms,
-- active warranty coverage,
-- matching product serial numbers,
-- authorized service history.
-
-### 500 Invalid Claim records
-- expired warranty periods beyond grace allowances,
-- excluded damage types (liquid damage, physical drop impact),
-- unauthorized third-party modifications,
-- unsupported claims without valid purchase proof.
-
-### 500 Manual Review records
-- boundary purchase dates within grace periods,
-- missing non-critical documents,
-- minor serial number typographical differences,
-- conflicting incident descriptions requiring human assessment.
-
-The dataset was partitioned using a stratified 70/15/15 distribution:
-
-| Dataset Split | Percentage | Number of Records |
-|:---|:---:|:---:|
-| **Training Set** | 70% | 1,050 |
-| **Validation Set** | 15% | 225 |
-| **Testing Set** | 15% | 225 |
-| **Total** | **100%** | **1,500** |
-
-The same class definitions are used across the dataset files and the visual Claim Summary Cards.
-
----
-
-## 6. Dataset Challenges
-
-Creating a synthetic dataset was not only a matter of generating 1,500 rows. The records also needed to contain enough variation so that the models would not simply learn one obvious feature.
-
-### 1. Avoiding trivial separation
-Early data patterns allowed the model to rely heavily on `product_age_days`. To reduce this issue, the dataset included cases where older products could still be valid because of longer industrial policies (e.g., 36 months), while newer products could be invalid because of damage exclusions (such as liquid spill).
-
-### 2. Multiple product categories
-The dataset covers three distinct equipment categories:
-- **Consumer Electronics** (Smartphones, Laptops, Tablets, Smart TVs)
-- **Home Appliances** (Refrigerators, Washing Machines, Microwaves, Air Conditioners)
-- **Industrial Tools** (Rotary Hammers, Angle Grinders, Air Compressors, Demolition Drills)
-
-Each category has different warranty durations, cost structures, failure types, and claim conditions.
-
-### 3. Document variation
-Invoice data was also varied using different date formats (`YYYY-MM-DD`, `DD/MM/YYYY`, `MM/DD/YYYY`), merchant names, and text variations. This was useful for testing the OCR and parsing components instead of assuming that every document would follow exactly the same structure.
-
----
-
-## 7. Python Model Development
-
-The Python classification branch is implemented in `src/core/python_classifier.py`. The model receives structured claim features extracted from the application.
-
-### Feature preprocessing
-A scikit-learn `ColumnTransformer` is used for preprocessing.
-
-#### Numerical features
-The following numeric values are processed:
-- `purchase_price`
-- `claim_amount`
-- `product_age_days`
-- `remaining_warranty_days`
-- `previous_repairs_count`
-
-Missing values are median-imputed and the features are scaled using `StandardScaler`.
-
-#### Categorical features
-The following categorical fields are encoded using `OneHotEncoder(handle_unknown='ignore')`:
-- `product_category`
-- `fault_category`
-- `damage_type`
-
-Using `handle_unknown='ignore'` prevents unseen evaluator categories from breaking the preprocessing pipeline during live testing.
-
-#### Binary evidence flags
-Several boolean indicators are passed through directly:
-- `has_receipt`
-- `has_warranty_card`
-- `serial_number_match`
-- `unauthorized_repair_flag`
-- `claim_date_conflict_flag`
-
-The resulting feature pipeline is then supplied to the classification algorithms.
-
----
-
-## 8. Algorithms Compared
-
-Three supervised learning algorithms were evaluated using 5-fold stratified cross-validation on the 1,050 training records.
-
-| Algorithm | 5-Fold CV Accuracy | Test Split Accuracy | Precision (Macro) | Recall (Macro) | F1-Score (Macro) |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| **Random Forest Classifier** | **99.90%** | **100.0%** | **1.0000** | **1.0000** | **1.0000** |
-| **HistGradientBoosting** | 99.71% | 99.56% | 0.9958 | 0.9956 | 0.9956 |
-| **Multi-Layer Perceptron (MLP)** | 98.48% | 98.67% | 0.9870 | 0.9867 | 0.9867 |
-
-In the current project test run, Random Forest produced the highest measured results among the three evaluated algorithms. It showed stable decision paths, quick training, and inference latency under 5 milliseconds.
-
-The selected model was serialized and saved as `model/python_model/best_model.joblib`.
-
-*Note: These results apply to the generated project dataset and test setup used during development. They should not be interpreted as a general commercial production benchmark.*
-
----
-
-## 9. Google Teachable Machine Training
-
-The second model path uses Google Teachable Machine. Instead of using raw claim data directly, the system generates standardized Claim Summary Cards and uses those cards as visual input.
-
-- **Training Volume**: At least two visual variations were created for each training card, producing **2,100 training images**.
-- **Visual Variations**: The visual variations changed presentation details such as card margins, font sizing, background canvas appearance, spacing, and layout padding. The underlying claim information itself remained identical.
-- **Evaluation**: For evaluation, the held-out test cards were kept strictly separate from training data. In the project test run, the model recorded **100.0% accuracy** on 225 held-out test cards.
-
-The local inference runtime is implemented in `src/core/teachable_machine_classifier.py`.
-
----
-
-## 10. Claim Summary Card Generation
-
-Claim Summary Cards are generated programmatically by `src/core/card_generator.py`. The cards are rendered as 640x420 PNG images using the Python Pillow (PIL) library.
-
-A card contains information such as:
-- product metadata (name, category, serial),
-- serial status and receipt match,
-- purchase dates and incident date,
-- fault description and repair count,
-- document availability flags.
-
-**Strict Neutral Formatting**: The card does **not** contain:
-- the ground-truth claim class,
-- Python model predictions,
-- GTM model predictions,
-- or the final claim decision.
-
-This separation is important because the visual model should work from the claim information shown on the card rather than simply reading an already-written answer. The card design uses a structured typography layout so that important fields can be detected consistently by the vision model.
-
----
-
-## 11. Python Integration
-
-The Python classifier and the Teachable Machine classifier are connected through the application's comparison and decision modules:
-- `ModelComparator` (`src/core/comparator.py`)
-- `DecisionEngine` (`src/core/decision_engine.py`)
-
-When a claim is submitted:
-1. Structured claim data is prepared and fed to the Python model.
-2. A Claim Summary Card is generated in parallel.
-3. The visual card is evaluated by the Teachable Machine classifier.
-4. Both models return class probabilities across the three classes:
-   - $P(\text{Valid})$
-   - $P(\text{Invalid})$
-   - $P(\text{Manual Review})$
-5. The outputs are passed to the comparison layer.
-6. Warranty rules and other validation checks are then applied.
-
-The implementation records execution latency and performance information for the entire inference pipeline.
-
----
-
-## 12. Model Prediction Comparison
-
-The system compares the highest-probability class from each model:
-
-$$\hat{y}_{\text{py}} = \arg\max(\mathbf{P}_{\text{py}}), \quad \hat{y}_{\text{gtm}} = \arg\max(\mathbf{P}_{\text{gtm}})$$
-
-There are two primary cases:
-
-### Agreement
-If $\hat{y}_{\text{py}} = \hat{y}_{\text{gtm}}$, both models have selected the same class. The claim can continue to the warranty rule validation stage.
-
-### Disagreement
-If $\hat{y}_{\text{py}} \neq \hat{y}_{\text{gtm}}$, the system assigns the status **`Model Disagreement`**. The claim is immediately sent for manual review rather than being automatically approved. This prevents one model from overriding a conflicting result from the second model.
-
----
-
-## 13. Confidence-Score Comparison
-
-AssureX also compares the confidence associated with the top prediction from each model. The confidence difference is computed as:
-
-$$\Delta_{\text{conf}} = \left| \max(\mathbf{P}_{\text{py}}) - \max(\mathbf{P}_{\text{gtm}}) \right|$$
-
-Three configurable thresholds are defined:
-- `MIN_CONFIDENCE = 0.60`
-- `STRONG_MATCH_DIFF = 0.15`
-- `ACCEPTABLE_MATCH_DIFF = 0.30`
-
-The system uses **five consistency statuses**:
-
-1. **Strong Match**: The predicted classes match and $\Delta_{\text{conf}} \le 0.15$. High certainty alignment.
-2. **Acceptable Match**: The predicted classes match and $0.15 < \Delta_{\text{conf}} \le 0.30$. Consistent direction with minor variance.
-3. **Weak Match**: The predicted classes match but $\Delta_{\text{conf}} > 0.30$. Flagged with confidence variance warning.
-4. **Model Disagreement**: The two models predict different classes ($\hat{y}_{\text{py}} \neq \hat{y}_{\text{gtm}}$). Automated approval is barred; routed to Manual Review.
-5. **Uncertain Result**: Either model has a top-class confidence below $0.60$. This indicates that the model output is not confident enough for an automated decision.
-
-The five consistency statuses are separate from the three claim classes. The claim classes describe the classification category, while the consistency statuses describe the relationship between the two model outputs.
-
----
-
-## 14. Warranty-Rule Design
-
-Warranty rules are stored separately from the core application logic in the `policies/` directory. The project contains three configurable policy categories:
-
-### Consumer Electronics (`consumer_electronics.json`)
-- 12-month coverage duration,
-- 7-day grace period,
-- 30-day incident reporting window,
-- authorized repair center requirement.
-- *Exclusions*: liquid ingress, screen drops, uncertified disassembly.
-
-### Home Appliances (`home_appliances.json`)
-- 24-month coverage duration,
-- 14-day grace period,
-- 45-day reporting window.
-- *Exclusions*: commercial rental usage, electrical power surge damage.
-
-### Industrial Tools (`industrial_tools.json`)
-- 36-month coverage duration,
-- 14-day grace period,
-- 30-day reporting window.
-- *Exclusions*: abnormal torque overload, unauthorized motor modifications.
-
-The `WarrantyPolicyEngine` evaluates the claim using six main validation groups:
-1. **Expiry**: Validates elapsed purchase age against coverage term plus grace days.
-2. **Reporting Window**: Verifies that the fault was reported within the policy window.
-3. **Exclusions**: Checks reported damage against policy exclusion lists.
-4. **Authorized Service**: Validates repair facility history.
-5. **Serial Verification**: Checks product serial match between invoice and device.
-6. **Document Completeness**: Verifies mandatory receipt and warranty card presence.
-
-Because policies are stored as JSON files, changes can be made without altering or recompiling the Python application code.
-
----
-
-## 15. OCR and Document Processing
-
-The document-processing layer is implemented in `src/ocr/document_processor.py`. The system processes uploaded claim documents and extracts useful information:
-
-### SHA-256 fingerprinting
-Each uploaded file is hashed using cryptographic SHA-256. The resulting hash is stored and used by the duplicate detector to identify identical files appearing across different claims or user accounts.
-
-### Regex-based extraction
-Regular expressions extract structured entities from uploaded text:
-- Invoice numbers (`INV-\d{4}-\d{5}`)
-- Purchase dates (ISO and localized formats)
-- Merchant names and payment totals
-- Hardware serial numbers
-
-The extracted information is compared with the user-entered claim details to verify consistency. OCR and extraction are treated as evidence validation steps, not as the sole decision mechanism.
-
----
-
-## 16. Difficulties Encountered
-
-Several practical issues appeared during development and were resolved:
-
-### 1. Visual feature bias
-Early Claim Summary Cards contained colored status badges. The visual model started relying on those colors instead of learning from the underlying claim fields. The solution was to simplify the cards to a neutral monochrome presentation focused purely on claim data attributes.
-
-### 2. OCR layout variation
-Real-world documents do not always have the same layout. Invoices use different date formats, field alignments, or text arrangements. To handle this, the document parser uses multiple regex patterns and also includes a Python fallback parser for environments where native Tesseract binaries are not installed.
-
-### 3. Discretionary rule routing vs. hard failures
-Some cases are not suitable for an immediate automated rejection. For example, a serial mismatch might be a simple typographical error by the customer, while a claim close to the warranty boundary may warrant customer goodwill. Instead of treating every such case as an automatic failure, the application routes these cases through `review_triggers` to the reviewer queue for manual evaluation.
-
----
-
-## 17. Model Errors
-
-Testing exposed a few model-related issues that were subsequently addressed:
-
-- **False Invalid predictions on industrial claims**: High repair costs initially affected some industrial claims because cost-related features were strongly associated with rejection in the initial training splits. The addition of a normalized `claim_to_price_ratio` feature helped resolve this bias.
-- **Vision errors on dense layouts**: Some Claim Summary Cards had long fault descriptions that reduced the spacing and visibility of adjacent serial fields. In response, the card generator was adjusted to improve line spacing, vertical padding, and field separation.
-
----
-
-## 18. Model Disagreement Cases
-
-Model disagreement occurs when structured features and visual card evidence point in different directions.
-
-A demonstration scenario involves an industrial rotary hammer (Demo Case 11):
-- The claim had an active warranty, a valid receipt, and one previous repair by an uncertified service center.
-- In the recorded test run:
-  - The Python model predicted **Valid Claim (92.4% confidence)** because all core numerical metrics were healthy.
-  - The GTM model predicted **Invalid Claim (88.7% confidence)** by detecting the visual warning flag in the repair history section.
-- Because the predicted classes differed, the system assigned **`Model Disagreement`**.
-- The confidence difference was $|0.924 - 0.887| = 0.037$.
-- Even though confidence values were close, the class predictions did not match. Therefore, the Master Decision Engine barred automated approval and routed the claim to the human reviewer queue.
-
----
-
-## 19. Testing Results
-
-The project contains automated unit and integration tests under `tests/`. The current test run reports:
-- **38 automated tests** covering all 18 SRS test categories,
-- **100.0% pass rate**,
-- approximately 6 seconds execution time.
-
-The project also includes the 11 mandatory demonstration scenarios:
-1. **Valid Claim**: Smart TV with covered motherboard fault $\to$ **`Likely Valid`**.
-2. **Invalid Claim**: Phone with liquid damage $\to$ **`Likely Invalid`**.
-3. **Manual Review Claim**: Industrial hammer with borderline wear near end of term $\to$ **`Manual Review Required`**.
-4. **Expired Warranty**: Claim submitted past warranty period $\to$ **`Likely Invalid`**.
-5. **Missing Document**: Claim submitted without required invoice $\to$ **`Manual Review Required`**.
-6. **Duplicate Claim**: Repeated submission on active product serial $\to$ **`Manual Review Required`**.
-7. **Contradictory Claim**: Reported fault date occurs before purchase date $\to$ **`Manual Review Required`**.
-8. **Serial Mismatch**: Receipt serial does not match product serial $\to$ **`Manual Review Required`**.
-9. **Unauthorized Repair**: Previous repair performed by uncertified service provider $\to$ **`Manual Review Required`**.
-10. **Boundary Date**: Claim filed on day 4 of 7-day grace period $\to$ **`Manual Review Required`**.
-11. **Model Disagreement**: Python predicts Valid while GTM predicts Invalid $\to$ **`Manual Review Required`**.
-
----
-
-## 20. Security Considerations
-
-Security was implemented at both the application and data levels:
-- **Role-Based Access Control (RBAC)**: Enforced boundaries between Customer, Reviewer, Staff, and Administrator using decorators (`@login_required`, `@role_required`).
-- **SQL Injection Protection**: Database operations use SQLAlchemy ORM parameterized queries instead of manual SQL string concatenation.
-- **Template Escaping**: Jinja2 template auto-escaping prevents cross-site scripting (XSS) in user comments and reviewer notes.
-- **Password Hashing & Audit Records**: Passwords are saved using Werkzeug PBKDF2/SHA-256 password hashing. Important actions such as reviewer decisions and administrative policy updates are recorded in the immutable `AuditLog` database table.
-
----
-
-## 21. Limitations
-
-AssureX operates under several defined constraints:
-1. **Visual card input**: The Teachable Machine model evaluates generated Claim Summary Cards rather than raw photographs of defective products.
-2. **OCR limitations**: Highly distorted, handwritten, or unusual invoices require human verification in the reviewer queue.
-3. **Fixed product categories**: The current configuration covers Consumer Electronics, Home Appliances, and Industrial Tools. Adding more categories requires new JSON policy schemas.
-4. **Synthetic dataset**: The machine learning models are evaluated on the project's generated dataset; commercial deployment would require additional field testing on real warranty records.
-
----
-
-## 22. Lessons Learned
-
-Building AssureX highlighted several practical software engineering lessons:
-- **Two model paths provide an additional validation step**: Comparing tabular structured data against a visual card representation catches edge cases that a single model might miss.
-- **Explainability matters during review**: A human reviewer needs supporting factors, opposing factors, and rule details rather than a raw prediction score.
-- **Decoupled policies simplify maintenance**: Keeping warranty rules in JSON configuration files allows adjusting grace periods or exclusions without rewriting the Python engine.
-- **Dataset quality directly impacts evaluation**: Avoiding trivial features and injecting realistic noise ensures that models learn meaningful relationships.
-
----
-
-## 23. Future Enhancements
-
-Potential improvements for future versions of AssureX include:
-1. **Vision-Language Document Models**: Exploring models such as LayoutLM or Donut for deeper document parsing of complex receipts.
-2. **Active Learning**: Collecting reviewer override cases as training examples to refine model performance around difficult boundary cases.
-3. **ERP Integration**: Connecting approved claim states directly into ERP systems like SAP or Oracle NetSuite to initiate replacement part logistics.
-4. **Additional Document Formats**: Expanding document processing to support multi-page warranty contracts and service center invoices.
-
----
-
-## Conclusion
-
-AssureX Claim Engine was developed as a warranty claim evaluation system combining structured machine learning, visual classification, document OCR, configurable policies, and human review.
-
-The architecture maintains clear boundaries across:
-- **3 claim classes**: Valid Claim, Invalid Claim, Manual Review
-- **5 model-consistency statuses**: Strong Match, Acceptable Match, Weak Match, Model Disagreement, Uncertain Result
-- **8 claim lifecycle stages**: Draft, Submitted, Under Evaluation, Info Required, Manual Review, Approved, Rejected, Closed
-
-The primary takeaway from this project is that practical warranty adjudication is not simply a classification problem. A reliable system requires document verification, business rule engines, model consensus, immutable audit logging, and a dedicated human review path when automated components do not agree.
-
----
-
-### Project Links
-- **Published Live on Medium**: [https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111](https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111)
-- **Source Code Repository**: [https://github.com/sami2515/assurex-claim-engine](https://github.com/sami2515/assurex-claim-engine)
-- **Publication Record**: [`documentation/BLOG_PUBLICATION.md`](documentation/BLOG_PUBLICATION.md)
-- **Local Interactive Reader**: [http://127.0.0.1:5000/blog](http://127.0.0.1:5000/blog)
+A **rule engine** checks the category's warranty policy, and detectors look for **contradictions** and
+**duplicates**. A **decision table** combines everything into one of three recommendations: *Likely Valid*,
+*Likely Invalid* or *Manual Review Required*. Reviewers work a queue of the uncertain claims; customers
+follow their claim through eight stages; administrators get dashboards, analytics, exports and an audit
+trail.
+
+## Application architecture
+
+The application is Flask with SQLAlchemy. Requests pass through an access-control layer before they reach
+a blueprint (auth, products, claims, reviewer, admin). Blueprints call services — claim lifecycle,
+documents, notifications, alerts, analytics, exports, PDF reports — and the evaluation pipeline:
+
+1. document service (validate by magic bytes, store under a random name, SHA-256, OCR);
+2. contradiction and duplicate detectors;
+3. feature builder, producing exactly the columns the model was trained on;
+4. rule engine driven by `policies/<category>.json`;
+5. Python model → probabilities for all three classes;
+6. card renderer → Teachable Machine → probabilities for all three classes;
+7. consistency status and decision table driven by `config/decision_policy.json`.
+
+Every run writes a new, immutable evaluation row holding the inputs, both model versions (hashes of the
+model files), the card's hash, the thresholds and the decision trace. Updating a model never rewrites a
+past result.
+
+## Dataset creation
+
+The competition gives no dataset, so we generated one: 1,500 claims, 500 per class, across consumer
+electronics, home appliances and industrial tools, split 70/15/15 with stratification (1,050 / 225 / 225).
+
+Our first generator worked backwards: *pick a class, then invent a claim that looks like it*. That is the
+natural way to think about test data and it is exactly wrong for machine learning. The second generator
+works forwards, the way real claims arrive. It samples each claim's attributes from overlapping,
+realistic distributions — where in the warranty life the claim falls, how long the customer waited, what
+caused the damage, how sure the technician is, repair history, which documents were attached — with no
+knowledge of the class. Then it **derives** the label by applying the warranty policy, and flips 4% of
+labels to simulate two reviewers disagreeing. Claim IDs are assigned after shuffling.
+
+The scenarios that emerge cover what the brief asks for: normal covered defects, expired warranties,
+claims inside the grace period, excluded damage, missing documents, contradictory dates, serial
+mismatches, unauthorised repairs, repeat repairs, possible duplicates and late reporting.
+
+## Dataset challenges
+
+Three problems taught us the most.
+
+**Label leakage.** Version 1 had a column called `damage_type` whose values mapped one-to-one onto the
+class — "Hardware Defect" was always valid. Any model learned that single column and scored 100%. Worse,
+the claim IDs were ordered by class (1–500 valid), so even the ID leaked. We now run a *leakage audit*
+before training: a small decision tree is trained on each feature alone, and training stops if any single
+feature predicts the class above 90%. The best single feature today, days to expiry, reaches 53%.
+
+**Train/serve skew.** The web form offered damage types that the training data had never seen, and an
+encoder configured to "ignore unknown values" silently turned them into zeros. The model then scored claims
+it had never seen anything like. Now one vocabulary module feeds the generator, the form, the policies and
+the encoder; unknown values raise an error; and a test renders the claim form and checks that its options
+equal the training values.
+
+**Rare scenarios.** Late reporting is only 23 of 1,500 claims. The model sees few examples and misses some
+of them — which is fine, because the rule engine never misses them.
+
+## Python model development
+
+Pre-processing turns a claim into 20 features: eight numeric (price, warranty length, product age, days to
+expiry, reporting delay, diagnostic confidence, repair count, missing-document count), ten binary
+(documents present, extended warranty, serial match, unauthorised repair, duplicate invoice, date
+conflict) and two categorical (category, damage cause). Numbers are standardised for the linear model;
+categories are one-hot encoded with a fixed vocabulary. The encoder and model are saved as **one** pipeline
+file, so they can never drift apart.
+
+## Algorithms compared
+
+We compared three algorithms with stratified 5-fold cross-validation on the training set, then on the
+validation set:
+
+| Algorithm | CV macro-F1 | Validation macro-F1 |
+|---|---|---|
+| Logistic regression | 0.739 | 0.726 |
+| Random forest | 0.922 | 0.942 |
+| HistGradientBoosting | 0.913 | **0.947** |
+
+The model is chosen on **validation**; the test set is touched exactly once at the end. (Version 1 picked
+the model by its test score, which quietly turns the test set into training data.) The winner is wrapped
+in sigmoid calibration so that "80% confident" means right about 80% of the time — essential, because the
+comparison between our two models is built on those confidence values.
+
+On 225 unseen test claims the calibrated model reaches **89.3% accuracy**, macro-F1 89.2%, ROC-AUC 0.948 and
+an expected calibration error of 0.082. The SRS asks for 85%. Given the 4% label noise, the practical
+ceiling is about 96%.
+
+## Google Teachable Machine training and the Claim Summary Card
+
+The second model is an image classifier trained in the browser with Google Teachable Machine on pictures of
+claims. The card had to be redesigned before that could work.
+
+Version 1 cards were 640 × 420 landscape images full of 12-pixel text. Teachable Machine centre-crops every
+upload to a square, which cut off both side columns; and an image model cannot read small text anyway. The
+fonts also fell back to a bitmap font on the Linux server, so live cards looked different from training
+cards.
+
+Version 2 cards are 600 × 600, use fonts bundled with the application, and encode every fact as a shape in
+a fixed position: a bar for how much of the warranty is used (with a marker at the expiry date), a bar for
+the reporting delay (marker at 30 days), a bar for diagnostic confidence, filled or hatched tiles for each
+document, filled or crossed circles for serial match, date consistency, authorised repairs and invoice
+uniqueness, and rows of pips for category, damage cause and previous repairs. Text is still there, for
+humans. The card never shows a prediction, a confidence or a decision.
+
+Each training claim is drawn twice with small, label-preserving variations — background tint, date format,
+a slight rotation, blur and JPEG quality — giving 2,100 training images. Validation and test cards are
+rendered once each and never uploaded to Teachable Machine. The exported TensorFlow Lite model runs inside
+the application; if it is missing, the system says so and sends the claim to a reviewer rather than
+deciding on one model.
+
+## Python integration
+
+The web application never retrains a model and never silently falls back to a different one. The Python
+model is loaded once per process from the pipeline file; its version string embeds the file's hash. The
+feature builder that feeds it lives in the application, and the training script imports the *same* feature
+lists. If the file is missing or was pickled by an incompatible library version, the claim is still
+evaluated by the rules, the model is marked unavailable, and the claim is routed to manual review with a
+clear message.
+
+## Model prediction comparison
+
+For each claim the application shows both predicted classes side by side with all three probabilities,
+whether the classes match, and the Claim Summary Card that the image model saw. The comparison ends in one
+of five statuses. If either model's top confidence is below 0.60 the result is an **Uncertain Result**. If
+the classes differ it is a **Model Disagreement**. Otherwise the gap between the two top confidences decides:
+up to 0.10 is a **Strong Match**, up to 0.25 an **Acceptable Match**, anything larger a **Weak Match**.
+
+## Confidence-score comparison
+
+The confidence difference is |Python top confidence − Teachable Machine top confidence|. The two models are
+trained on different representations and will never agree exactly, so the thresholds absorb normal
+variation. Disagreement, uncertainty and weak matches all send the claim to manual review. All three
+thresholds live in a configuration file that administrators edit in the app, and each evaluation stores the
+thresholds it used.
+
+## Warranty-rule design
+
+Each product category has a JSON policy: coverage length, standard and extended terms, grace period,
+reporting deadline, covered faults, excluded damage causes, how sure a technician must be to confirm an
+exclusion, repeat-repair threshold, repair and replacement conditions, mandatory and supporting documents,
+and three lists of rules — hard-fail, manual-review and warning. The engine knows sixteen checks. Which
+list a check is in decides its severity; a check in no list is switched off.
+
+The final decision is a table read top to bottom, first match wins: a hard-fail rule makes a claim *Likely
+Invalid*; contradictions, duplicates, a missing mandatory document, model disagreement or uncertainty, or a
+manual-review rule make it *Manual Review Required*; only then do the two models decide — both Invalid gives
+*Likely Invalid*, both Valid gives *Likely Valid*; anything else goes to a reviewer. Changing the decision
+logic, adding an exclusion or moving a threshold is a configuration edit, not a code change — which is what
+the competition's "surprise modification" round asks for, and each of those modifications has a test.
+
+## OCR and document processing
+
+Receipts are read with pdfplumber (text PDFs) and Tesseract (photos and scans). We extract invoice number,
+purchase date, product name, model, serial number, retailer, amount and warranty length with labelled
+patterns only. The first version also compared text against hard-coded lists of known retailers and
+products — it worked beautifully on our demo receipts and would have failed on any hidden test receipt, so
+it is gone. Identifiers must contain a digit, so the word "Invoice" is never mistaken for an invoice
+number. Every extracted value is shown to the user, who confirms or corrects it; corrections are audited.
+Files are validated by their first bytes, not their extension: a text file renamed to `.png` is refused.
+
+## Difficulties encountered
+
+* Writing a generator that does **not** know the answer was harder than writing one that does.
+* Making image-model inputs model-friendly meant designing a picture for a neural network, not a person.
+* Keeping one vocabulary across form, dataset, model, policies and cards required a test that renders the
+  form.
+* Access control for four roles needed record scope, not just role checks: a service-center employee must
+  see their own center's claims and nothing else, and a reviewer must not approve a claim they filed.
+
+## Model errors
+
+On the test split the Python model's weakest spot is Invalid claims predicted as Manual Review (8 of 75).
+Of the 14 Invalid claims it misses, 5 are late-reporting cases (rare in training), 4 carry deliberately
+flipped labels, 3 are excluded-damage claims with a diagnosis right at the threshold, and 2 sit on the
+expiry boundary. Every one of those is a hard-fail rule in the policy, so the rule engine still rejects them
+correctly. That is the point of combining a model with rules: the model generalises, the rules guarantee.
+
+## Model disagreement cases
+
+Disagreement is information, not failure. When the two models disagree the claim goes to a reviewer, who
+sees both predictions, every rule result and the evidence on one page. As a design check we simulated an
+image model that always agrees with the Python model: the rules and decision table then map 93% of test
+claims to their labelled class, and two-thirds of the remaining differences are the noisy labels. The
+measured comparison with the real Teachable Machine model is produced by one script
+(`reports/generate_comparison_report.py`) as soon as the export is installed.
+
+## Testing results
+
+192 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
+period, the reporting deadline ±1 day, the exclusion threshold), contradiction and duplicate detection,
+OCR patterns, upload validation, both model runtimes, all five consistency statuses, the eleven
+demonstration cases from the competition brief, full HTTP journeys from registration to approval, and the
+security controls below. We also render every page for every role and take browser screenshots on desktop
+and phone widths.
+
+## Security considerations
+
+Access is denied by default. Each role holds a list of permissions, each permission a scope — own records,
+own service center, the review queue, or everything — and each action passes business constraints:
+reviewers cannot decide claims they filed, claims move only along allowed transitions, overriding the
+automated recommendation needs a written reason, and administrators cannot demote themselves or the last
+administrator. A record outside your scope returns "not found", so identifiers cannot be probed. Users are
+reloaded from the database on every request; a role change or disabled account signs them out everywhere.
+Sign-in errors never reveal whether an email exists, five failures lock the account, forms carry CSRF
+tokens, and the Content-Security-Policy forbids inline and third-party scripts. Every sensitive action —
+including blocked access attempts — goes to an append-only audit log.
+
+## Limitations
+
+The dataset is synthetic; real claims will need retraining and recalibration. The Teachable Machine model
+must be trained in the browser and re-exported whenever the card design changes. Image OCR depends on
+Tesseract being installed on the server. Duplicate text detection is lexical, not semantic. SQLite suits a
+single server; larger deployments should move to PostgreSQL.
+
+## Lessons learned
+
+* **Distrust a perfect score.** 100% accuracy on generated data is almost always leakage.
+* **Select on validation, report on test, once.**
+* **Calibrate before you compare confidences** between two models.
+* **One vocabulary everywhere**, enforced by tests, prevents the quietest bugs.
+* **Rules and models are partners.** Models generalise; rules guarantee the policy; the decision table makes
+  their relationship explicit and editable.
+* **Record everything**, including the model versions that produced each answer.
+
+## Future enhancements
+
+Retraining on real claims with drift monitoring; learning from reviewer overrides; image-based damage
+detection on customer photos; semantic duplicate detection; email and SMS notifications; an API for
+service-center systems; and multi-manufacturer tenancy.

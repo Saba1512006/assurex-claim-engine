@@ -1,0 +1,24 @@
+flowchart LR
+  CU(["Customer"])
+  ST(["Service-center staff"])
+  RV(["Claim reviewer"])
+  AD(["Administrator"])
+  subgraph System["AssureX Claim Engine"]
+    U1(["Register / sign in"])
+    U2(["Register product &amp; warranty"])
+    U3(["Upload receipt · confirm OCR values"])
+    U4(["File claim &amp; upload evidence"])
+    U5(["Track claim · receive alerts"])
+    U6(["Record repair"])
+    U7(["Work review queue"])
+    U8(["Approve / reject / request info / override"])
+    U9(["Manage policies &amp; thresholds"])
+    U10(["Manage users &amp; roles"])
+    U11(["Install &amp; evaluate models"])
+    U12(["View dashboards · export data · audit trail"])
+    U13(["Download claim report"])
+  end
+  CU --- U1 & U2 & U3 & U4 & U5 & U13
+  ST --- U1 & U2 & U4 & U6 & U13
+  RV --- U1 & U7 & U8 & U13
+  AD --- U1 & U9 & U10 & U11 & U12 & U13

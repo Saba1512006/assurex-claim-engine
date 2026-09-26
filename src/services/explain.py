@@ -55,7 +55,7 @@ def summarise(claim) -> dict:
     ]
     issues = []
     if log:
-        issues += [r["title"] for r in log.of("hard_fail")]
+        issues += [r.get("description") or r["title"] for r in log.of("hard_fail") + log.of("manual_review")]
         issues += [c["message"] for c in log.contradictions][:2]
         issues += [d["message"] for d in log.duplicate_flags][:2]
     if ev:
@@ -93,7 +93,7 @@ def explain(claim) -> dict:
         for r in log.rules:
             (failed if r["fired"] else passed).append(r)
         for r in failed:
-            oppose.append(f"{r['title']}: {r['message']}")
+            oppose.append(r["message"])
         if not failed:
             support.append("Every enabled warranty rule passed.")
         if not log.contradictions:

@@ -1,0 +1,27 @@
+flowchart TD
+  S((Start)) --> A1["Choose registered product"]
+  A1 --> A2["Enter fault, cause, date, description"]
+  A2 --> A3["Upload receipt and evidence"]
+  A3 --> A4{"Receipt readable?"}
+  A4 -- "yes" --> A5["Show extracted values; user confirms or corrects"]
+  A4 -- "no / OCR unavailable" --> A6["User types the details"]
+  A5 --> A7["Readiness checklist"]
+  A6 --> A7
+  A7 --> A8{"Submit or save draft?"}
+  A8 -- "draft" --> E1((Draft saved))
+  A8 -- "submit" --> B1["Submitted → Under Evaluation"]
+  B1 --> B2["Detect contradictions &amp; duplicates"]
+  B2 --> B3["Build features · run rules"]
+  B3 --> B4["Python model"]
+  B3 --> B5["Render card → Teachable Machine"]
+  B4 --> B6["Consistency status"]
+  B5 --> B6
+  B6 --> B7{"Decision table"}
+  B7 -- "Likely Valid" --> C1["Approved"]
+  B7 -- "Likely Invalid" --> C2["Rejected"]
+  B7 -- "Manual Review Required" --> C3["Manual Review queue"]
+  C3 --> C4{"Reviewer"}
+  C4 -- "approve / reject" --> C5["Approved / Rejected (override needs reason)"]
+  C4 -- "request info" --> C6["Additional Information Required"]
+  C6 --> A3
+  C1 & C2 & C5 --> C7["Closed"] --> E2((End))
