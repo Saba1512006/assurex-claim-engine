@@ -204,7 +204,7 @@ assurex-claim-engine/
 ## Technical Blog
 
 - **Medium Link:** [https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111](https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111)
-- **Local Copy:** [`documentation/TECHNICAL_BLOG.md`](file:///c:/Users/sami/Desktop/techwiz%207/documentation/TECHNICAL_BLOG.md)
+- **Local Copy:** [`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md)
 
 ---
 

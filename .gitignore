@@ -11,26 +11,11 @@ env/
 ENV/
 .env
 
-# Uploads cache (keep directory, ignore runtime temporary uploads)
+# Runtime temporary uploads
 data/uploads/*
 !data/uploads/.gitkeep
-
-# Large training and validation images cache (keep test sample cards for evaluation)
-data/summary_cards/train/
-data/summary_cards/val/
 
 # Operating System files
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Local reference & scratch files
-*_assets/
-*_PROMPT.txt
-*_USAGE.md
-*_PAGE_BY_PAGE.md
-*_SRS.pdf
-generate_project_report_pdf.py
-reports/generate_project_report_pdf.py
-/page-05-architecture-diagram.jpg
-static/img/logo2 - Copy.png

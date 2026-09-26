@@ -30,7 +30,7 @@ The AssureX Claim Engine verification framework enforces exhaustive quality assu
 
 ## 2. 18-Category Formal Test Matrix (SRS Section 3.3, Pages 30–31)
 
-Each test case below is automated within [`tests/test_srs_18_categories.py`](file:///c:/Users/sami/Desktop/techwiz%207/tests/test_srs_18_categories.py) and can be executed via `python -m unittest tests/test_srs_18_categories.py`.
+Each test case below is automated within [`tests/test_srs_18_categories.py`](tests/test_srs_18_categories.py) and can be executed via `python -m unittest tests/test_srs_18_categories.py`.
 
 | ID | Test Category | Test Case Objective | Input / Pre-conditions | Expected Result | Actual Result | Status |
 |:---|:---|:---|:---|:---|:---|:---:|
@@ -57,7 +57,7 @@ Each test case below is automated within [`tests/test_srs_18_categories.py`](fil
 
 ## 3. Mandatory 11 Demonstration Scenarios (SRS Section 3.3, Page 31)
 
-Automated within [`tests/test_srs_demonstration_cases.py`](file:///c:/Users/sami/Desktop/techwiz%207/tests/test_srs_demonstration_cases.py), asserting exact business rules and system decisions.
+Automated within [`tests/test_srs_demonstration_cases.py`](tests/test_srs_demonstration_cases.py), asserting exact business rules and system decisions.
 
 ```
 +--------------------------------------------------------------------------------------------------+
@@ -163,8 +163,8 @@ Automated within [`tests/test_srs_demonstration_cases.py`](file:///c:/Users/sami
 
 Adhering strictly to SRS Section 3.2, 36 completely unseen test claims across all 3 product categories and claim classes were evaluated side-by-side.
 
-- **Full CSV Dataset:** [`reports/model_comparison_report.csv`](file:///c:/Users/sami/Desktop/techwiz%207/reports/model_comparison_report.csv) (Exact 21-column schema)
-- **Detailed Markdown Report:** [`reports/model_comparison_report.md`](file:///c:/Users/sami/Desktop/techwiz%207/reports/model_comparison_report.md)
+- **Full CSV Dataset:** [`reports/model_comparison_report.csv`](reports/model_comparison_report.csv) (Exact 21-column schema)
+- **Detailed Markdown Report:** [`reports/model_comparison_report.md`](reports/model_comparison_report.md)
 
 ### 21-Column Adjudication Schema
 1. `claim_id`

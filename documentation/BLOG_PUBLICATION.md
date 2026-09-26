@@ -15,7 +15,7 @@
 | **Author** | Muhammad Sami &middot; AssureX Engineering Team |
 | **Publication Date** | September 2026 |
 | **Official Word Count** | **3,794+ Words** *(Exceeds mandatory $\ge 2,000$ words requirement)* |
-| **Local Source File** | [`documentation/TECHNICAL_BLOG.md`](file:///c:/Users/sami/Desktop/techwiz%207/documentation/TECHNICAL_BLOG.md) |
+| **Local Source File** | [`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md) |
 | **In-App Reader Route**| `http://127.0.0.1:5000/blog` |
 
 ---
@@ -55,7 +55,7 @@ Per SRS Section 1.10 (Deliverable 14, Page 35–36), the technical blog covers a
 ## 🚀 Publishing Instructions for Team Members
 
 To republish or update the live blog on Medium or another free blogging platform:
-1. Open the in-app blog at `http://127.0.0.1:5000/blog` and click **"Copy Markdown for Medium / Blogger"**, or copy directly from [`documentation/TECHNICAL_BLOG.md`](file:///c:/Users/sami/Desktop/techwiz%207/documentation/TECHNICAL_BLOG.md).
+1. Open the in-app blog at `http://127.0.0.1:5000/blog` and click **"Copy Markdown for Medium / Blogger"**, or copy directly from [`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md).
 2. Log into your [Medium](https://medium.com/) or [Blogger](https://blogger.com/) account.
 3. Create a **New Story** and paste the formatted article.
 4. Add tags: `Machine Learning`, `Artificial Intelligence`, `Computer Vision`, `Python`, `Document Ops`.
