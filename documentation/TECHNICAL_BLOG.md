@@ -137,12 +137,21 @@ upload to a square, which cut off both side columns; and an image model cannot r
 fonts also fell back to a bitmap font on the Linux server, so live cards looked different from training
 cards.
 
-Version 2 cards are 600 × 600, use fonts bundled with the application, and encode every fact as a shape in
-a fixed position: a bar for how much of the warranty is used (with a marker at the expiry date), a bar for
-the reporting delay (marker at 30 days), a bar for diagnostic confidence, filled or hatched tiles for each
-document, filled or crossed circles for serial match, date consistency, authorised repairs and invoice
-uniqueness, and rows of pips for category, damage cause and previous repairs. Text is still there, for
-humans. The card never shows a prediction, a confidence or a decision.
+Version 2 cards are 600 × 600 and use fonts bundled with the application. They drew every fact as a small
+grey shape in a fixed position: bars for warranty life, reporting delay and diagnostic confidence, hatched
+tiles for missing documents, pips for category and damage cause. It looked tidy and it failed: the real
+Teachable Machine model trained on those cards scored 54.2% on the test cards. Teachable Machine does not
+retrain the image network; it puts a small classifier on top of frozen ImageNet features, and at 224 × 224
+pixels thin grey bars look nearly the same whatever their length. We rebuilt Teachable Machine's trainer
+offline (`notebooks/tm_replica_check.py`) and it reproduced the failure (58–66%), which told us the card,
+not the training run, was the problem.
+
+Version 3 shows each fact against its policy limit as one of nine large tiles in a fixed 3 × 3 grid —
+coverage, reporting time, damage cause, receipt, supporting evidence, serial number, dates, invoice and
+repairs. A tile's colour and glyph change with the fact (within coverage, grace period or coverage ended;
+reported in time or late; covered or excluded cause), and a colour band shows the category. The same
+replica now scores 92.9–94.2% on the test cards. Text is still there, for humans. The card never shows a
+prediction, a confidence, a rule outcome or a decision.
 
 Each training claim is drawn twice with small, label-preserving variations — background tint, date format,
 a slight rotation, blur and JPEG quality — giving 2,100 training images. Validation and test cards are

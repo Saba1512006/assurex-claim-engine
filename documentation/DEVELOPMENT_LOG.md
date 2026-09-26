@@ -41,6 +41,16 @@ Earlier days are in the Git history; team members should add their own entries b
 - 192 automated tests passing; every page rendered for all four roles; browser screenshots desktop/mobile;
   seed run submitting the 11 demonstration claims through the live pipeline.
 
+**Teachable Machine, first run (card v2)**
+- Trained in the browser on the 2,100 v2 cards (epochs 50, batch 16, learning rate 0.001) and installed
+  as `gtm-ec95b4aa49b5`. Test accuracy 54.2% (validation 52.9%, macro F1 45.1%): below the 85% target.
+- The TensorFlow 2.20 package on Windows no longer ships `tf.lite.Interpreter`; the runtime uses
+  `ai-edge-litert`, which installed fine on Windows.
+- Root cause found with an offline replica of Teachable Machine's trainer (`notebooks/tm_replica_check.py`):
+  frozen MobileNet features cannot separate the v2 card's thin grey shapes (replica 58–66%).
+- Card redesigned (v3, policy-relative colour tiles); replica test accuracy 92.9–94.2%. Training cards
+  regenerated; the browser model must be retrained on them.
+
 **Open items**
 - Train and install the Teachable Machine model; run `notebooks/evaluate_gtm.py` and
   `reports/generate_comparison_report.py`; record results in `documentation/GTM_EVIDENCE.md`.

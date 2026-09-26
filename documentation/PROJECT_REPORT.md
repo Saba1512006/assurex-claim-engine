@@ -148,7 +148,7 @@ plus a file store for documents and cards.
 | `src/core/vocab.py` | Single vocabulary: categories, damage types, faults, classes, document types, date formats |
 | `src/core/features.py` | Pre-processing and feature engineering for a stored claim |
 | `src/core/python_classifier.py` | Loads the versioned sklearn pipeline; never retrains itself |
-| `src/core/card_v2.py` | Deterministic 600×600 card renderer with bundled fonts |
+| `src/core/card_v2.py` | Deterministic 600×600 card renderer (v3 tile design) with bundled fonts |
 | `src/core/gtm_classifier_v2.py` | Teachable Machine TFLite runtime, label parsing, version hashing |
 | `src/core/consistency.py`, `decision_table.py` | Five statuses; first-match decision table with validation and safe saving |
 | `src/core/pipeline.py` | Orchestration and immutable persistence of each evaluation |
@@ -222,10 +222,10 @@ as one pipeline artefact with its feature list and library version. Full evidenc
 ## 21. Google Teachable Machine model design
 
 Standard image model trained on 2,100 Claim Summary Cards (700 per class; two variations of each training
-claim), exported as TensorFlow Lite. The card encodes every feature visually in a fixed position — bars for
-warranty life, reporting delay and diagnosis; filled/hatched tiles for documents; filled/crossed circles for
-integrity signals; pips for category, damage cause and previous repairs — because an image model cannot
-read small text. Procedure and status: `documentation/GTM_EVIDENCE.md`.
+claim), exported as TensorFlow Lite. The card (v3) shows each claim fact against its policy limit as one of
+nine large colour-and-glyph tiles in a fixed 3 × 3 grid (coverage, reporting time, damage cause, receipt,
+supporting evidence, serial, dates, invoice, repairs), because Teachable Machine classifies with frozen
+ImageNet features and cannot read small text. Procedure and status: `documentation/GTM_EVIDENCE.md`.
 
 ## 22. Dataset description
 
