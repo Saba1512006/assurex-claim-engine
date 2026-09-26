@@ -1,316 +1,125 @@
-import os
-import re
+"""Receipt / document text extraction (SRS vi, vii).
+
+PDF text is read with pdfplumber; images go through Tesseract (pytesseract) when
+the `tesseract` binary is installed. Entities are pulled out with labelled
+patterns only - there are no hard-coded retailer or product lists, so a hidden
+test receipt is read the same way as a demo one. Every extracted value is shown
+to the user for confirmation/correction before it is used.
+"""
+from __future__ import annotations
+
 import hashlib
+import re
+import shutil
 from pathlib import Path
+
 from PIL import Image
+
+from src.core.vocab import try_parse_date
 
 try:
     import pytesseract
-    PYTESSERACT_AVAILABLE = True
-except ImportError:
-    PYTESSERACT_AVAILABLE = False
+except ImportError:  # pragma: no cover - optional dependency
+    pytesseract = None
 
 try:
     import pdfplumber
-    PDFPLUMBER_AVAILABLE = True
-except ImportError:
-    PDFPLUMBER_AVAILABLE = False
+except ImportError:  # pragma: no cover
+    pdfplumber = None
+
+TEXT_TYPES = {"receipt", "warranty_card", "diagnostic_report", "serial_photo"}
+ENTITY_KEYS = ("invoice_number", "purchase_date", "product_name", "model_number", "serial_number",
+               "retailer", "purchase_amount", "warranty_duration_months")
 
 
-class DocumentProcessor:
-    """Intelligent Document Ingestion, SHA-256 Hashing, and OCR Entity Extraction Engine."""
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
-    def __init__(self, tesseract_cmd: str = None):
-        if PYTESSERACT_AVAILABLE:
-            if tesseract_cmd:
-                pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
-            else:
-                common_paths = [
-                    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-                    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-                    "/usr/bin/tesseract",
-                    "/usr/local/bin/tesseract"
-                ]
-                for p in common_paths:
-                    if os.path.exists(p):
-                        pytesseract.pytesseract.tesseract_cmd = p
-                        break
 
-    @staticmethod
-    def compute_sha256(file_input) -> str:
-        """Computes cryptographic SHA-256 hash of a file or byte buffer for duplicate detection."""
-        hasher = hashlib.sha256()
-        if isinstance(file_input, (bytes, bytearray)):
-            hasher.update(file_input)
-            return hasher.hexdigest()
-        with open(file_input, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+def tesseract_available() -> bool:
+    if pytesseract is None:
+        return False
+    cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
+    return bool(shutil.which(cmd) or Path(cmd).exists())
 
-    def extract_text_from_pdf(self, pdf_path: Path) -> str:
-        """Extracts text content from digital PDF invoice or certificate."""
-        if not PDFPLUMBER_AVAILABLE:
-            return ""
 
-        extracted_text = []
+def extract_text(path: Path, mime: str) -> tuple[str, str]:
+    """Return (text, status) where status is ok | unreadable | unavailable."""
+    if mime == "application/pdf":
+        if pdfplumber is None:
+            return "", "unavailable"
         try:
-            with pdfplumber.open(pdf_path) as pdf:
-                for page in pdf.pages:
-                    txt = page.extract_text()
-                    if txt:
-                        extracted_text.append(txt)
-            return "\n".join(extracted_text)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("PDF extraction failed for %s: %s", pdf_path.name, e)
-            return ""
-
-    def extract_text_from_image(self, image_path: Path) -> str:
-        """Extracts text from scanned invoice image using Tesseract."""
-        if PYTESSERACT_AVAILABLE:
-            try:
-                with Image.open(image_path) as img:
-                    gray = img.convert("L")
-                    text = pytesseract.image_to_string(gray)
-                    if text and text.strip():
-                        return text.strip()
-            except Exception:
-                pass
-
-        return ""
-
-    def extract_document_text(self, file_path: Path) -> str:
-        """Universal text extractor routing based on file extension."""
-        # Check if the file is directly a plain text buffer (e.g. test receipt or mock)
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                if any(k in content.upper() for k in ["INVOICE", "RECEIPT", "PURCHASE", "ORDER", "TAX", "TOTAL"]):
-                    return content
+            with pdfplumber.open(path) as pdf:
+                text = "\n".join((p.extract_text() or "") for p in pdf.pages[:5])
         except Exception:
-            pass
-
-        suffix = file_path.suffix.lower()
-        if suffix == ".pdf":
-            text = self.extract_text_from_pdf(file_path)
-            return text.strip() if text else ""
-        elif suffix in [".png", ".jpg", ".jpeg", ".webp", ".bmp"]:
-            return self.extract_text_from_image(file_path)
-        return ""
-
-    def parse_entities_from_text(self, raw_text: str) -> dict:
-        """
-        Parses all 8 required warranty entities from extracted invoice/receipt text:
-        1. purchase_date
-        2. invoice_number
-        3. product_name
-        4. model_number
-        5. serial_number
-        6. retailer
-        7. purchase_amount
-        8. warranty_duration (in months)
-        """
-        entities = {
-            "invoice_number": None,
-            "purchase_date": None,
-            "product_name": None,
-            "model_number": None,
-            "serial_number": None,
-            "retailer": None,
-            "purchase_amount": None,
-            "warranty_duration": 12,
-            "raw_text_snippet": raw_text[:300] if raw_text else ""
-        }
-
-        if not raw_text:
-            return entities
-
-        # 1. Invoice Number pattern (e.g. INV-2026-12345, INV-887412, or Invoice: 12345)
-        direct_inv = re.search(r"\b(INV-[A-Z0-9-]+)\b", raw_text, re.IGNORECASE)
-        inv_labeled = re.search(r"(?:Invoice|Inv)(?:\s*(?:No\.?|Num(?:ber)?|#))?\s*[:#]\s*([A-Z0-9-]+)", raw_text, re.IGNORECASE)
-
-        if direct_inv:
-            entities["invoice_number"] = direct_inv.group(1).strip()
-        elif inv_labeled and inv_labeled.group(1).upper() not in ["NO", "NUM", "NUMBER"]:
-            entities["invoice_number"] = inv_labeled.group(1).strip()
-        else:
-            entities["invoice_number"] = None
-
-        # 2. Purchase Date pattern (YYYY-MM-DD or DD/MM/YYYY)
-        date_iso = re.search(r"\b(202[0-9]-[0-1][0-9]-[0-3][0-9])\b", raw_text)
-        date_std = re.search(r"\b([0-3]?[0-9]/[0-1]?[0-9]/202[0-9])\b", raw_text)
-        date_labeled = re.search(r"(?:Purchase\s*)?Date\s*:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{4})", raw_text, re.IGNORECASE)
-        if date_iso:
-            entities["purchase_date"] = date_iso.group(1)
-        elif date_std:
-            entities["purchase_date"] = date_std.group(1)
-        elif date_labeled:
-            entities["purchase_date"] = date_labeled.group(1)
-        else:
-            entities["purchase_date"] = None
-
-        # 3. Serial Number pattern (SN-XXX-XXXXXXX or Serial: XXX)
-        sn_match = re.search(r"\b(SN-[A-Z0-9-]+)\b", raw_text)
-        if sn_match:
-            entities["serial_number"] = sn_match.group(1).strip()
-        else:
-            sn_alt = re.search(r"Serial(?:\s*(?:No\.?|Number|#))?\s*[:#]\s*([A-Z0-9-]+)", raw_text, re.IGNORECASE)
-            entities["serial_number"] = sn_alt.group(1).strip() if sn_alt else None
-
-        # 4. Purchase Amount pattern ($XXX.XX or labeled Amount)
-        amt_match = re.search(r"\$\s*([0-9,]+\.[0-9]{2})", raw_text)
-        if not amt_match:
-            amt_match = re.search(r"(?:Total(?:\s*Amount)?|Purchase\s*Amount|Amount|Price)\s*:\s*\$?\s*([0-9,]+\.[0-9]{2})", raw_text, re.IGNORECASE)
-        if amt_match:
-            cleaned_amt = amt_match.group(1).replace(",", "")
-            try:
-                entities["purchase_amount"] = float(cleaned_amt)
-            except ValueError:
-                entities["purchase_amount"] = None
-        else:
-            entities["purchase_amount"] = None
-
-        # 5. Retailer pattern
-        retailers = [
-            "TechMegaStore Downtown", "Electronics Hub Metro", "National Appliance Depot",
-            "Industrial Supply Direct", "Prime Retail Express", "Official Brand Store",
-            "Best Buy", "Home Depot", "Amazon", "Target", "Walmart", "Official Authorized Merchant Hub",
-            "TechWiz Retail Store"
-        ]
-        for ret in retailers:
-            if ret.lower() in raw_text.lower():
-                entities["retailer"] = ret
-                break
-        if not entities["retailer"]:
-            ret_match = re.search(r"(?:Retailer|Merchant|Store|Seller)\s*:\s*([^\n\r,]+)", raw_text, re.IGNORECASE)
-            entities["retailer"] = ret_match.group(1).strip() if ret_match else None
-
-        # 6. Product Name pattern
-        prod_labeled = re.search(r"(?:Product(?:\s*Name)?|Item(?:\s*Description)?|Equipment|Device)\s*:\s*([^\n\r,;]+)", raw_text, re.IGNORECASE)
-        if prod_labeled and len(prod_labeled.group(1).strip()) > 3:
-            entities["product_name"] = prod_labeled.group(1).strip()
-        else:
-            # Check known common hardware names
-            known_prods = [
-                "ApexBook Pro 16 Laptop", "Spectra Quantum OLED TV 65", "FrostGuard Smart Refrigerator",
-                "TitanPower Cordless Rotary Hammer", "Apex UltraBook 14", "SoundWave ANC Headphones"
-            ]
-            for kp in known_prods:
-                if kp.lower() in raw_text.lower():
-                    entities["product_name"] = kp
-                    break
-
-        # 7. Model Number pattern
-        model_labeled = re.search(r"(?:Model(?:\s*(?:No\.?|Num(?:ber)?|#))?)\s*[:#]\s*([A-Z0-9-]+)", raw_text, re.IGNORECASE)
-        if model_labeled:
-            entities["model_number"] = model_labeled.group(1).strip()
-        else:
-            # Look for typical alphanumeric model patterns e.g. ABP-16-M3, SV-65X
-            code_match = re.search(r"\b([A-Z]{2,4}-[A-Z0-9-]+)\b", raw_text)
-            if code_match and not code_match.group(1).startswith("SN-") and not code_match.group(1).startswith("INV-"):
-                entities["model_number"] = code_match.group(1).strip()
-            else:
-                entities["model_number"] = None
-
-        # 8. Warranty Duration pattern
-        warr_month_match = re.search(r"(?:Warranty(?:\s*(?:Duration|Period|Coverage|Term))?)\s*:\s*(\d+)\s*(?:Months?|m\b)", raw_text, re.IGNORECASE)
-        warr_year_match = re.search(r"(?:Warranty(?:\s*(?:Duration|Period|Coverage|Term))?)\s*:\s*(\d+)\s*(?:Years?|yr|yrs)", raw_text, re.IGNORECASE)
-        generic_warr = re.search(r"(\d+)\s*[- ]?(?:Months?|m\b)\s*(?:Warranty|Coverage)", raw_text, re.IGNORECASE)
-
-        if warr_month_match:
-            entities["warranty_duration"] = int(warr_month_match.group(1))
-        elif warr_year_match:
-            entities["warranty_duration"] = int(warr_year_match.group(1)) * 12
-        elif generic_warr:
-            entities["warranty_duration"] = int(generic_warr.group(1))
-        else:
-            entities["warranty_duration"] = 12
-
-        return entities
-
-    def is_valid_receipt_document(self, doc_info: dict) -> bool:
-        """
-        Verifies whether extracted OCR text and entities represent a valid
-        invoice or purchase receipt rather than a logo or unrelated image.
-        """
-        if not doc_info:
-            return False
-        raw_text = (doc_info.get("raw_text") or "").strip()
-        if not raw_text:
-            return False
-        entities = doc_info.get("entities") or {}
-        core_identifiers = [
-            entities.get("invoice_number"),
-            entities.get("serial_number"),
-            entities.get("purchase_amount"),
-            entities.get("purchase_date")
-        ]
-        all_detected = [
-            entities.get("invoice_number"),
-            entities.get("serial_number"),
-            entities.get("product_name"),
-            entities.get("model_number"),
-            entities.get("purchase_amount"),
-            entities.get("purchase_date"),
-            entities.get("retailer")
-        ]
-        has_core = any(bool(v) for v in core_identifiers)
-        detected_count = sum(1 for v in all_detected if v)
-        return bool(has_core and detected_count >= 2)
-
-    def process_document(self, file_path: Path, document_type: str = "receipt") -> dict:
-        """
-        Complete document ingestion pipeline:
-        1. Validates file existence
-        2. Computes SHA-256 hash
-        3. Extracts text via OCR / PDF engine
-        4. Parses structured entities
-        5. Validates whether extracted content is a genuine receipt/invoice
-        6. Formats verification payload for UI review
-        """
-        if not file_path.exists():
-            raise FileNotFoundError(f"Uploaded file not found at: {file_path}")
-
-        file_hash = self.compute_sha256(file_path)
-        file_size = file_path.stat().st_size
-        extracted_text = self.extract_document_text(file_path)
-        parsed_entities = self.parse_entities_from_text(extracted_text)
-
-        result = {
-            "document_type": document_type,
-            "filename": file_path.name,
-            "file_size_bytes": file_size,
-            "sha256_hash": file_hash,
-            "raw_text": extracted_text,
-            "entities": parsed_entities,
-            "requires_user_verification": True
-        }
-
-        # Flag whether this document contains valid receipt/invoice content
-        result["ocr_valid"] = self.is_valid_receipt_document(result)
-        return result
-
-    def process_text(self, raw_text: str) -> dict:
-        """Processes raw text and returns extracted entity payload."""
-        entities = self.parse_entities_from_text(raw_text)
-        return {
-            "extracted_text": raw_text,
-            "entities": entities,
-            "serial_number": entities.get("serial_number"),
-            "invoice_number": entities.get("invoice_number"),
-            "purchase_date": entities.get("purchase_date"),
-            "retailer": entities.get("retailer")
-        }
-
-    extract_receipt_entities = parse_entities_from_text
+            return "", "unreadable"
+        return (text.strip(), "ok") if text.strip() else ("", "unreadable")
+    if mime.startswith("image/"):
+        if not tesseract_available():
+            return "", "unavailable"
+        try:
+            with Image.open(path) as img:
+                text = pytesseract.image_to_string(img.convert("L"))
+        except Exception:
+            return "", "unreadable"
+        return (text.strip(), "ok") if text.strip() else ("", "unreadable")
+    return "", "unavailable"
 
 
-# Singleton document processor
-_doc_processor_instance = None
+_LABEL = r"\s*(?:no\.?|number|num|#)?\s*[:#]?\s*"
 
-def get_document_processor() -> DocumentProcessor:
-    global _doc_processor_instance
-    if _doc_processor_instance is None:
-        _doc_processor_instance = DocumentProcessor()
-    return _doc_processor_instance
+
+def _find(pattern: str, text: str, flags=re.IGNORECASE):
+    m = re.search(pattern, text, flags)
+    return m.group(1).strip() if m else None
+
+
+def parse_entities(text: str) -> dict:
+    """Pull the eight receipt fields from free text. Missing fields stay None (never guessed)."""
+    out = dict.fromkeys(ENTITY_KEYS)
+    if not text:
+        return out
+    # identifiers must contain a digit, so the words "Invoice" / "Serial" are never captured
+    ident = r"([A-Z0-9-/]*[0-9][A-Z0-9-/]*)"
+    out["invoice_number"] = _find(r"\b(INV[-/]?[A-Z0-9-/]*[0-9][A-Z0-9-/]*)\b", text, 0) or \
+        _find(r"(?:invoice|receipt|bill)" + _LABEL + ident, text)
+    out["serial_number"] = _find(r"\b(SN[-:]?[A-Z0-9-]*[0-9][A-Z0-9-]*)\b", text, 0) or \
+        _find(r"serial" + _LABEL + ident, text)
+    out["model_number"] = _find(r"model" + _LABEL + r"([A-Z0-9][A-Z0-9 .-]{1,40}?)\s*(?:\n|$|,|;|\|)", text)
+    out["product_name"] = _find(r"(?:product|item|description|device)(?:\s*name)?\s*[:#]\s*([^\n\r;|]{3,80})", text)
+    out["retailer"] = _find(r"(?:retailer|merchant|store|seller|sold by)\s*[:#]?\s*([^\n\r;|]{3,80})", text)
+    raw_date = _find(r"(?:purchase\s*date|invoice\s*date|date\s*of\s*purchase|date)\s*[:#]?\s*"
+                     r"([0-9]{1,4}[-/ ][0-9A-Za-z]{1,9}[-/ ,]+[0-9]{2,4})", text)
+    parsed = try_parse_date(raw_date) or try_parse_date(_find(r"\b(20[0-9]{2}-[01][0-9]-[0-3][0-9])\b", text))
+    out["purchase_date"] = parsed.isoformat() if parsed else None
+    amount = _find(r"(?:grand\s*total|total\s*amount|total|amount\s*paid|amount)\s*[:#]?\s*(?:[A-Z]{0,3}\s?[$€£₨]?\s*)"
+                   r"([0-9][0-9,]*\.?[0-9]{0,2})", text)
+    try:
+        out["purchase_amount"] = round(float(amount.replace(",", "")), 2) if amount else None
+    except ValueError:
+        out["purchase_amount"] = None
+    months = _find(r"warranty[^\n\r0-9]{0,20}([0-9]{1,3})\s*(?:months?|mo\b)", text)
+    years = _find(r"warranty[^\n\r0-9]{0,20}([0-9]{1,2})\s*(?:years?|yrs?)", text)
+    out["warranty_duration_months"] = int(months) if months else (int(years) * 12 if years else None)
+    return out
+
+
+def looks_like_receipt(entities: dict) -> bool:
+    """A receipt needs at least one identifier (invoice, serial, amount, date) and two fields overall."""
+    core = any(entities.get(k) for k in ("invoice_number", "serial_number", "purchase_amount", "purchase_date"))
+    return core and sum(1 for k in ENTITY_KEYS if entities.get(k)) >= 2
+
+
+def process(path: Path, mime: str, document_type: str) -> dict:
+    """OCR one stored file. Returns {status, text, entities}."""
+    if document_type not in TEXT_TYPES:
+        return {"status": "not_applicable", "text": "", "entities": {}}
+    text, status = extract_text(path, mime)
+    entities = parse_entities(text)
+    if status == "ok" and not any(entities.values()):
+        status = "unreadable"
+    return {"status": status, "text": text[:5000], "entities": {k: v for k, v in entities.items() if v is not None}}

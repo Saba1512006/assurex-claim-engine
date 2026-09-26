@@ -1,0 +1,157 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import csrf, empty, doc_icon %}
+{% block title %}New claim{% endblock %}
+{% block content %}
+{% set staff = current_user.role == 'service_center_staff' %}
+<div class="page-head">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('claims.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i><span>New claim</span></div>
+    <h1>File a warranty claim</h1>
+    <p class="lede">Four short steps. We check your claim as you go and tell you what's missing before you submit.</p>
+  </div>
+</div>
+
+{% if not products %}
+  <div class="card">{{ empty('bi-box-seam', 'Register a product first', 'Claims are filed against a registered product with a warranty on file.', url_for('products.register_product'), 'Register product') }}</div>
+{% else %}
+<form id="wizard" method="post" enctype="multipart/form-data" data-wizard
+      data-prep-url="{{ url_for('claims.preparation_check') }}" data-ocr-url="{{ url_for('claims.ocr_extract') }}" novalidate>
+  {{ csrf() }}
+  <nav class="steps" aria-label="Claim steps">
+    <button type="button" data-step-btn="0" aria-current="step"><b>1</b>Product</button>
+    <button type="button" data-step-btn="1"><b>2</b>What happened</button>
+    <button type="button" data-step-btn="2"><b>3</b>Evidence</button>
+    <button type="button" data-step-btn="3"><b>4</b>Review &amp; submit</button>
+  </nav>
+
+  <div class="split mt-3">
+    <div>
+      <!-- 1 product -->
+      <section class="card wizard-step active" data-step="0">
+        <div class="card-h"><h2>Which product is it?</h2><span class="hint">Only products with a warranty on file are listed.</span></div>
+        <div class="card-b tiles" role="radiogroup" aria-label="Product">
+          {% for p in products %}
+            {% set w = p.warranty %}
+            <label class="tile" style="cursor:pointer">
+              <div class="row between">
+                <span class="row"><input type="radio" name="product_id" value="{{ p.product_id }}" required {{ 'checked' if (form.get('product_id') or selected) == p.product_id }}>
+                  <b>{{ p.product_name }}</b></span>
+                <span class="badge {{ tone('warranty', w.status) }}">{{ w.status }}</span>
+              </div>
+              <div class="small muted">{{ p.category }} · {{ p.brand }} · <span class="mono">{{ p.serial_number }}</span>{% if staff %} · {{ p.owner.full_name }}{% endif %}</div>
+              <div class="meter {{ tone('warranty', w.status) }}"><i style="width: {{ (w.life_used * 100)|round }}%"></i></div>
+              <div class="small muted">Bought {{ p.purchase_date|date }} · cover ends {{ w.expiry_date|date }}</div>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="card-f row between"><a class="small" href="{{ url_for('products.register_product') }}">Product not listed? Register it →</a><button class="btn" type="button" data-next>Continue</button></div>
+      </section>
+
+      <!-- 2 fault -->
+      <section class="card wizard-step" data-step="1">
+        <div class="card-h"><h2>What happened?</h2></div>
+        <div class="card-b form-grid">
+          <label class="field"><span>Fault <span class="req">*</span></span>
+            <select class="select" name="fault_category" data-fault-select required>
+              <option value="">Choose the fault…</option>
+            </select>
+            <span class="help">Faults listed are the ones covered for this product category.</span></label>
+          <label class="field"><span>What caused it? <span class="req">*</span></span>
+            <select class="select" name="damage_type" required>
+              <option value="">Choose a cause…</option>
+              {% for d in damage_types %}<option value="{{ d }}" {{ 'selected' if form.get('damage_type') == d }}>{{ d }}</option>{% endfor %}
+            </select>
+            <span class="help" data-exclusion-hint></span></label>
+          <label class="field"><span>When did it start? <span class="req">*</span></span>
+            <input class="input" type="date" name="fault_occurrence_date" value="{{ form.get('fault_occurrence_date', '') }}" max="{{ today.isoformat() }}" required>
+            <span class="help" data-deadline-hint></span></label>
+          <label class="field"><span>Diagnostic confidence {% if staff %}<span class="req">*</span>{% endif %}</span>
+            <input class="input" type="number" name="diagnostic_confidence" min="0" max="1" step="0.01" value="{{ form.get('diagnostic_confidence', '') }}" placeholder="{{ '0.00 – 1.00' if staff else 'Leave blank if no technician report' }}">
+            <span class="help">{% if staff %}Technician's confidence that the stated cause is correct.{% else %}Only if a service center gave you a diagnosis. Blank means “not assessed” (0.50).{% endif %}</span></label>
+          <label class="field full"><span>Describe the problem <span class="req">*</span></span>
+            <textarea class="textarea" name="fault_description" minlength="15" maxlength="2000" required placeholder="What stopped working, how often, anything that happened before it started…">{{ form.get('fault_description', '') }}</textarea></label>
+          <label class="field full"><span>Previously replaced?</span>
+            <input class="input" name="previous_replacement_details" value="{{ form.get('previous_replacement_details', '') }}" placeholder="e.g. Unit replaced under warranty in March 2025 (leave blank if not)"></label>
+        </div>
+        <div class="card-f row between"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Continue</button></div>
+      </section>
+
+      <!-- 3 evidence -->
+      <section class="card wizard-step" data-step="2">
+        <div class="card-h"><h2>Evidence</h2><span class="hint">PDF, JPG or PNG up to 10 MB · MP4 up to 16 MB for video</span></div>
+        <div class="card-b stack">
+          <div class="callout brand small"><i class="bi bi-info-circle"></i> A <b>purchase receipt</b> is required. The warranty card, a serial-number photo and a damage photo are strongly recommended — two or more missing sends the claim to manual review.
+            <span data-receipt-on-file class="hidden"><br><b>Good news:</b> a receipt for this product is already on file.</span></div>
+          {% set labels = {'receipt': ('Purchase receipt / invoice', 'Required'), 'warranty_card': ('Warranty card', 'Recommended'), 'serial_photo': ('Serial-number photo', 'Recommended'), 'damage_photo': ('Damage / fault photo', 'Recommended'), 'diagnostic_report': ('Diagnostic / repair report', 'Optional'), 'product_photo': ('Product photo', 'Optional'), 'fault_video': ('Fault video', 'Optional'), 'other_evidence': ('Other evidence', 'Optional')} %}
+          {% for kind in doc_types %}
+            <label class="dropzone" data-dropzone>
+              <span class="ico"><i class="bi {{ doc_icon(kind) }}"></i></span>
+              <span style="flex:1; min-width:0">
+                <b class="small">{{ labels[kind][0] }}</b> <span class="badge plain {{ 'bad' if labels[kind][1] == 'Required' else ('info' if labels[kind][1] == 'Recommended' else '') }}">{{ labels[kind][1] }}</span>
+                <input type="file" name="{{ kind }}" accept="{{ '.mp4' if kind == 'fault_video' else '.pdf,.jpg,.jpeg,.png' }}" {% if kind == 'receipt' %}data-ocr-input{% endif %} data-doc-input="{{ kind }}">
+              </span>
+            </label>
+            {% if kind == 'receipt' %}
+            <div class="card soft hidden" data-ocr-panel>
+              <div class="card-b stack-sm">
+                <div class="row between"><b class="small"><i class="bi bi-magic"></i> Details read from your receipt</b><span class="small muted" data-ocr-status></span></div>
+                <p class="small muted mb-0">Check each value and correct anything that's wrong — your corrections are saved with the claim.</p>
+                <div class="form-grid">
+                  {% for key, label in [('invoice_number', 'Invoice number'), ('purchase_date', 'Purchase date'), ('serial_number', 'Serial number'), ('model_number', 'Model'), ('retailer', 'Retailer'), ('purchase_amount', 'Amount')] %}
+                    <label class="field"><span>{{ label }}</span><input class="input sm" name="verified_{{ key }}" data-ocr-field="{{ key }}"></label>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="card-f row between"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Review claim</button></div>
+      </section>
+
+      <!-- 4 review -->
+      <section class="card wizard-step" data-step="3">
+        <div class="card-h"><h2>Review &amp; submit</h2><span class="hint">Both models and all warranty rules run as soon as you submit.</span></div>
+        <div class="card-b stack">
+          <dl class="kv" data-review></dl>
+          <div class="callout small">By submitting you confirm the information is accurate. Your claim receives a unique Claim ID and you can follow every stage from the claim page.</div>
+        </div>
+        <div class="card-f row between">
+          <button class="btn quiet" type="button" data-prev>Back</button>
+          <div class="row">
+            <button class="btn quiet" type="submit" name="action" value="draft" formnovalidate>Save as draft</button>
+            <button class="btn" type="submit" name="action" value="submit" data-submit><i class="bi bi-send"></i>Submit claim</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="stack sticky">
+      <section class="card">
+        <div class="card-h"><h2>Claim readiness</h2><span class="badge" data-ready-badge>—</span></div>
+        <div class="card-b">
+          <div class="meter" aria-hidden="true"><i data-ready-bar style="width:0%"></i></div>
+          <ul class="list" data-ready-list style="margin: 10px -20px -18px;">
+            <li class="small muted">Choose a product to start the checklist.</li>
+          </ul>
+        </div>
+      </section>
+      <section class="card soft" data-policy-card hidden>
+        <div class="card-b stack-sm small">
+          <b data-policy-name></b>
+          <div class="row"><span class="chip"><i class="bi bi-hourglass"></i><span data-policy-reporting></span></span><span class="chip"><i class="bi bi-calendar-plus"></i><span data-policy-grace></span></span></div>
+          <div class="muted">Not covered: <span data-policy-excluded></span></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</form>
+<script type="application/json" id="wizard-data">{{ {
+  'products': products_data,
+  'faults': faults,
+  'policies': policies,
+  'staff': staff,
+  'initialFault': form.get('fault_category', '')
+}|tojson }}</script>
+{% endif %}
+{% endblock %}

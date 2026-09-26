@@ -1,287 +1,222 @@
-import os
-import json
-from pathlib import Path
-from datetime import datetime, date
+"""Warranty rule validation (SRS xxv). Deterministic, config-driven, explainable.
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-POLICIES_DIR = BASE_DIR / "policies"
+Each check in CHECKS returns (fired, message). Whether a fired rule is a hard
+fail, a manual-review trigger or a warning is decided by the category policy
+file (policies/*.json), never here. Rules that pass are reported too, so the
+decision explanation can list "rules passed" as the SRS requires.
+"""
+from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
 
-class WarrantyPolicyEngine:
-    """Configurable Business Rule Engine validating claims against product category policies."""
+from src.rules.policy_store import RULE_CATALOG, RULE_NAMES, get_policy
 
-    def __init__(self, policies_dir: Path = None):
-        self.policies_dir = policies_dir or POLICIES_DIR
-        self.policies = {}
-        self.load_all_policies()
-
-    def load_all_policies(self):
-        """Loads all JSON policy definition files from the policies directory."""
-        if not self.policies_dir.exists():
-            return
-
-        for p_file in self.policies_dir.glob("*.json"):
-            try:
-                with open(p_file, "r", encoding="utf-8") as f:
-                    policy_data = json.load(f)
-                    cat = policy_data.get("category")
-                    if cat:
-                        self.policies[cat] = policy_data
-            except Exception as e:
-                print(f"[!] Warning: Failed loading policy {p_file.name}: {e}")
-
-    def get_policy_for_category(self, category_name: str) -> dict:
-        """
-        Retrieves category policy from database (WarrantyPolicy) or configurable JSON files.
-        Supports different warranty rules for different product categories.
-        """
-        # 1. Attempt lookup from persistent database
-        try:
-            from src.models.entities import WarrantyPolicy
-            db_policy = WarrantyPolicy.query.filter(WarrantyPolicy.category.ilike(category_name)).first()
-            if db_policy:
-                rules = db_policy.get_rules()
-                combined = dict(rules)
-                combined["category"] = db_policy.category
-                combined["policy_name"] = db_policy.policy_name
-                combined["coverage_duration_months"] = db_policy.coverage_duration_months
-                combined["grace_period_days"] = db_policy.grace_period_days
-                combined["claim_reporting_period_days"] = db_policy.claim_reporting_period_days
-                combined["authorized_service_center_required"] = db_policy.authorized_service_center_required
-                return combined
-        except Exception:
-            pass
-
-        # 2. Lookup from configurable JSON policy files
-        if category_name in self.policies:
-            return self.policies[category_name]
-
-        # Case-insensitive or partial match fallback
-        for k, v in self.policies.items():
-            if k.lower() in category_name.lower() or category_name.lower() in k.lower():
-                return v
-
-        # Fallback default policy if category not specifically mapped
-        return {
-            "category": category_name,
-            "policy_name": f"Default Standard Policy ({category_name})",
-            "coverage_duration_months": 12,
-            "claim_reporting_period_days": 30,
-            "grace_period_days": 7,
-            "authorized_service_center_required": True,
-            "covered_faults": ["Hardware Defect", "Component failure", "Power failure"],
-            "exclusions": ["Liquid damage", "Screen shattering from drops", "Third-party unauthorized disassembly"],
-            "mandatory_documents": ["Purchase Invoice", "Warranty Card", "Serial Photo"],
-            "hard_fail_rules": ["Warranty expired beyond grace period", "Liquid/water ingress", "Unauthorized repair"],
-            "warning_rules": ["Grace period claim", "Late reporting"],
-            "manual_review_rules": ["Missing mandatory invoice", "Model disagreement"]
-        }
-
-    def evaluate_claim_rules(self, claim_data: dict) -> dict:
-        """
-        Executes business rule validation against the category policy.
-        
-        Evaluates:
-        1. Warranty Expiry & Grace Period Boundaries
-        2. Claim Reporting Window
-        3. Covered Fault Schedule
-        4. Excluded Damage Types (Hard-Fail)
-        5. Authorized Service Center Adherence (Hard-Fail)
-        6. Mandatory Document Completeness
-        7. Serial Number Cross-Check
-        """
-        category = claim_data.get("product_category", "Consumer Electronics")
-        policy = self.get_policy_for_category(category)
-
-        passed_rules = []
-        failed_rules = []
-        warnings = []
-        review_triggers = []
-
-        # -------------------------------------------------------------
-        # 1. Warranty Expiry & Grace Period Check
-        # -------------------------------------------------------------
-        remaining_days = claim_data.get("remaining_warranty_days")
-        if remaining_days is None:
-            remaining_days = claim_data.get("days_until_warranty_expiry", 0)
-
-        product_age = claim_data.get("product_age_days")
-        if product_age is None:
-            product_age = claim_data.get("days_since_purchase", 0)
-
-        duration_months = claim_data.get("warranty_duration_months") or claim_data.get("warranty_period_months") or policy.get("coverage_duration_months", 12)
-        # Use accurate average days-per-month (365.25/12 ≈ 30.44) to avoid
-        # calendar drift that incorrectly flags end-of-year claims as expired
-        duration_days = int(duration_months * 30.4375)
-        overdue_days = max(0, product_age - duration_days)
-        grace_days = policy.get("grace_period_days", 7)
-
-        if remaining_days > 0 or (remaining_days >= 0 and overdue_days == 0):
-            passed_rules.append(f"Warranty active: {remaining_days} days remaining within coverage.")
-        else:
-            if overdue_days <= grace_days and overdue_days > 0:
-                warnings.append(
-                    f"Claim submitted during grace period window: {overdue_days} days past standard term (allowance: {grace_days} days)."
-                )
-                passed_rules.append("Eligible for discretionary grace period review.")
-                review_triggers.append("Grace period adjudication required.")
-            else:
-                failed_rules.append(
-                    f"HARD FAIL: Warranty expired {overdue_days} days ago, exceeding permissible {grace_days}-day grace period."
-                )
-
-        # -------------------------------------------------------------
-        # 2. Fault Coverage Schedule Check
-        # -------------------------------------------------------------
-        fault_cat = claim_data.get("fault_category", "")
-        covered = policy.get("covered_faults", [])
-        is_covered = any(c.lower() in fault_cat.lower() for c in covered)
-        if is_covered or claim_data.get("damage_type") == "Hardware Defect":
-            passed_rules.append(f"Fault coverage verified: '{fault_cat}' is covered under standard protection schedule.")
-        else:
-            review_triggers.append(f"Uncommon fault category '{fault_cat}': Manual technician inspection required.")
-
-        # -------------------------------------------------------------
-        # 3. Claim Reporting Period Window
-        # -------------------------------------------------------------
-        max_reporting = policy.get("claim_reporting_period_days", 30)
-        days_between = claim_data.get("days_between_fault_and_claim")
-        if days_between is None and claim_data.get("fault_occurrence_date") and claim_data.get("claim_submission_date"):
-            try:
-                f_d = datetime.strptime(str(claim_data["fault_occurrence_date"])[:10], "%Y-%m-%d").date()
-                c_d = datetime.strptime(str(claim_data["claim_submission_date"])[:10], "%Y-%m-%d").date()
-                days_between = (c_d - f_d).days
-            except Exception:
-                days_between = 0
-
-        if days_between is not None and days_between > max_reporting:
-            failed_rules.append(
-                f"HARD FAIL: Claim reporting deadline exceeded: Reported {days_between} days after fault occurrence (deadline: {max_reporting} days)."
-            )
-        elif days_between is not None and days_between > (max_reporting - 7):
-            warnings.append(
-                f"Claim reported near deadline ({days_between} days after fault occurrence, deadline: {max_reporting} days)."
-            )
-        else:
-            passed_rules.append("Claim reported within permissible reporting window.")
-
-        # -------------------------------------------------------------
-        # 4. Proof of Purchase Verification
-        # -------------------------------------------------------------
-        has_receipt = claim_data.get("has_receipt", 1)
-        if claim_data.get("mandatory_documents_present") == 0:
-            has_receipt = 0
-
-        if has_receipt == 0:
-            review_triggers.append("Primary proof of purchase receipt missing: Claimant identity verification required.")
-            warnings.append("Missing primary tax invoice.")
-        else:
-            passed_rules.append("Proof of purchase verified: Valid sales invoice / receipt on record.")
-
-        # -------------------------------------------------------------
-        # 5. Extended Warranty Validation
-        # -------------------------------------------------------------
-        is_extended = bool(claim_data.get("is_extended_warranty") or claim_data.get("is_extended"))
-        if is_extended:
-            passed_rules.append("Extended warranty validated: Product protected under supplementary service agreement.")
-        else:
-            passed_rules.append("Standard warranty terms applied (no supplementary extension active).")
-
-        # -------------------------------------------------------------
-        # 6. Serial Number Cross-Check
-        # -------------------------------------------------------------
-        if claim_data.get("serial_number_match", 1) == 0:
-            review_triggers.append("Serial Mismatch Trigger: Hardware serial number does not match purchase invoice documentation.")
-            warnings.append("Serial number mismatch detected.")
-        else:
-            passed_rules.append("Serial number verification passed: Exact match between device backplate and tax invoice.")
-
-        # -------------------------------------------------------------
-        # 7. Previous Repairs History & Workshop Authorization
-        # -------------------------------------------------------------
-        prev_repairs = int(claim_data.get("previous_repairs_count", 0))
-        unauth_flag = int(claim_data.get("unauthorized_repair_flag", 0))
-        if policy.get("authorized_service_center_required", True) and unauth_flag == 1:
-            review_triggers.append("Unauthorized Service Alert: Product has history of maintenance by uncertified third-party facility.")
-            warnings.append("Unauthorized service facility record found.")
-        elif prev_repairs > 2:
-            warnings.append(f"Frequent repair history flagged: {prev_repairs} previous service interventions on file.")
-            passed_rules.append(f"Previous repairs logged: {prev_repairs} authorized maintenance records on file.")
-        else:
-            passed_rules.append(f"Service center history verified: {prev_repairs} previous repair(s), no unauthorized workshop tampering detected.")
-
-        # -------------------------------------------------------------
-        # 8. Product Replacement Eligibility & History
-        # -------------------------------------------------------------
-        prev_replacement = claim_data.get("previous_replacement_details")
-        if prev_replacement and str(prev_replacement).strip() and str(prev_replacement).lower() not in ["none", "null", "no", "false", ""]:
-            warnings.append(f"Prior product replacement recorded: '{prev_replacement}'. Unit serial history inspection required.")
-            review_triggers.append("Prior product replacement on file: Unit replacement eligibility verification required.")
-        else:
-            passed_rules.append("Product replacement check: Original hardware unit verified with no conflicting replacement history.")
-
-        # -------------------------------------------------------------
-        # 9. Excluded Damage & Policy Exclusions
-        # -------------------------------------------------------------
-        damage_type = claim_data.get("damage_type", "")
-        exclusions = policy.get("exclusions", [])
-        exclusion_matched = False
-        for excl in exclusions:
-            if excl.lower() in damage_type.lower() or excl.lower() in fault_cat.lower():
-                failed_rules.append(f"HARD FAIL: Excluded damage detected - '{excl}' is explicitly excluded by policy terms.")
-                exclusion_matched = True
-                break
-        if not exclusion_matched:
-            passed_rules.append(f"Excluded damage check: Reported damage '{damage_type}' contains no policy exclusions.")
-
-        # -------------------------------------------------------------
-        # 10. Required Documents Dossier Completeness
-        # -------------------------------------------------------------
-        missing_count = int(claim_data.get("missing_document_count", 0))
-        if claim_data.get("mandatory_documents_present") == 0:
-            missing_count = max(missing_count, 2)
-
-        if missing_count > 0:
-            warnings.append(f"{missing_count} mandatory claim document(s) missing from submission dossier.")
-            if missing_count >= 2:
-                review_triggers.append("Multiple mandatory documents missing: Routing to manual review queue.")
-        else:
-            passed_rules.append("Mandatory documentation complete: Receipt, warranty card, and photos verified.")
-
-        # -------------------------------------------------------------
-        # 11. Chronological Coherence Check
-        # -------------------------------------------------------------
-        if claim_data.get("claim_date_conflict_flag", 0) == 1:
-            review_triggers.append("Chronological Contradiction Trigger: Fault date conflict detected relative to purchase date.")
-            warnings.append("Chronological date conflict flagged.")
-
-        # Determine Overall Rule Status
-        if len(failed_rules) > 0:
-            overall_status = "FAIL"
-        elif len(review_triggers) > 0 or len(warnings) > 1:
-            overall_status = "REVIEW"
-        else:
-            overall_status = "PASS"
-
-        return {
-            "overall_status": overall_status,
-            "policy_category": policy.get("category"),
-            "policy_name": policy.get("policy_name"),
-            "passed_rules": passed_rules,
-            "failed_rules": failed_rules,
-            "warnings": warnings,
-            "manual_review_triggers": review_triggers,
-            "passed_count": len(passed_rules),
-            "failed_count": len(failed_rules),
-            "warning_count": len(warnings)
-        }
+SEVERITY_OF_LIST = {"hard_fail_rules": "hard_fail", "manual_review_rules": "manual_review",
+                    "warning_rules": "warning"}
 
 
-# Singleton policy engine instance
-_policy_engine_instance = None
+@dataclass
+class RuleResult:
+    rule_id: str
+    title: str
+    severity: str          # hard_fail | manual_review | warning
+    fired: bool
+    message: str
 
-def get_policy_engine() -> WarrantyPolicyEngine:
-    global _policy_engine_instance
-    if _policy_engine_instance is None:
-        _policy_engine_instance = WarrantyPolicyEngine()
-    return _policy_engine_instance
+
+@dataclass
+class RuleReport:
+    policy_name: str
+    category: str
+    results: list = field(default_factory=list)
+
+    def _fired(self, severity: str) -> list:
+        return [r for r in self.results if r.fired and r.severity == severity]
+
+    @property
+    def hard_fails(self):
+        return self._fired("hard_fail")
+
+    @property
+    def manual_triggers(self):
+        return self._fired("manual_review")
+
+    @property
+    def warnings(self):
+        return self._fired("warning")
+
+    @property
+    def passed(self):
+        return [r for r in self.results if not r.fired]
+
+    @property
+    def overall(self) -> str:
+        if self.hard_fails:
+            return "FAIL"
+        if self.manual_triggers or self.warnings:
+            return "REVIEW"
+        return "PASS"
+
+    def to_dict(self) -> dict:
+        return {"policy_name": self.policy_name, "category": self.category, "overall": self.overall,
+                "results": [asdict(r) for r in self.results]}
+
+
+# ------------------------------------------------------------------ checks
+# f = claim facts (see src/core/features.py), p = category policy
+def _overdue(f):
+    return -int(f["days_to_expiry"])
+
+
+def _warranty_expired(f, p):
+    over = _overdue(f)
+    if over > p["grace_period_days"]:
+        return True, f"Warranty ended {over} days before the claim; grace period is {p['grace_period_days']} days."
+    return False, "Claim is inside the warranty period or its grace period."
+
+
+def _grace_period(f, p):
+    over = _overdue(f)
+    if 0 < over <= p["grace_period_days"]:
+        return True, f"Claim filed {over} days after expiry, inside the {p['grace_period_days']}-day grace period."
+    return False, "Claim is not in the grace-period window."
+
+
+def _ending_soon(f, p):
+    days = int(f["days_to_expiry"])
+    if 0 <= days <= 14:
+        return True, f"Warranty ends {days} days after the claim date."
+    return False, "Warranty is not about to end."
+
+
+def _unauthorized_repair(f, p):
+    if int(f["unauthorized_repair_flag"]):
+        return True, "Repair history includes work by an unauthorised service center."
+    return False, "All previous repairs were done by authorised centers."
+
+
+def _excluded(f, p):
+    return f["damage_type"] in set(p.get("excluded_damage_types", []))
+
+
+def _excluded_damage(f, p):
+    thr = p["exclusion_min_diagnostic_confidence"]
+    if _excluded(f, p) and float(f["diagnostic_confidence"]) >= thr:
+        return True, (f"'{f['damage_type']}' is excluded for {p['category']} and the diagnosis confirms it "
+                      f"({float(f['diagnostic_confidence']):.2f} ≥ {thr:.2f}).")
+    return False, f"Damage cause '{f['damage_type']}' is not a confirmed exclusion."
+
+
+def _excluded_unconfirmed(f, p):
+    thr = p["exclusion_min_diagnostic_confidence"]
+    if _excluded(f, p) and float(f["diagnostic_confidence"]) < thr:
+        return True, (f"'{f['damage_type']}' is excluded for {p['category']}, but diagnostic confidence "
+                      f"{float(f['diagnostic_confidence']):.2f} is below {thr:.2f}. A reviewer must confirm the cause.")
+    return False, "No unconfirmed exclusion."
+
+
+def _serial_mismatch(f, p):
+    if not int(f["serial_number_match"]) and int(f["has_receipt"]) and int(f["has_serial_photo"]):
+        return True, "Registered serial number differs from the one on the receipt and serial photo."
+    return False, "Serial number is consistent with the evidence."
+
+
+def _serial_unverified(f, p):
+    if not int(f["serial_number_match"]) and not (int(f["has_receipt"]) and int(f["has_serial_photo"])):
+        return True, "Serial number mismatch reported, but receipt or serial photo is missing to confirm it."
+    return False, "No unverifiable serial mismatch."
+
+
+def _late_reporting(f, p):
+    if int(f["claim_date_conflict_flag"]):
+        return False, "Reporting window not assessed: claim dates conflict (see contradictions)."
+    delay, limit = int(f["reporting_delay_days"]), p["claim_reporting_period_days"]
+    if delay > limit:
+        return True, f"Fault reported {delay} days after it occurred; the policy allows {limit} days."
+    return False, f"Fault reported {delay} days after it occurred (limit {limit})."
+
+
+def _near_deadline(f, p):
+    delay, limit = int(f["reporting_delay_days"]), p["claim_reporting_period_days"]
+    if limit - 7 < delay <= limit and not int(f["claim_date_conflict_flag"]):
+        return True, f"Reported on day {delay} of a {limit}-day reporting window."
+    return False, "Reported well inside the reporting window."
+
+
+def _uncovered_fault(f, p):
+    covered = p.get("covered_faults", [])
+    if covered and f.get("fault_category") not in covered:
+        return True, f"'{f.get('fault_category')}' is not on the covered-fault list for {p['category']}."
+    return False, f"'{f.get('fault_category')}' is a covered fault."
+
+
+def _unknown_cause(f, p):
+    if f["damage_type"] == "Unknown / Not Sure" and float(f["diagnostic_confidence"]) < 0.5:
+        return True, "Cause is unknown and the diagnosis is inconclusive."
+    return False, "Cause of damage is identified."
+
+
+def _repeat_repairs(f, p):
+    n, thr = int(f["previous_repairs_count"]), p["repeat_repair_review_threshold"]
+    if n >= thr:
+        return True, f"{n} previous repairs on record (review threshold {thr})."
+    return False, f"{n} previous repair(s), below the review threshold of {thr}."
+
+
+def _prior_replacement(f, p):
+    detail = (f.get("previous_replacement_details") or "").strip()
+    if detail and detail.lower() not in {"none", "no", "n/a", "-"}:
+        return True, f"Product was previously replaced: {detail}"
+    return False, "No earlier replacement of this unit."
+
+
+def _supporting_missing(f, p):
+    flag = {"warranty_card": "has_warranty_card", "serial_photo": "has_serial_photo",
+            "damage_photo": "has_damage_photo", "receipt": "has_receipt"}
+    return [d for d in p.get("supporting_documents", []) if d in flag and not int(f[flag[d]])]
+
+
+def _incomplete_evidence(f, p):
+    gone = _supporting_missing(f, p)
+    if len(gone) >= 2:
+        return True, f"{len(gone)} supporting documents are missing ({', '.join(d.replace('_', ' ') for d in gone)})."
+    return False, "Supporting evidence is sufficient."
+
+
+def _supporting_document_missing(f, p):
+    gone = _supporting_missing(f, p)
+    if len(gone) == 1:
+        return True, f"The {gone[0].replace('_', ' ')} is missing; uploading it speeds up the claim."
+    return False, "No single supporting document is missing." if not gone else "See incomplete-evidence rule."
+
+
+CHECKS = {
+    "WARRANTY_EXPIRED": _warranty_expired,
+    "GRACE_PERIOD": _grace_period,
+    "WARRANTY_ENDING_SOON": _ending_soon,
+    "UNAUTHORIZED_REPAIR": _unauthorized_repair,
+    "EXCLUDED_DAMAGE": _excluded_damage,
+    "EXCLUDED_DAMAGE_UNCONFIRMED": _excluded_unconfirmed,
+    "SERIAL_MISMATCH": _serial_mismatch,
+    "SERIAL_UNVERIFIED": _serial_unverified,
+    "LATE_REPORTING": _late_reporting,
+    "NEAR_REPORTING_DEADLINE": _near_deadline,
+    "UNCOVERED_FAULT": _uncovered_fault,
+    "UNKNOWN_CAUSE": _unknown_cause,
+    "REPEAT_REPAIRS": _repeat_repairs,
+    "PRIOR_REPLACEMENT": _prior_replacement,
+    "INCOMPLETE_EVIDENCE": _incomplete_evidence,
+    "SUPPORTING_DOCUMENT_MISSING": _supporting_document_missing,
+}
+assert set(CHECKS) == set(RULE_CATALOG) == set(RULE_NAMES), "every catalogued rule needs a check and a name"
+
+
+def evaluate(facts: dict) -> RuleReport:
+    """Run every enabled rule of the claim's category policy against the facts."""
+    policy = get_policy(facts["product_category"])
+    report = RuleReport(policy_name=policy["policy_name"], category=policy["category"])
+    for list_name, severity in SEVERITY_OF_LIST.items():
+        for rule_id in policy.get(list_name, []):
+            fired, message = CHECKS[rule_id](facts, policy)
+            report.results.append(RuleResult(rule_id, RULE_NAMES[rule_id], severity, bool(fired), message))
+    return report

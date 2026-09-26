@@ -1,85 +1,44 @@
 {% extends "components/base.html" %}
-
-{% block title %}Create Account{% endblock %}
-
-{% block content %}
-<div class="row justify-content-center py-4">
-    <div class="col-md-7 col-lg-6">
-        <div class="card shadow-sm border-0 rounded-4 bg-white overflow-hidden">
-            <div class="bg-white border-bottom border-light-subtle p-4 text-center">
-                <div class="brand-combo brand-combo-lg mb-2">
-                    <img src="{{ url_for('static', filename='img/logoicon.png') }}" alt="AssureX Shield" class="brand-combo-icon">
-                    <div class="brand-combo-text text-start">
-                        <img src="{{ url_for('static', filename='img/assurex_wordmark.png') }}" alt="AssureX Claim Engine" class="brand-wordmark-img">
-                        <div class="brand-subtitle-wrapper">
-                            <span class="brand-subtitle-line"></span>
-                            <span class="brand-subtitle-text">WARRANTY INTELLIGENCE</span>
-                            <span class="brand-subtitle-line"></span>
-                        </div>
-                    </div>
-                </div>
-                <h5 class="fw-bold mb-1 text-slate-800 mt-2">Create Customer Account</h5>
-                <p class="mb-0 text-muted small">Register your account to manage products, warranties, and file claims</p>
-            </div>
-
-            <div class="card-body p-4 p-md-5">
-                <form method="POST" action="{{ url_for('auth.register') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-                    <!-- Customer Registration Notice -->
-                    <div class="alert alert-info border-0 bg-primary-subtle text-primary-emphasis d-flex align-items-center gap-2 p-3 mb-4 rounded-3 small">
-                        <i class="bi bi-shield-lock-fill fs-5 text-primary flex-shrink-0"></i>
-                        <div>
-                            <strong>Customer Portal Registration</strong><br>
-                            This portal creates Customer accounts for warranty tracking and claims submission. Staff and Administrative accounts are provisioned directly by enterprise administrators.
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-12">
-                            <label for="full_name" class="form-label fw-semibold small text-slate-700">Full Legal Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control bg-light" id="full_name" name="full_name" required placeholder="e.g. John Doe">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="email" class="form-label fw-semibold small text-slate-700">Email Address</label>
-                            <input type="email" class="form-control bg-light" id="email" name="email" required placeholder="john.doe@example.com">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="phone" class="form-label fw-semibold small text-slate-700">Phone Number</label>
-                            <input type="tel" class="form-control bg-light" id="phone" name="phone" placeholder="+92 300 1234567">
-                        </div>
-                        <div class="col-12">
-                            <label for="address" class="form-label fw-semibold small text-slate-700">Mailing Address</label>
-                            <input type="text" class="form-control bg-light" id="address" name="address" placeholder="123 Innovation Way, Suite 400">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="password" class="form-label fw-semibold small text-slate-700">Password</label>
-                            <input type="password" class="form-control bg-light" id="password" name="password" required minlength="8" placeholder="Minimum 8 characters">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="confirm_password" class="form-label fw-semibold small text-slate-700">Confirm Password</label>
-                            <input type="password" class="form-control bg-light" id="confirm_password" name="confirm_password" required minlength="8" placeholder="Repeat password">
-                        </div>
-                    </div>
-
-                    <div class="form-check mb-4">
-                        <input class="form-check-input" type="checkbox" id="terms" required checked>
-                        <label class="form-check-label extra-small text-muted" for="terms">
-                            I agree to the AssureX Warranty Intelligence Terms of Service, Privacy Policy, and automated fraud screening.
-                        </label>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
-                        <i class="bi bi-person-check-fill"></i> Complete Registration
-                    </button>
-                </form>
-
-                <div class="text-center mt-4 pt-3 border-top border-light-subtle">
-                    <span class="text-muted small">Already registered?</span>
-                    <a href="{{ url_for('auth.login') }}" class="text-primary small fw-semibold ms-1">Sign In</a>
-                </div>
-            </div>
-        </div>
+{% block title %}Create account{% endblock %}
+{% block main %}
+<div class="auth">
+  <div class="auth-art">
+    <div>
+      <h2>Register once, claim in minutes.</h2>
+      <p>Add your products and receipts, get reminded before a warranty ends, and file a claim with everything already on file.</p>
+      <div class="points">
+        <div><i class="bi bi-hourglass-split"></i><span>Expiry reminders before cover ends</span></div>
+        <div><i class="bi bi-receipt"></i><span>Receipts stored securely and fingerprinted</span></div>
+        <div><i class="bi bi-list-check"></i><span>A checklist tells you what's missing before you submit</span></div>
+      </div>
     </div>
+    <p class="small">Public sign-up creates customer accounts only.</p>
+  </div>
+  <div class="auth-form">
+    <div class="box stack">
+      <div>
+        <h1>Create your account</h1>
+        <p class="muted mt-1">Takes about a minute.</p>
+      </div>
+      <form method="post" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field full"><span>Full name <span class="req">*</span></span>
+          <input class="input" name="full_name" value="{{ form.get('full_name', '') }}" autocomplete="name" required minlength="2" maxlength="100"></label>
+        <label class="field full"><span>Email <span class="req">*</span></span>
+          <input class="input" type="email" name="email" value="{{ form.get('email', '') }}" autocomplete="email" required></label>
+        <label class="field"><span>Password <span class="req">*</span></span>
+          <input class="input" type="password" name="password" autocomplete="new-password" required minlength="10">
+          <span class="help">10+ characters, with a letter and a number.</span></label>
+        <label class="field"><span>Confirm password <span class="req">*</span></span>
+          <input class="input" type="password" name="confirm_password" autocomplete="new-password" required minlength="10"></label>
+        <label class="field"><span>Phone</span>
+          <input class="input" type="tel" name="phone" value="{{ form.get('phone', '') }}" autocomplete="tel" placeholder="+92 300 1234567"></label>
+        <label class="field"><span>City / address</span>
+          <input class="input" name="address" value="{{ form.get('address', '') }}" autocomplete="street-address"></label>
+        <div class="full"><button class="btn lg block" type="submit">Create account</button></div>
+      </form>
+      <p class="small muted center">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+    </div>
+  </div>
 </div>
 {% endblock %}

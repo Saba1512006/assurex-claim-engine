@@ -1,0 +1,30 @@
+{
+  "version": "2026.09.26",
+  "consistency": {
+    "min_confidence": 0.60,
+    "strong_max_diff": 0.10,
+    "acceptable_max_diff": 0.25
+  },
+  "decision_table": [
+    {"id": "D01", "when": {"any": [["hard_fail_count", ">", 0]]},
+     "decision": "Likely Invalid", "reason": "A policy hard-fail rule was triggered"},
+    {"id": "D02", "when": {"any": [["contradiction_count", ">", 0], ["duplicate_count", ">", 0]]},
+     "decision": "Manual Review Required", "reason": "Contradiction or duplicate indicator found"},
+    {"id": "D03", "when": {"any": [["missing_mandatory_count", ">", 0]]},
+     "decision": "Manual Review Required", "reason": "A mandatory document is missing"},
+    {"id": "D04", "when": {"any": [["consistency", "in", ["Model Disagreement", "Uncertain Result", "Weak Match"]]]},
+     "decision": "Manual Review Required", "reason": "The models disagree, are not confident, or one is unavailable"},
+    {"id": "D05", "when": {"any": [["manual_trigger_count", ">", 0]]},
+     "decision": "Manual Review Required", "reason": "A policy manual-review rule was triggered"},
+    {"id": "D06", "when": {"all": [["python_class", "==", "Invalid Claim"], ["gtm_class", "==", "Invalid Claim"]]},
+     "decision": "Likely Invalid", "reason": "Both models predict Invalid with consistent confidence"},
+    {"id": "D07", "when": {"all": [["python_class", "==", "Valid Claim"], ["gtm_class", "==", "Valid Claim"]]},
+     "decision": "Likely Valid", "reason": "Both models predict Valid and no blocking rule fired"}
+  ],
+  "default": {"id": "D99", "decision": "Manual Review Required", "reason": "No automatic rule was conclusive"},
+  "routing": {
+    "Likely Valid": "Approved",
+    "Likely Invalid": "Rejected",
+    "Manual Review Required": "Manual Review"
+  }
+}

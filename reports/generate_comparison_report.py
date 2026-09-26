@@ -1,160 +1,87 @@
-import os
+"""Model prediction & confidence comparison report (SRS deliverable 6).
+
+    python reports/generate_comparison_report.py [--split test] [--limit 225]
+
+For every unseen claim: the structured record goes to the Python model and its
+canonical Claim Summary Card (data/summary_cards/<split>/<id>_v0.jpg) goes to
+the Teachable Machine model; the rule engine and decision table then produce the
+application decision. Writes reports/model_comparison_report.csv and .md.
+If the Teachable Machine export is not installed, its columns say "unavailable"
+and the summary states it - nothing is estimated or filled in.
+"""
+from __future__ import annotations
+
+import argparse
+import json
 import sys
-import csv
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from src.core.gtm_classifier_v2 import find_model_file  # noqa: E402
+from src.core.offline_eval import evaluate_split, summarise  # noqa: E402
 
-import pandas as pd
-from config.config import Config
-from src.core.decision_engine import get_decision_engine
+COLUMNS = {  # csv column -> report heading (SRS page 28-29 order)
+    "claim_id": "Claim ID", "actual_class": "Actual class", "python_predicted": "Python predicted class",
+    "python_valid": "Python conf. Valid", "python_invalid": "Python conf. Invalid", "python_manual": "Python conf. Manual",
+    "card_filename": "Card filename", "gtm_predicted": "GTM predicted class", "gtm_valid": "GTM conf. Valid",
+    "gtm_invalid": "GTM conf. Invalid", "gtm_manual": "GTM conf. Manual", "class_match": "Classes match",
+    "confidence_difference": "Top-confidence difference", "consistency_status": "Consistency status",
+    "rule_result": "Warranty-rule result", "missing_documents": "Missing documents",
+    "contradictions": "Contradictions", "duplicate_indicators": "Duplicate indicators",
+    "final_decision": "Final application decision", "disagreement_explanation": "Explanation of disagreement",
+}
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-REPORTS_DIR = BASE_DIR / "reports"
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+def fmt(v):
+    if v is None or (isinstance(v, float) and v != v):
+        return "—"
+    if isinstance(v, float):
+        return f"{v:.4f}"
+    return str(v) if v != "" else "—"
 
 
-def generate_comparison_reports(sample_size: int = 40):
-    """
-    Evaluates both Python Tabular ML and Google Teachable Machine Vision models
-    on unseen test set claims and generates model_comparison_report.csv & .md
-    strictly complying with the SRS-mandated 21-column schema.
-    """
-    test_csv_path = BASE_DIR / "data" / "splits" / "test.csv"
-    if not test_csv_path.exists():
-        raise FileNotFoundError(f"Test split dataset not found at: {test_csv_path}")
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--split", default="test", choices=["val", "test"])
+    ap.add_argument("--limit", type=int, default=225, help="claims to include (SRS minimum 30)")
+    args = ap.parse_args()
+    rows = evaluate_split(args.split).head(max(30, args.limit))
+    summary = summarise(rows)
+    out = ROOT / "reports"
+    rows[list(COLUMNS)].rename(columns=COLUMNS).to_csv(out / "model_comparison_report.csv", index=False)
 
-    df_test = pd.read_csv(test_csv_path)
-    engine = get_decision_engine()
-
-    # Stratified selection to ensure balanced representation across all 3 classes
-    sample_df = df_test.groupby("claim_class", group_keys=False).apply(
-        lambda x: x.head(sample_size // 3 + 1)
-    ).head(sample_size)
-
-    fieldnames = [
-        "claim_id",
-        "product_category",
-        "fault_category",
-        "reported_damage_type",
-        "claim_amount",
-        "warranty_status",
-        "python_predicted_class",
-        "python_conf_valid",
-        "python_conf_invalid",
-        "python_conf_manual",
-        "python_top_confidence",
-        "gtm_predicted_class",
-        "gtm_conf_valid",
-        "gtm_conf_invalid",
-        "gtm_conf_manual",
-        "gtm_top_confidence",
-        "is_class_match",
-        "top_confidence_difference",
-        "model_consistency_status",
-        "master_engine_decision",
-        "decision_rationale"
-    ]
-
-    records = []
-    consistency_counts = {
-        Config.CONSISTENCY_STRONG: 0,
-        Config.CONSISTENCY_ACCEPTABLE: 0,
-        Config.CONSISTENCY_WEAK: 0,
-        Config.CONSISTENCY_DISAGREEMENT: 0,
-        Config.CONSISTENCY_UNCERTAIN: 0
-    }
-    match_count = 0
-
-    print(f"[*] Running dual-model inference on {len(sample_df)} unseen test claims...")
-
-    for idx, row in sample_df.iterrows():
-        claim_dict = row.to_dict()
-        res = engine.adjudicate_claim(claim_dict)
-
-        py_eval = res["dual_model_evaluation"]["python_model"]
-        gtm_eval = res["dual_model_evaluation"]["gtm_model"]
-        dual_eval = res["dual_model_evaluation"]
-
-        is_match = dual_eval["is_class_match"]
-        consistency = dual_eval["model_consistency_status"]
-        if is_match:
-            match_count += 1
-        consistency_counts[consistency] = consistency_counts.get(consistency, 0) + 1
-
-        rem_days = claim_dict.get("remaining_warranty_days", 0)
-        warr_status = "Active" if rem_days > 0 else "Expired"
-
-        rec = {
-            "claim_id": claim_dict.get("claim_id"),
-            "product_category": claim_dict.get("product_category"),
-            "fault_category": claim_dict.get("fault_category"),
-            "reported_damage_type": claim_dict.get("damage_type"),
-            "claim_amount": f"{float(claim_dict.get('purchase_price', 150.0) * 0.25):.2f}",
-            "warranty_status": warr_status,
-            "python_predicted_class": py_eval["predicted_class"],
-            "python_conf_valid": f"{py_eval['confidence_scores'].get('Valid Claim', 0.0):.4f}",
-            "python_conf_invalid": f"{py_eval['confidence_scores'].get('Invalid Claim', 0.0):.4f}",
-            "python_conf_manual": f"{py_eval['confidence_scores'].get('Manual Review', 0.0):.4f}",
-            "python_top_confidence": f"{py_eval['top_confidence']:.4f}",
-            "gtm_predicted_class": gtm_eval["predicted_class"],
-            "gtm_conf_valid": f"{gtm_eval['confidence_scores'].get('Valid Claim', 0.0):.4f}",
-            "gtm_conf_invalid": f"{gtm_eval['confidence_scores'].get('Invalid Claim', 0.0):.4f}",
-            "gtm_conf_manual": f"{gtm_eval['confidence_scores'].get('Manual Review', 0.0):.4f}",
-            "gtm_top_confidence": f"{gtm_eval['top_confidence']:.4f}",
-            "is_class_match": is_match,
-            "top_confidence_difference": f"{dual_eval['top_confidence_difference']:.4f}",
-            "model_consistency_status": consistency,
-            "master_engine_decision": res["final_decision"],
-            "decision_rationale": res["decision_summary"].replace(",", ";")
-        }
-        records.append(rec)
-
-    # 1. Save CSV Report
-    csv_file = REPORTS_DIR / "model_comparison_report.csv"
-    with open(csv_file, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(records)
-
-    print(f"[+] Successfully wrote CSV comparison report to: {csv_file}")
-
-    # 2. Save Markdown Report
-    md_file = REPORTS_DIR / "model_comparison_report.md"
-    agreement_rate = (match_count / len(records) * 100) if records else 0.0
-    avg_diff = sum(float(r["top_confidence_difference"]) for r in records) / len(records) if records else 0.0
-
-    with open(md_file, "w", encoding="utf-8") as f:
-        f.write("# AssureX Dual-Model Consensus Evaluation Report\n\n")
-        f.write("Official verification dossier comparing Python Tabular Classifier vs. Google Teachable Machine Vision Classifier on unseen test data.\n\n")
-        f.write("## Executive Summary\n\n")
-        f.write(f"- **Evaluated Test Claims:** {len(records)}\n")
-        f.write(f"- **Dual-Model Class Agreement Rate:** {agreement_rate:.2f}%\n")
-        f.write(f"- **Average Confidence Difference (|Δconf|):** {avg_diff:.4f}\n\n")
-        f.write("### Consistency Status Distribution\n\n")
-        f.write("| Model Consistency Status | Claim Count | Share (%) |\n")
-        f.write("|:---|:---:|:---:|\n")
-        for status_name, cnt in consistency_counts.items():
-            share = (cnt / len(records) * 100) if records else 0.0
-            f.write(f"| **{status_name}** | {cnt} | {share:.1f}% |\n")
-
-        f.write("\n## Detailed Claim-by-Claim Adjudication Log (21-Column Schema)\n\n")
-        f.write("| Claim ID | Category | Fault Category | Python Pred | Py Conf | GTM Pred | GTM Conf | Class Match | |Δconf| | Consistency Status | Final Decision |\n")
-        f.write("|:---|:---|:---|:---|:---:|:---|:---:|:---:|:---:|:---|:---|\n")
-        for r in records:
-            f.write(
-                f"| `{r['claim_id']}` | {r['product_category']} | {r['fault_category']} | "
-                f"{r['python_predicted_class']} | {r['python_top_confidence']} | "
-                f"{r['gtm_predicted_class']} | {r['gtm_top_confidence']} | "
-                f"{'✅ Yes' if r['is_class_match'] else '❌ No'} | {r['top_confidence_difference']} | "
-                f"`{r['model_consistency_status']}` | **{r['master_engine_decision']}** |\n"
-            )
-
-    print(f"[+] Successfully wrote Markdown comparison report to: {md_file}")
-    return records
+    gtm_on = find_model_file() is not None
+    lines = [f"# Model prediction & confidence comparison — {args.split} split", "",
+             f"{len(rows)} unseen claims. Python model on the structured record; Google Teachable Machine on the "
+             "claim's canonical Claim Summary Card; rules and decision table as in production.", ""]
+    if not gtm_on:
+        lines += ["> **Teachable Machine model not installed.** Its columns read “unavailable”, every comparison is "
+                  "*Uncertain Result*, and the application sends those claims to manual review. Install the export "
+                  "(Admin › Models) and re-run this script to fill the columns.", ""]
+    py = summary["python"]
+    lines += ["## Overall comparison summary", "",
+              "| Metric | Value |", "|---|---|",
+              f"| Python model accuracy | {py['accuracy']:.1%} |", f"| Python model macro F1 | {py['f1_macro']:.1%} |"]
+    if "gtm" in summary:
+        lines += [f"| Teachable Machine accuracy | {summary['gtm']['accuracy']:.1%} |",
+                  f"| Teachable Machine macro F1 | {summary['gtm']['f1_macro']:.1%} |",
+                  f"| Predicted-class agreement | {summary['agreement_rate']:.1%} |"]
+    lines += [f"| Application decision accuracy (decision → class) | {summary['application']['accuracy']:.1%} |"]
+    lines += ["", "**Consistency statuses:** " + ", ".join(f"{k} {v}" for k, v in summary["status_counts"].items()),
+              "", "**Final decisions:** " + ", ".join(f"{k} {v}" for k, v in summary["decision_counts"].items()), ""]
+    dis = rows[rows["disagreement_explanation"] != ""]
+    lines += ["## Major disagreements", ""]
+    lines += [f"- **{r.claim_id}** (actual {r.actual_class}): {r.disagreement_explanation}" for r in dis.itertuples()] \
+        or ["- None" if gtm_on else "- Not measurable until the Teachable Machine model is installed."]
+    lines += ["", "## Per-claim results", "", "| " + " | ".join(COLUMNS.values()) + " |",
+              "|" + "---|" * len(COLUMNS)]
+    for r in rows.to_dict("records"):
+        lines.append("| " + " | ".join(fmt(r[c]).replace("|", "/") for c in COLUMNS) + " |")
+    (out / "model_comparison_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(json.dumps({k: v for k, v in summary.items() if k in ("claims", "status_counts", "decision_counts")}, indent=2))
+    print("python accuracy", py["accuracy"], "| written reports/model_comparison_report.{csv,md}")
 
 
 if __name__ == "__main__":
-    generate_comparison_reports(sample_size=36)
+    main()

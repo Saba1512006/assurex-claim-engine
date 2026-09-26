@@ -1,801 +1,260 @@
-import json
+"""Products, warranties and repair history (SRS iii, iv, viii, xiii, xiv)."""
+from __future__ import annotations
+
+import tempfile
+from datetime import date, timedelta
 from pathlib import Path
-from datetime import datetime, date, timedelta
-from werkzeug.utils import secure_filename
-from flask import Blueprint, request, session, redirect, url_for, flash, jsonify, render_template, send_file
+
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
+from sqlalchemy import or_
+
 from config.config import Config
 from database.db import db
-from src.models.entities import Product, ProductWarranty, WarrantyPolicy, RepairHistory, Notification, AuditLog, ClaimDocument
-from src.api.auth import login_required, get_current_user
-from src.ocr.document_processor import get_document_processor
+from src.core.vocab import CATEGORIES, coverage_days, try_parse_date
+from src.models.entities import (Claim, Product, ProductWarranty, RepairHistory, ServiceCenter, User,
+                                 WarrantyPolicy)
+from src.ocr import document_processor as ocr
+from src.rules import validator
+from src.rules.policy_store import get_policy
+from src.security.guards import authorize_object, check, require, scoped_products
+from src.services import documents as doc_service
+from src.services.alert_service import alert_days
+from src.services.audit import audit
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
+PRODUCT_DOC_TYPES = ("receipt", "warranty_card", "serial_photo", "product_photo")
 
 
-@product_bp.route("/", methods=["GET"])
-@login_required
+def _load(product_id: str, permission: str) -> Product:
+    return authorize_object(permission, Product.query.filter_by(product_id=product_id).first_or_404())
+
+
+def _policy_row(category: str) -> WarrantyPolicy:
+    """Snapshot of the category policy at registration time (the live rules stay in policies/*.json)."""
+    row = WarrantyPolicy.query.filter_by(category=category).first()
+    if row is None:
+        p = get_policy(category)
+        row = WarrantyPolicy(category=category, policy_name=p["policy_name"],
+                             coverage_duration_months=p["coverage_duration_months"],
+                             grace_period_days=p["grace_period_days"],
+                             claim_reporting_period_days=p["claim_reporting_period_days"],
+                             authorized_service_center_required=p["authorized_service_center_required"])
+        db.session.add(row)
+    return row
+
+
+@product_bp.get("/")
+@require("product.read")
 def list_products():
-    """
-    Displays registered products and warranty statuses from a common interface.
-    Supports viewing all active, expired, approaching expiry, and extended warranties.
-    """
-    user = get_current_user()
-    status_filter = (request.args.get("status") or request.args.get("tab") or "all").strip().lower()
-
-    is_elevated = user and user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_STAFF, Config.ROLE_REVIEWER,
-        "administrator", "service_center_staff", "claim_reviewer", "Admin", "Staff", "Reviewer"
-    ]
-    if is_elevated:
-        query = Product.query
-    else:
-        query = Product.query.filter_by(user_id=user.id if user else None)
-
-    all_products = query.order_by(Product.created_at.desc()).all()
-
-    # Calculate status counts for the common interface dashboard
-    counts = {
-        "all": len(all_products),
-        "active": 0,
-        "approaching": 0,
-        "expired": 0,
-        "extended": 0
-    }
-    for p in all_products:
-        if p.warranty:
-            if p.warranty.is_extended:
-                counts["extended"] += 1
-            if not p.warranty.is_active():
-                counts["expired"] += 1
-            elif p.warranty.is_approaching_expiry():
-                counts["approaching"] += 1
-            else:
-                counts["active"] += 1
-
-    # Filter products based on selected status tab
-    if status_filter == "active":
-        filtered_products = [p for p in all_products if p.warranty and p.warranty.is_active() and not p.warranty.is_approaching_expiry()]
-    elif status_filter == "approaching":
-        filtered_products = [p for p in all_products if p.warranty and p.warranty.is_approaching_expiry()]
-    elif status_filter == "expired":
-        filtered_products = [p for p in all_products if p.warranty and not p.warranty.is_active()]
-    elif status_filter == "extended":
-        filtered_products = [p for p in all_products if p.warranty and p.warranty.is_extended]
-    else:
-        filtered_products = all_products
-
-    return render_template(
-        "customer/products_list.html",
-        products=filtered_products,
-        counts=counts,
-        current_status=status_filter
-    )
+    q = scoped_products(Product, Claim)
+    term = request.args.get("q", "").strip()
+    if term:
+        like = f"%{term}%"
+        q = q.filter(or_(Product.product_name.ilike(like), Product.serial_number.ilike(like),
+                         Product.product_id.ilike(like), Product.brand.ilike(like)))
+    if request.args.get("category") in CATEGORIES:
+        q = q.filter(Product.category == request.args["category"])
+    products = q.order_by(Product.created_at.desc()).all()
+    status = request.args.get("warranty")
+    if status:
+        products = [p for p in products if (p.warranty.status if p.warranty else "No warranty") == status]
+    return render_template("products/list.html", products=products, categories=CATEGORIES)
 
 
-@product_bp.route("/register", methods=["GET", "POST"])
-@login_required
+def _owner_for_new_product(form):
+    """Customers register their own products; staff register a walk-in customer's product."""
+    if g.user.role == Config.ROLE_CUSTOMER:
+        return g.user, None
+    email = (form.get("customer_email") or "").strip().lower()
+    owner = User.query.filter_by(email=email, role=Config.ROLE_CUSTOMER, is_active=True).first()
+    return owner, None if owner else "No active customer account uses that email. Ask the customer to sign up first."
+
+
+@product_bp.route("/new", methods=["GET", "POST"])
+@require("product.create")
 def register_product():
-    """
-    Product Registration - Allows users to register products with details:
-    product name, category, brand, model number, serial number, purchase date,
-    purchase price, retailer, and warranty duration. Assigns unique Product ID.
-    
-    Req iv: Warranty Record Management - Stores standard and extended warranty
-    information including warranty provider, start date, expiry date, coverage conditions,
-    exclusions, and service-center details.
-    """
-    user = get_current_user()
-
+    centers = ServiceCenter.query.order_by(ServiceCenter.name).all()
+    policies = {c: get_policy(c) for c in CATEGORIES}
     if request.method == "POST":
-        product_name = request.form.get("product_name", "").strip()
-        category = request.form.get("category", "").strip()
-        brand = request.form.get("brand", "").strip()
-        model_number = request.form.get("model_number", "").strip()
-        serial_number = request.form.get("serial_number", "").strip()
-        purchase_date_str = request.form.get("purchase_date", "").strip()
-        try:
-            purchase_price = float(request.form.get("purchase_price", "0.0") or 0.0)
-        except ValueError:
-            flash("Please enter a valid numerical purchase price.", "danger")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        if purchase_price < 0:
-            flash("Purchase price cannot be negative.", "danger")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        retailer = request.form.get("retailer", "").strip()
-        invoice_number = request.form.get("invoice_number", "").strip()
-
-        # Warranty specifications
-        warranty_duration_str = request.form.get("warranty_duration", "").strip()
-        warranty_type = request.form.get("warranty_type", "standard").strip().lower()
-        warranty_provider = request.form.get("warranty_provider", "").strip()
-        service_center_name = request.form.get("service_center_name", "").strip()
-
-        if not product_name or not serial_number or not purchase_date_str:
-            flash("Product name, serial number, and purchase date are mandatory.", "warning")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        # Parse purchase date
-        from src.rules.validator import ClaimValidator
-        p_date = ClaimValidator.parse_date(purchase_date_str)
-        if not p_date:
-            flash("Please enter a valid purchase date (YYYY-MM-DD or DD/MM/YYYY).", "warning")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-        if p_date > date.today():
-            flash("Purchase date cannot be in the future.", "warning")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        # Check existing serial to avoid collisions
-        existing = Product.query.filter_by(serial_number=serial_number).first()
-        if existing:
-            flash(f"A product with serial number '{serial_number}' is already registered.", "danger")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        # 1. Create Product Entity with System Unique Product ID
-        product = Product(
-            user_id=user.id,
-            product_name=product_name,
-            category=category,
-            brand=brand,
-            model_number=model_number,
-            serial_number=serial_number,
-            purchase_date=p_date,
-            purchase_price=purchase_price,
-            retailer=retailer,
-            invoice_number=invoice_number
-        )
+        values, errors, warnings = validator.product_form(request.form)
+        owner, owner_err = _owner_for_new_product(request.form)
+        if owner_err:
+            errors.append(owner_err)
+        if g.user.role == Config.ROLE_STAFF:
+            center_id = g.user.service_center_id
+        else:
+            raw = request.form.get("service_center_id", "")
+            center_id = int(raw) if raw.isdigit() and db.session.get(ServiceCenter, int(raw)) else None
+        if errors:
+            for msg in errors:
+                flash(msg, "warning")
+            return render_template("products/register.html", form=request.form, centers=centers, policies=policies), 400
+        product = Product(user_id=owner.id, service_center_id=center_id, product_name=values["product_name"],
+                          category=values["category"], brand=values["brand"], model_number=values["model_number"],
+                          serial_number=values["serial_number"], purchase_date=values["purchase_date"],
+                          purchase_price=values["purchase_price"], retailer=values["retailer"],
+                          invoice_number=values["invoice_number"])
         db.session.add(product)
         db.session.flush()
-
-        # 2. Attach Warranty Record
-        policy = WarrantyPolicy.query.filter_by(category=category).first()
-        if not policy and "industrial" in category.lower():
-            policy = WarrantyPolicy.query.filter_by(category="Industrial Tools").first()
-        
-        # Determine duration: user input or default from policy
-        if warranty_duration_str and warranty_duration_str.isdigit():
-            duration_months = max(1, min(120, int(warranty_duration_str)))
-        else:
-            duration_months = policy.coverage_duration_months if policy else 12
-
-        is_extended = (warranty_type == "extended")
-        extended_months = max(0, duration_months - (policy.coverage_duration_months if policy else 12)) if is_extended else 0
-
-        provider_name = warranty_provider if warranty_provider else f"{brand} Official Care"
-        service_center = service_center_name if service_center_name else "Authorized National Service Network"
-
-        w_start = p_date
-        w_expiry = w_start + timedelta(days=int(duration_months * 30.4375))
-
-        # Use matched policy, or fall back to the first available policy
-        if not policy:
-            policy = WarrantyPolicy.query.first()
-        warranty = ProductWarranty(
-            product_id=product.id,
-            policy_id=policy.id if policy else None,
-            warranty_provider=provider_name,
-            start_date=w_start,
-            expiry_date=w_expiry,
-            is_extended=is_extended,
-            extended_months=extended_months,
-            service_center_name=service_center
-        )
-        db.session.add(warranty)
-
-        # 3. Securely Store Uploaded Receipt / Invoice Document
-        receipt_file = request.files.get("receipt_document") or request.files.get("receipt_file") or request.files.get("invoice_document")
-        if receipt_file and receipt_file.filename:
-            ext = receipt_file.filename.rsplit(".", 1)[-1].lower() if "." in receipt_file.filename else ""
-            if ext in Config.ALLOWED_DOCUMENT_EXTENSIONS:
-                upload_folder = Path(Config.UPLOAD_DIR)
-                upload_folder.mkdir(parents=True, exist_ok=True)
-                sec_filename = f"{product.product_id}_receipt_{secure_filename(receipt_file.filename)}"
-                save_dest = upload_folder / sec_filename
-                receipt_file.save(save_dest)
-
-                doc_processor = get_document_processor()
-                doc_info = doc_processor.process_document(save_dest, document_type="receipt")
-
-                if ext in ["png", "jpg", "jpeg"] and not doc_processor.is_valid_receipt_document(doc_info):
-                    try:
-                        if save_dest.exists():
-                            save_dest.unlink()
-                    except Exception:
-                        pass
-                    db.session.rollback()
-                    flash("The uploaded receipt image does not contain readable invoice details. Please upload a clear receipt or register without attaching an unreadable image.", "danger")
-                    policies = WarrantyPolicy.query.all()
-                    return render_template("customer/product_register.html", policies=policies)
-
-                claim_doc = ClaimDocument(
-                    product_id=product.id,
-                    claim_id=None,
-                    document_type="receipt",
-                    file_path=str(save_dest),
-                    original_filename=receipt_file.filename,
-                    file_size_bytes=doc_info["file_size_bytes"],
-                    file_hash_sha256=doc_info["sha256_hash"],
-                    ocr_extracted_text=doc_info["raw_text"],
-                    ocr_data_json=json.dumps(doc_info["entities"]),
-                    verified_by_user=True
-                )
-                db.session.add(claim_doc)
-
-        # Record Audit Log
-        audit = AuditLog(
-            user_id=user.id,
-            user_role=user.role if user else None,
-            action="PRODUCT_REGISTRATION",
-            entity_type="PRODUCT",
-            entity_id=product.product_id,
-            ip_address=request.remote_addr,
-            details_json=json.dumps({"product_name": product.product_name, "serial": product.serial_number})
-        )
-        db.session.add(audit)
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            flash("An error occurred while saving the product. Please try again.", "danger")
-            policies = WarrantyPolicy.query.all()
-            return render_template("customer/product_register.html", policies=policies)
-
-        flash(
-            f"Product '{product_name}' registered successfully! Assigned Unique Product ID: {product.product_id} with {duration_months}-month warranty coverage.",
-            "success"
-        )
-        return redirect(url_for("products.list_products"))
-
-    policies = WarrantyPolicy.query.all()
-    return render_template("customer/product_register.html", policies=policies)
+        policy = get_policy(values["category"])
+        base = min(policy["standard_terms_months"])
+        center = db.session.get(ServiceCenter, center_id) if center_id else None
+        db.session.add(ProductWarranty(
+            product=product, policy=_policy_row(values["category"]),
+            warranty_provider=values["warranty_provider"] or f"{values['brand']} manufacturer warranty",
+            start_date=values["purchase_date"],
+            expiry_date=values["purchase_date"] + timedelta(days=coverage_days(values["warranty_months"])),
+            duration_months=values["warranty_months"], is_extended=values["is_extended"],
+            extended_months=max(0, values["warranty_months"] - base) if values["is_extended"] else 0,
+            coverage_conditions=f"Covered faults: {', '.join(policy['covered_faults'])}.",
+            exclusions="; ".join(policy["exclusions"]), service_center_name=center.name if center else None))
+        receipt = request.files.get("receipt")
+        if receipt and receipt.filename:
+            try:
+                _, info = doc_service.store(receipt, "receipt", product=product, uploader=g.user)
+                if info["reused_in"]:
+                    warnings.append("This receipt file was already used for another product; claims will be reviewed.")
+            except doc_service.UploadError as exc:
+                db.session.rollback()
+                audit("UPLOAD_FAILED", "Product", None, reason=str(exc))
+                db.session.commit()
+                flash(str(exc), "danger")
+                return render_template("products/register.html", form=request.form, centers=centers, policies=policies), 400
+        if Product.query.filter(Product.serial_number == product.serial_number, Product.id != product.id).first():
+            warnings.append("Another product already uses this serial number. Any claim will get a duplicate check.")
+            audit("DUPLICATE_SERIAL_REGISTERED", "Product", product.product_id, serial=product.serial_number)
+        audit("PRODUCT_REGISTERED", "Product", product.product_id, owner=owner.user_id, category=product.category,
+              warranty_months=values["warranty_months"], extended=values["is_extended"])
+        db.session.commit()
+        for msg in warnings:
+            flash(msg, "warning")
+        flash(f"{product.product_name} registered as {product.product_id}. Warranty runs to "
+              f"{product.warranty.expiry_date:%d %b %Y}.", "success")
+        return redirect(url_for("products.view_product", product_id=product.product_id))
+    return render_template("products/register.html", form={}, centers=centers, policies=policies)
 
 
-@product_bp.route("/scan-receipt", methods=["POST"])
-@login_required
+@product_bp.post("/scan-receipt")
+@require("product.create")
 def scan_receipt():
-    """
-    Document scanning and extracted data verification endpoint for product registration.
-    Extracts purchase date, invoice number, product name, model number, serial number,
-    retailer, purchase amount, and warranty duration from PDF, JPG, JPEG, and PNG files.
-    """
-    uploaded_file = request.files.get("receipt_document") or request.files.get("document") or request.files.get("file")
-    if not uploaded_file or not uploaded_file.filename:
-        return jsonify({"success": False, "error": "No file uploaded. Please select an invoice or receipt."}), 400
-
-    ext = uploaded_file.filename.rsplit(".", 1)[-1].lower() if "." in uploaded_file.filename else ""
-    if ext not in Config.ALLOWED_DOCUMENT_EXTENSIONS:
-        return jsonify({
-            "success": False,
-            "error": f"Unsupported format '.{ext}'. Allowed formats: PDF, JPG, JPEG, PNG."
-        }), 400
-
-    upload_folder = Path(Config.UPLOAD_DIR)
-    upload_folder.mkdir(parents=True, exist_ok=True)
-    temp_filename = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secure_filename(uploaded_file.filename)}"
-    temp_path = upload_folder / temp_filename
-    uploaded_file.save(temp_path)
-
-    doc_processor = get_document_processor()
-    doc_info = doc_processor.process_document(temp_path, document_type="receipt")
-
-    if not doc_processor.is_valid_receipt_document(doc_info):
-        try:
-            if temp_path.exists():
-                temp_path.unlink()
-        except Exception:
-            pass
-        return jsonify({
-            "success": False,
-            "filename": doc_info["filename"],
-            "sha256": doc_info["sha256_hash"],
-            "error": "No readable invoice or receipt details were found in this file. Please upload a clear invoice or enter the details manually."
-        }), 200
-
-    return jsonify({
-        "success": True,
-        "filename": doc_info["filename"],
-        "temp_path": str(temp_path),
-        "sha256": doc_info["sha256_hash"],
-        "file_size_bytes": doc_info["file_size_bytes"],
-        "entities": doc_info["entities"],
-        "raw_text_snippet": doc_info["raw_text"][:250]
-    })
-
-
-def _ensure_document_file_on_disk(doc: ClaimDocument, target_path: Path) -> bool:
-    """Rebuilds a seeded document file on disk if it is missing from the upload directory."""
+    """Read a receipt for the registration form without storing it (SRS vi, vii)."""
+    file = request.files.get("receipt")
     try:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        suffix = target_path.suffix.lower()
-        p = doc.product or (doc.claim.product if doc.claim else None)
-        text_body = (
-            doc.ocr_extracted_text
-            or f"Document ID: {doc.document_id}\n"
-               f"Filename: {doc.original_filename}\n"
-               f"Document Type: {doc.document_type}\n"
-               f"SHA-256: {doc.file_hash_sha256}\n"
-        )
-        if suffix == ".pdf":
-            from reportlab.pdfgen import canvas
-            from reportlab.lib.pagesizes import letter
-            from reportlab.lib import colors
-
-            c = canvas.Canvas(str(target_path), pagesize=letter)
-            width, height = letter
-
-            # Header Banner
-            c.setFillColor(colors.HexColor("#0f172a"))
-            c.rect(40, height - 105, width - 80, 65, fill=1, stroke=0)
-            c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 16)
-            retailer_name = p.retailer if p and p.retailer else "AssureX Authorized Retailer"
-            c.drawString(58, height - 68, retailer_name.upper())
-            c.setFont("Helvetica", 10)
-            c.drawString(58, height - 86, "OFFICIAL TAX INVOICE & PROOF OF PURCHASE")
-
-            if p:
-                inv_no = p.invoice_number or "INV-2026-00100"
-                p_date = p.purchase_date.strftime("%Y-%m-%d") if p.purchase_date else "2026-01-15"
-                owner_name = p.owner.full_name if p.owner else "Registered Customer"
-                owner_email = p.owner.email if p.owner else "customer@assurex.local"
-                w_months = p.warranty.policy.coverage_duration_months if (p.warranty and p.warranty.policy) else 12
-                w_provider = p.warranty.warranty_provider if p.warranty else f"{p.brand} Manufacturer Warranty"
-                w_expiry = p.warranty.expiry_date.strftime("%Y-%m-%d") if p.warranty and p.warranty.expiry_date else "Active"
-
-                # Invoice Meta Box
-                c.setFillColor(colors.HexColor("#f8fafc"))
-                c.setStrokeColor(colors.HexColor("#cbd5e1"))
-                c.rect(40, height - 185, width - 80, 65, fill=1, stroke=1)
-
-                c.setFillColor(colors.HexColor("#334155"))
-                c.setFont("Helvetica-Bold", 9)
-                c.drawString(55, height - 140, "INVOICE NUMBER:")
-                c.drawString(55, height - 158, "PURCHASE DATE:")
-                c.drawString(55, height - 174, "DOCUMENT ID:")
-
-                c.setFont("Helvetica", 9)
-                c.drawString(155, height - 140, inv_no)
-                c.drawString(155, height - 158, p_date)
-                c.drawString(155, height - 174, doc.document_id)
-
-                c.setFont("Helvetica-Bold", 9)
-                c.drawString(320, height - 140, "BILLED TO:")
-                c.drawString(320, height - 158, "CUSTOMER EMAIL:")
-                c.drawString(320, height - 174, "PAYMENT STATUS:")
-
-                c.setFont("Helvetica", 9)
-                c.drawString(415, height - 140, owner_name)
-                c.drawString(415, height - 158, owner_email)
-                c.drawString(415, height - 174, "PAID IN FULL")
-
-                # Itemized Equipment Table Header
-                c.setFillColor(colors.HexColor("#1e293b"))
-                c.rect(40, height - 225, width - 80, 24, fill=1, stroke=0)
-                c.setFillColor(colors.white)
-                c.setFont("Helvetica-Bold", 9)
-                c.drawString(52, height - 216, "EQUIPMENT DESCRIPTION")
-                c.drawString(245, height - 216, "MODEL NO.")
-                c.drawString(345, height - 216, "SERIAL NUMBER")
-                c.drawRightString(width - 52, height - 216, "AMOUNT (USD)")
-
-                # Item Row
-                c.setFillColor(colors.white)
-                c.setStrokeColor(colors.HexColor("#cbd5e1"))
-                c.rect(40, height - 275, width - 80, 50, fill=1, stroke=1)
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.setFont("Helvetica-Bold", 10)
-                c.drawString(52, height - 245, p.product_name[:34])
-                c.setFont("Helvetica", 8.5)
-                c.setFillColor(colors.HexColor("#475569"))
-                c.drawString(52, height - 260, f"Brand: {p.brand}  |  Category: {p.category}")
-
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.setFont("Helvetica", 9.5)
-                c.drawString(245, height - 250, p.model_number)
-                c.drawString(345, height - 250, p.serial_number)
-                c.setFont("Helvetica-Bold", 10)
-                c.drawRightString(width - 52, height - 250, f"${p.purchase_price:,.2f}")
-
-                # Totals Box
-                c.setFillColor(colors.HexColor("#f1f5f9"))
-                c.rect(340, height - 335, width - 380, 48, fill=1, stroke=1)
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.setFont("Helvetica", 9)
-                c.drawString(355, height - 305, "Subtotal (Tax Included):")
-                c.drawRightString(width - 52, height - 305, f"${p.purchase_price:,.2f}")
-                c.setFont("Helvetica-Bold", 10.5)
-                c.drawString(355, height - 324, "TOTAL PURCHASE AMOUNT:")
-                c.drawRightString(width - 52, height - 324, f"${p.purchase_price:,.2f}")
-
-                # Warranty Terms Box
-                c.setFillColor(colors.HexColor("#f8fafc"))
-                c.rect(40, height - 415, width - 80, 62, fill=1, stroke=1)
-                c.setFillColor(colors.HexColor("#0f172a"))
-                c.setFont("Helvetica-Bold", 9.5)
-                c.drawString(52, height - 372, "WARRANTY COVERAGE & REGISTRATION SUMMARY")
-                c.setFont("Helvetica", 9)
-                c.drawString(52, height - 390, f"Warranty Provider: {w_provider}   |   Coverage Term: {w_months} Months")
-                c.drawString(52, height - 405, f"Coverage Expiration Date: {w_expiry}   |   Retailer Verification: Confirmed")
-                y_text = height - 450
-            else:
-                y_text = height - 135
-
-            # OCR / Text Summary Block (preserves full text extractability for pdfplumber)
-            c.setFillColor(colors.HexColor("#334155"))
-            c.setFont("Helvetica-Bold", 9)
-            c.drawString(40, y_text, "VERIFIED RECEIPT RECORD DETAILS:")
-            c.setFont("Helvetica", 8.5)
-            y = y_text - 16
-            for line in text_body.splitlines():
-                c.drawString(40, y, line[:95])
-                y -= 13
-                if y < 70:
-                    break
-
-            # Footer
-            c.setStrokeColor(colors.HexColor("#e2e8f0"))
-            c.line(40, 55, width - 40, 55)
-            c.setFillColor(colors.HexColor("#64748b"))
-            c.setFont("Helvetica", 7.5)
-            c.drawString(40, 40, f"Cryptographic SHA-256: {doc.file_hash_sha256}")
-            c.drawRightString(width - 40, 40, "AssureX Verified Proof-of-Purchase Archive")
-            c.save()
-            return True
-        elif suffix in [".png", ".jpg", ".jpeg"]:
-            from PIL import Image, ImageDraw
-            img = Image.new("RGB", (720, 480), color=(255, 255, 255))
-            draw = ImageDraw.Draw(img)
-            draw.rectangle([20, 20, 700, 460], outline=(30, 41, 59), width=2)
-            y = 45
-            for line in text_body.splitlines():
-                draw.text((40, y), line[:85], fill=(15, 23, 42))
-                y += 24
-            img.save(str(target_path))
-            return True
-        else:
-            target_path.write_text(text_body, encoding="utf-8")
-            return True
-    except Exception:
-        return False
+        data, mime, ext = doc_service.validate(file, "receipt")
+    except doc_service.UploadError as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / f"receipt.{ext}"
+        path.write_bytes(data)
+        result = ocr.process(path, mime, "receipt")
+    if result["status"] == "unavailable":
+        return jsonify(ok=False, status="unavailable",
+                       error="Automatic reading isn't available for this file type on this server. "
+                             "Type the details from your receipt.")
+    if result["status"] != "ok" or not ocr.looks_like_receipt(result["entities"]):
+        return jsonify(ok=False, status="unreadable", error="We couldn't find invoice details in this file. "
+                                                            "Check that it is the receipt and that it is legible.")
+    return jsonify(ok=True, entities=result["entities"])
 
 
-@product_bp.route("/documents/<string:document_id>/download", methods=["GET"])
-@login_required
-def download_document(document_id):
-    """
-    Securely serves or downloads uploaded purchase receipts,
-    invoices, warranty cards, damage photos, and repair reports.
-    Enforces user access rights before serving.
-    """
-    doc = ClaimDocument.query.filter_by(document_id=document_id).first()
-    if not doc:
-        from flask import abort
-        abort(404)
-    user = get_current_user()
-    if not user:
-        flash("Please sign in to continue.", "warning")
-        return redirect(url_for("auth.login"))
-
-    # Access control verification
-    is_authorized = False
-    if user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_REVIEWER, Config.ROLE_STAFF,
-        "administrator", "claim_reviewer", "service_center_staff", "Admin", "Reviewer", "Staff"
-    ]:
-        is_authorized = True
-    elif doc.product and doc.product.user_id == user.id:
-        is_authorized = True
-    elif doc.claim and doc.claim.user_id == user.id:
-        is_authorized = True
-
-    if not is_authorized:
-        flash("Access denied: You don't have permission to view this document.", "danger")
-        return redirect(request.referrer or url_for("auth.portal_redirect"))
-
-    normalized_name = str(doc.file_path or doc.original_filename).replace("\\", "/").split("/")[-1]
-    upload_candidate = (Path(Config.UPLOAD_DIR) / normalized_name).resolve()
-
-    raw_path = Path(doc.file_path) if doc.file_path else upload_candidate
-    if not raw_path.is_absolute():
-        base_candidate = (Path(Config.BASE_DIR) / str(doc.file_path).replace("\\", "/")).resolve()
-    else:
-        base_candidate = raw_path.resolve()
-
-    if base_candidate.exists() and base_candidate.is_file():
-        file_path = base_candidate
-    elif upload_candidate.exists() and upload_candidate.is_file():
-        file_path = upload_candidate
-    elif _ensure_document_file_on_disk(doc, upload_candidate):
-        file_path = upload_candidate
-    else:
-        flash("Document file not found on disk.", "warning")
-        return redirect(request.referrer or url_for("products.list_products"))
-
-    as_attachment = request.args.get("mode") == "download" or request.args.get("download") == "1"
-    return send_file(
-        str(file_path.resolve()),
-        as_attachment=as_attachment,
-        download_name=doc.original_filename
-    )
-
-
-@product_bp.route("/documents/<string:document_id>/replace", methods=["POST"])
-@login_required
-def replace_document(document_id):
-    """
-    Document Organization - Replace document.
-    Allows authorized users (owner, staff, admin) to replace an existing document file
-    with an updated version, recalculating checksum, file size, and re-running OCR extraction.
-    """
-    doc = ClaimDocument.query.filter_by(document_id=document_id).first_or_404()
-    user = get_current_user()
-    if not user:
-        flash("Please sign in to continue.", "warning")
-        return redirect(url_for("auth.login"))
-
-    # Access control verification
-    is_authorized = False
-    if user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_STAFF,
-        "administrator", "service_center_staff", "Admin", "Staff"
-    ]:
-        is_authorized = True
-    elif doc.product and doc.product.user_id == user.id:
-        is_authorized = True
-    elif doc.claim and doc.claim.user_id == user.id:
-        if doc.claim.status not in [Config.STATUS_APPROVED, Config.STATUS_REJECTED]:
-            is_authorized = True
-        else:
-            flash("Evidence documents cannot be altered on finalized claims.", "warning")
-            return redirect(request.referrer or url_for("claims.view_claim", claim_id=doc.claim.claim_id))
-
-    if not is_authorized:
-        flash("Access denied: You don't have permission to replace this document.", "danger")
-        return redirect(request.referrer or url_for("auth.portal_redirect"))
-
-    uploaded_file = request.files.get("replacement_file")
-    if not uploaded_file or not uploaded_file.filename:
-        flash("Please select a valid replacement file.", "warning")
-        return redirect(request.referrer or url_for("products.list_products"))
-
-    from src.rules.validator import ClaimValidator
-    ok, err_msg = ClaimValidator.validate_file(uploaded_file)
-    if not ok:
-        flash(err_msg, "danger")
-        return redirect(request.referrer or url_for("products.list_products"))
-
-    upload_folder = Path(Config.UPLOAD_DIR)
-    upload_folder.mkdir(parents=True, exist_ok=True)
-    clean_filename = secure_filename(uploaded_file.filename)
-    dest_filename = f"rep_{doc.document_id}_{clean_filename}"
-    save_path = upload_folder / dest_filename
-    uploaded_file.save(save_path)
-
-    # Recalculate file metadata & SHA-256
-    doc_processor = get_document_processor()
-    doc_info = doc_processor.process_document(save_path, document_type=doc.document_type)
-
-    ext = clean_filename.rsplit(".", 1)[-1].lower() if "." in clean_filename else ""
-    if doc.document_type in ["receipt", "invoice_document"] and ext in ["png", "jpg", "jpeg"] and not doc_processor.is_valid_receipt_document(doc_info):
-        try:
-            if save_path.exists():
-                save_path.unlink()
-        except Exception:
-            pass
-        flash("The uploaded receipt image does not contain readable invoice details. Please upload a clear receipt or invoice.", "danger")
-        return redirect(request.referrer or url_for("products.list_products"))
-
-    # Delete old file safely if different
-    try:
-        old_path = Path(doc.file_path)
-        if old_path.exists() and old_path.resolve() != save_path.resolve():
-            old_path.unlink()
-    except Exception:
-        pass
-
-    prev_name = doc.original_filename
-    doc.file_path = str(save_path)
-    doc.original_filename = clean_filename
-    doc.file_size_bytes = doc_info["file_size_bytes"]
-    doc.file_hash_sha256 = doc_info["sha256_hash"]
-    if doc_info.get("raw_text"):
-        doc.ocr_extracted_text = doc_info["raw_text"]
-        doc.ocr_data_json = json.dumps(doc_info.get("entities", {}))
-
-    audit = AuditLog(
-        user_id=user.id,
-        user_role=user.role,
-        action="DOCUMENT_REPLACED",
-        entity_type="CLAIM_DOCUMENT",
-        entity_id=doc.document_id,
-        details_json=json.dumps({
-            "previous_file": prev_name,
-            "new_file": clean_filename,
-            "new_sha256": doc.file_hash_sha256
-        }),
-        ip_address=request.remote_addr
-    )
-    db.session.add(audit)
-    db.session.commit()
-
-    flash(f"Document successfully replaced with '{clean_filename}'.", "success")
-    return redirect(request.referrer or url_for("products.list_products"))
-
-
-@product_bp.route("/documents/<string:document_id>/delete", methods=["POST"])
-@login_required
-def delete_document(document_id):
-    """
-    Document Organization - Remove document.
-    Allows authorized users (owner, staff, admin) to remove an uploaded document
-    according to their access rights.
-    """
-    doc = ClaimDocument.query.filter_by(document_id=document_id).first_or_404()
-    user = get_current_user()
-    if not user:
-        flash("Please sign in to continue.", "warning")
-        return redirect(url_for("auth.login"))
-
-    # Access control verification
-    is_authorized = False
-    if user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_STAFF,
-        "administrator", "service_center_staff", "Admin", "Staff"
-    ]:
-        is_authorized = True
-    elif doc.product and doc.product.user_id == user.id:
-        is_authorized = True
-    elif doc.claim and doc.claim.user_id == user.id:
-        if doc.claim.status not in [Config.STATUS_APPROVED, Config.STATUS_REJECTED]:
-            is_authorized = True
-        else:
-            flash("Evidence documents cannot be deleted from finalized claims.", "warning")
-            return redirect(request.referrer or url_for("claims.view_claim", claim_id=doc.claim.claim_id))
-
-    if not is_authorized:
-        flash("Access denied: You don't have permission to remove this document.", "danger")
-        return redirect(request.referrer or url_for("auth.portal_redirect"))
-
-    # Safely remove file on disk
-    try:
-        f_path = Path(doc.file_path)
-        if f_path.exists():
-            f_path.unlink()
-    except Exception:
-        pass
-
-    doc_name = doc.original_filename
-    doc_id_val = doc.document_id
-
-    audit = AuditLog(
-        user_id=user.id,
-        user_role=user.role,
-        action="DOCUMENT_REMOVED",
-        entity_type="CLAIM_DOCUMENT",
-        entity_id=doc_id_val,
-        details_json=json.dumps({"filename": doc_name}),
-        ip_address=request.remote_addr
-    )
-    db.session.add(audit)
-    db.session.delete(doc)
-    db.session.commit()
-
-    flash(f"Document '{doc_name}' has been successfully removed.", "success")
-    return redirect(request.referrer or url_for("products.list_products"))
-
-
-
-@product_bp.route("/<string:product_id>", methods=["GET"])
-@login_required
+@product_bp.get("/<string:product_id>")
+@require("product.read")
 def view_product(product_id):
-    """
-    Detailed product overview showing hardware specifications, warranty lifecycle countdown,
-    policy coverage conditions, exclusions, historical service records, and uploaded proof documents.
-    """
-    product = Product.query.filter_by(product_id=product_id).first_or_404()
-    curr_user = get_current_user()
-    if not curr_user:
-        flash("Please sign in to continue.", "warning")
-        return redirect(url_for("auth.login"))
-
-    is_elevated = curr_user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_STAFF, Config.ROLE_REVIEWER,
-        "administrator", "service_center_staff", "claim_reviewer", "Admin", "Staff", "Reviewer"
-    ]
-    if not is_elevated and product.user_id != curr_user.id:
-        flash("Access denied: You can only view your own registered products.", "danger")
-        return redirect(url_for("products.list_products"))
-    policy_rules = product.warranty.policy.get_rules() if product.warranty and product.warranty.policy else {}
-    return render_template("customer/product_detail.html", product=product, policy_rules=policy_rules)
+    product = _load(product_id, "product.read")
+    claims = [c for c in product.claims if check("claim.read", c)]
+    docs = [d for d in product.documents if d.claim_id is None]
+    return render_template("products/detail.html", product=product, claims=claims, docs=docs,
+                           policy=get_policy(product.category), doc_types=PRODUCT_DOC_TYPES,
+                           alert_window=alert_days(), today=date.today())
 
 
-@product_bp.route("/<string:product_id>/repairs/new", methods=["POST"])
-@login_required
-def add_repair_record(product_id):
-    """
-    Repair History Management
-    Records previous repair dates, repair-center details, replaced parts, repair outcomes,
-    repair costs, and whether each repair was completed by an authorized or unauthorized service center.
-    """
-    user = get_current_user()
-    if not user:
-        flash("Please sign in to continue.", "warning")
-        return redirect(url_for("auth.login"))
-    product = Product.query.filter_by(product_id=product_id).first_or_404()
-
-    # Permission check: owner, service center staff, or administrator
-    is_staff_or_admin = user.role in [
-        Config.ROLE_ADMIN, Config.ROLE_STAFF,
-        "administrator", "service_center_staff", "Admin", "Staff"
-    ]
-    if not is_staff_or_admin and product.user_id != user.id:
-        flash("You do not have authorization to log repairs for this equipment asset.", "danger")
-        return redirect(url_for("products.view_product", product_id=product.product_id))
-
-    repair_date_str = request.form.get("repair_date")
-    repair_center = request.form.get("repair_center", "").strip()
-    replaced_parts = request.form.get("replaced_parts", "").strip()
-    outcome = request.form.get("outcome", "Repaired").strip()
-    repair_cost_str = request.form.get("repair_cost", "0.0")
-    is_authorized = request.form.get("is_authorized_center") in ["true", "1", "on", "yes", True]
-    notes = request.form.get("notes", "").strip()
-
-    from src.rules.validator import ClaimValidator
-    repair_date = ClaimValidator.parse_date(repair_date_str)
-    if not repair_date:
-        repair_date = date.today()
-    elif repair_date > date.today():
-        flash("Repair date cannot be in the future.", "warning")
-        return redirect(url_for("products.view_product", product_id=product.product_id))
-    elif product.purchase_date and repair_date < product.purchase_date:
-        flash("Repair date cannot be before the product purchase date.", "warning")
-        return redirect(url_for("products.view_product", product_id=product.product_id))
-
-    try:
-        repair_cost = float(repair_cost_str)
-    except ValueError:
-        flash("Please enter a valid numerical repair cost.", "warning")
-        return redirect(url_for("products.view_product", product_id=product.product_id))
-
-    if repair_cost < 0:
-        flash("Repair cost cannot be negative.", "warning")
-        return redirect(url_for("products.view_product", product_id=product.product_id))
-
-    repair = RepairHistory(
-        product_id=product.id,
-        repair_date=repair_date,
-        repair_center=repair_center or "Authorized Service Center",
-        replaced_parts=replaced_parts or "None / Inspection Only",
-        outcome=outcome,
-        repair_cost=repair_cost,
-        is_authorized_center=is_authorized,
-        notes=notes
-    )
-    db.session.add(repair)
-
-    AuditLog.log_event(
-        action="REPAIR_RECORDED",
-        user_id=user.id,
-        user_role=user.role,
-        entity_type="Product",
-        entity_id=product.product_id,
-        details={
-            "repair_id": repair.repair_id,
-            "repair_center": repair_center,
-            "is_authorized": is_authorized,
-            "outcome": outcome,
-            "cost": repair_cost
-        }
-    )
+@product_bp.post("/<string:product_id>/update")
+@require("product.update")
+def update_product(product_id):
+    product = _load(product_id, "product.update")
+    if any(c.status != Config.STATUS_DRAFT for c in product.claims):
+        flash("Product details are locked once a claim has been submitted for it.", "warning")
+        return redirect(url_for("products.view_product", product_id=product_id))
+    form = {**product.to_dict(), "category": product.category, **{k: v for k, v in request.form.items() if v}}
+    form["purchase_date"] = request.form.get("purchase_date") or product.purchase_date.isoformat()
+    form["warranty_months"] = request.form.get("warranty_months") or product.warranty.duration_months
+    form["warranty_type"] = request.form.get("warranty_type") or ("extended" if product.warranty.is_extended else "standard")
+    values, errors, _ = validator.product_form(form)
+    if errors:
+        for msg in errors:
+            flash(msg, "warning")
+        return redirect(url_for("products.view_product", product_id=product_id))
+    for field in ("product_name", "brand", "model_number", "retailer", "invoice_number", "purchase_price", "purchase_date"):
+        setattr(product, field, values[field])
+    w = product.warranty
+    w.start_date = values["purchase_date"]
+    w.duration_months, w.is_extended = values["warranty_months"], values["is_extended"]
+    w.expiry_date = w.start_date + timedelta(days=coverage_days(values["warranty_months"]))
+    if values["warranty_provider"]:
+        w.warranty_provider = values["warranty_provider"]
+    audit("PRODUCT_UPDATED", "Product", product.product_id, fields=sorted(request.form.keys()))
     db.session.commit()
+    flash("Product and warranty updated.", "success")
+    return redirect(url_for("products.view_product", product_id=product_id))
 
-    flash(f"Service and maintenance record {repair.repair_id} recorded successfully.", "success")
-    return redirect(url_for("products.view_product", product_id=product.product_id))
 
+@product_bp.post("/<string:product_id>/documents")
+@require("document.upload")
+def upload_product_document(product_id):
+    product = _load(product_id, "product.read")
+    authorize_object("document.upload", product)
+    kind = request.form.get("document_type", "")
+    if kind not in PRODUCT_DOC_TYPES:
+        abort(400)
+    try:
+        doc, info = doc_service.store(request.files.get("file"), kind, product=product, uploader=g.user)
+    except doc_service.UploadError as exc:
+        audit("UPLOAD_FAILED", "Product", product.product_id, reason=str(exc))
+        db.session.commit()
+        flash(str(exc), "danger")
+        return redirect(url_for("products.view_product", product_id=product_id, _anchor="documents"))
+    db.session.flush()
+    audit("DOCUMENT_UPLOADED", "ClaimDocument", doc.document_id, product=product.product_id, type=kind,
+          sha256=doc.file_hash_sha256, ocr=info["ocr_status"])
+    db.session.commit()
+    if info["reused_in"]:
+        flash("This exact file was already uploaded elsewhere; it will be flagged as a possible duplicate.", "warning")
+    flash(f"{doc.original_filename} uploaded.", "success")
+    return redirect(url_for("products.view_product", product_id=product_id, _anchor="documents"))
+
+
+@product_bp.post("/<string:product_id>/repairs")
+@require("repair.record")
+def add_repair(product_id):
+    product = _load(product_id, "repair.record")
+    f = request.form
+    repair_date = try_parse_date(f.get("repair_date"))
+    errors = []
+    if repair_date is None or repair_date > date.today():
+        errors.append("Enter a repair date that is not in the future.")
+    if not f.get("repair_center", "").strip():
+        errors.append("Enter the repair center.")
+    try:
+        cost = round(float(f.get("repair_cost") or 0), 2)
+        if cost < 0:
+            raise ValueError
+    except ValueError:
+        errors.append("Repair cost must be a positive number.")
+        cost = 0
+    if errors:
+        for msg in errors:
+            flash(msg, "warning")
+        return redirect(url_for("products.view_product", product_id=product_id, _anchor="repairs"))
+    rec = RepairHistory(product=product, recorded_by_id=g.user.id, repair_date=repair_date,
+                        repair_center=f["repair_center"].strip()[:120],
+                        replaced_parts=f.get("replaced_parts", "").strip()[:255] or None,
+                        outcome=f.get("outcome") if f.get("outcome") in ("Repaired", "Replaced", "Not repairable", "Pending") else "Repaired",
+                        repair_cost=cost, is_authorized_center=f.get("is_authorized_center") == "1",
+                        serial_number_seen=f.get("serial_number_seen", "").strip().upper() or None,
+                        notes=f.get("notes", "").strip() or None)
+    db.session.add(rec)
+    db.session.flush()
+    audit("REPAIR_RECORDED", "Product", product.product_id, repair=rec.repair_id, authorised=rec.is_authorized_center)
+    db.session.commit()
+    flash("Repair recorded.", "success")
+    return redirect(url_for("products.view_product", product_id=product_id, _anchor="repairs"))

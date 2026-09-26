@@ -1,0 +1,139 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import status, decision, csrf, empty, doc_icon %}
+{% block title %}{{ product.product_name }}{% endblock %}
+{% block content %}
+{% set w = product.warranty %}
+<div class="page-head">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('products.list_products') }}">Products</a><i class="bi bi-chevron-right"></i><span class="id">{{ product.product_id }}</span></div>
+    <h1>{{ product.product_name }}</h1>
+    <div class="row mt-1"><span class="chip">{{ product.category }}</span><span class="chip">{{ product.brand }} · {{ product.model_number }}</span><span class="chip mono">{{ product.serial_number }}</span>
+      {% if current_user.role != 'customer' %}<span class="chip"><i class="bi bi-person"></i>{{ product.owner.full_name }}</span>{% endif %}</div>
+  </div>
+  {% if can('claim.create', product) and w %}<a class="btn" href="{{ url_for('claims.new_claim', product=product.product_id) }}"><i class="bi bi-plus-lg"></i>File a claim</a>{% endif %}
+</div>
+
+<div class="split">
+  <div class="stack">
+    {% if w %}
+    <section class="card">
+      <div class="card-h"><h2 class="section-title"><i class="bi bi-shield-check"></i>Warranty</h2><span class="badge lg {{ tone('warranty', w.status) }}">{{ w.status }}</span></div>
+      <div class="card-b stack">
+        <div class="grid grid-3">
+          <div><div class="big-number">{{ w.remaining_days() }}</div><div class="small muted">days of cover left</div></div>
+          <div><div class="big-number" style="font-size:1.4rem">{{ w.expiry_date|date }}</div><div class="small muted">expiry date</div></div>
+          <div><div class="big-number" style="font-size:1.4rem">{{ w.duration_months }} mo</div><div class="small muted">{{ 'extended' if w.is_extended else 'standard' }} term</div></div>
+        </div>
+        <div>
+          <div class="meter {{ tone('warranty', w.status) }}" style="height:10px"><i style="width: {{ (w.life_used * 100)|round }}%"></i></div>
+          <div class="row between tiny muted mt-1"><span>Started {{ w.start_date|date }}</span><span>{{ (w.life_used * 100)|round|int }}% used</span><span>Grace period {{ policy.grace_period_days }} days after expiry</span></div>
+        </div>
+        {% if w.is_approaching_expiry() %}<div class="alert warning mb-0"><i class="lead bi bi-hourglass-split"></i><div>Cover ends within {{ alert_window }} days. If something is already faulty, file the claim now.</div></div>{% endif %}
+        <dl class="kv">
+          <dt>Provider</dt><dd>{{ w.warranty_provider }}</dd>
+          <dt>Service center</dt><dd>{{ w.service_center_name or (product.service_center.name if product.service_center else 'Any authorised center') }}</dd>
+          <dt>Covered faults</dt><dd>{{ policy.covered_faults|join(', ') }}</dd>
+          <dt>Exclusions</dt><dd>{{ policy.exclusions|join('; ') }}</dd>
+          <dt>Report faults within</dt><dd>{{ policy.claim_reporting_period_days }} days</dd>
+          <dt>Repairs</dt><dd>{{ policy.repair_conditions }}</dd>
+        </dl>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <div class="card-h"><h2 class="section-title"><i class="bi bi-folder2-open"></i>Claims</h2></div>
+      {% if claims %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Claim</th><th>Status</th><th>Recommendation</th><th>Submitted</th></tr></thead>
+        <tbody>{% for c in claims %}<tr><td><a href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}"><b>{{ c.fault_category }}</b></a><div class="t-sub"><span class="id">{{ c.claim_id }}</span></div></td><td>{{ status(c.status) }}</td><td>{{ decision(c.final_decision) }}</td><td class="small muted">{{ c.claim_submission_date|date if c.claim_submission_date else 'Draft' }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}{{ empty('bi-emoji-smile', 'No claims for this product') }}{% endif %}
+    </section>
+
+    <section class="card" id="documents">
+      <div class="card-h"><h2 class="section-title"><i class="bi bi-paperclip"></i>Product documents</h2><span class="hint">Used automatically by every claim on this product</span></div>
+      <ul class="list">
+        {% for d in docs %}
+          <li><span class="ico"><i class="bi {{ doc_icon(d.document_type) }}"></i></span>
+            <div class="grow"><div class="ttl small">{{ doc_label(d.document_type) }}</div><div class="sub">{{ d.original_filename }} · <span class="mono">{{ d.file_hash_sha256[:12] }}</span> · {{ d.created_at|date }}{% if d.ocr_status == 'ok' %} · text read{% endif %}</div></div>
+            <div class="row">
+              <a class="btn quiet sm" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener">Open</a>
+              {% if can('document.replace', d) %}
+              <form class="row" method="post" enctype="multipart/form-data" action="{{ url_for('claims.replace_document', doc_id=d.document_id) }}">{{ csrf() }}
+                <label class="btn quiet sm" style="position:relative; overflow:hidden">Replace<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" data-autosubmit style="position:absolute; inset:0; opacity:0; cursor:pointer"></label></form>
+              {% endif %}
+              {% if can('document.delete', d) %}
+              <form method="post" action="{{ url_for('claims.delete_document', doc_id=d.document_id) }}" data-confirm="Remove this document?">{{ csrf() }}<button class="btn danger sm">Remove</button></form>
+              {% endif %}
+            </div></li>
+        {% else %}<li class="small muted">No product-level documents yet. Uploading the receipt here saves you doing it for every claim.</li>{% endfor %}
+      </ul>
+      {% if can('document.upload', product) %}
+      <form class="card-f row" method="post" enctype="multipart/form-data" action="{{ url_for('products.upload_product_document', product_id=product.product_id) }}">{{ csrf() }}
+        <select class="select sm" name="document_type" style="width:auto" aria-label="Document type">{% for k in doc_types %}<option value="{{ k }}">{{ doc_label(k) }}</option>{% endfor %}</select>
+        <input class="input sm" type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png" style="flex:1; min-width:200px">
+        <button class="btn sm" type="submit"><i class="bi bi-cloud-upload"></i>Upload</button>
+      </form>
+      {% endif %}
+    </section>
+
+    <section class="card" id="repairs">
+      <div class="card-h"><h2 class="section-title"><i class="bi bi-wrench-adjustable"></i>Repair history</h2></div>
+      {% if product.repair_records %}
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th>Date</th><th>Center</th><th>Work</th><th>Outcome</th><th class="right">Cost</th></tr></thead>
+        <tbody>{% for r in product.repair_records|reverse %}
+          <tr><td class="nowrap">{{ r.repair_date|date }}</td>
+            <td>{{ r.repair_center }} {% if r.is_authorized_center %}<span class="badge good plain">authorised</span>{% else %}<span class="badge bad plain">unauthorised</span>{% endif %}</td>
+            <td class="small">{{ r.replaced_parts or '—' }}{% if r.notes %}<div class="muted">{{ r.notes }}</div>{% endif %}</td>
+            <td>{{ r.outcome }}</td><td class="right">{{ '%.2f'|format(r.repair_cost) }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}{{ empty('bi-wrench', 'No repairs on record') }}{% endif %}
+      {% if can('repair.record', product) %}
+      <details class="card-f"><summary class="small" style="cursor:pointer; font-weight:600"><i class="bi bi-plus-circle"></i> Record a repair</summary>
+        <form class="form-grid mt-2" method="post" action="{{ url_for('products.add_repair', product_id=product.product_id) }}">{{ csrf() }}
+          <label class="field"><span>Repair date</span><input class="input sm" type="date" name="repair_date" max="{{ today.isoformat() }}" required></label>
+          <label class="field"><span>Repair center</span><input class="input sm" name="repair_center" required></label>
+          <label class="field"><span>Parts replaced</span><input class="input sm" name="replaced_parts"></label>
+          <label class="field"><span>Outcome</span><select class="select sm" name="outcome">{% for o in ['Repaired', 'Replaced', 'Not repairable', 'Pending'] %}<option>{{ o }}</option>{% endfor %}</select></label>
+          <label class="field"><span>Cost</span><input class="input sm" name="repair_cost" inputmode="decimal" value="0"></label>
+          <label class="field"><span>Serial seen on unit</span><input class="input sm mono" name="serial_number_seen" placeholder="{{ product.serial_number }}"></label>
+          <label class="check full"><input type="checkbox" name="is_authorized_center" value="1" checked> Done by an authorised service center</label>
+          <label class="field full"><span>Notes</span><input class="input sm" name="notes"></label>
+          <div class="full"><button class="btn sm" type="submit">Save repair</button></div>
+        </form></details>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="card">
+      <div class="card-h"><h2>Purchase</h2></div>
+      <div class="card-b"><dl class="kv">
+        <dt>Product ID</dt><dd><span class="id">{{ product.product_id }}</span></dd>
+        <dt>Bought</dt><dd>{{ product.purchase_date|date }}</dd>
+        <dt>Retailer</dt><dd>{{ product.retailer }}</dd>
+        <dt>Price</dt><dd>{{ '{:,.2f}'.format(product.purchase_price) }}</dd>
+        <dt>Invoice</dt><dd class="mono">{{ product.invoice_number or '—' }}</dd>
+        <dt>Registered</dt><dd>{{ product.created_at|date }}</dd>
+      </dl></div>
+    </section>
+    {% if can('product.update', product) and not (product.claims|rejectattr('status', 'equalto', 'Draft')|list) %}
+    <section class="card">
+      <div class="card-h"><h2>Correct details</h2></div>
+      <form class="card-b stack-sm" method="post" action="{{ url_for('products.update_product', product_id=product.product_id) }}">{{ csrf() }}
+        <label class="field"><span>Product name</span><input class="input sm" name="product_name" value="{{ product.product_name }}"></label>
+        <label class="field"><span>Retailer</span><input class="input sm" name="retailer" value="{{ product.retailer }}"></label>
+        <label class="field"><span>Invoice number</span><input class="input sm" name="invoice_number" value="{{ product.invoice_number or '' }}"></label>
+        <label class="field"><span>Purchase date</span><input class="input sm" type="date" name="purchase_date" value="{{ product.purchase_date.isoformat() }}"></label>
+        <label class="field"><span>Warranty months</span><input class="input sm" type="number" min="1" max="120" name="warranty_months" value="{{ w.duration_months if w else '' }}"></label>
+        <button class="btn quiet sm" type="submit">Save</button>
+        <span class="tiny muted">Locked once a claim is submitted for this product.</span>
+      </form>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

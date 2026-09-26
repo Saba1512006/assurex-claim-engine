@@ -1,0 +1,37 @@
+{% extends "components/base.html" %}
+{% block title %}Audit trail{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Compliance</div>
+    <h1>Audit trail</h1>
+    <p class="lede">Append-only record of sign-ins, registrations, uploads, OCR corrections, predictions, submissions, status changes, reviewer actions, configuration changes and blocked access attempts.</p>
+  </div>
+  <a class="btn quiet" href="{{ url_for('admin.export', kind='audit') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>
+</div>
+<form class="card" method="get"><div class="card-b filters">
+  <label class="field"><span>Action</span><select class="select sm" name="action" data-autosubmit><option value="">All actions</option>{% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}</select></label>
+  <label class="field grow"><span>Search entity or details</span><input class="input sm" name="q" value="{{ args.get('q', '') }}" placeholder="CLM-…, USR-…, a file hash…"></label>
+  <div class="row"><button class="btn sm" type="submit">Search</button><a class="btn ghost sm" href="{{ url_for('admin.audit_log') }}">Clear</a></div>
+</div></form>
+<section class="card mt-3">
+  <div class="card-h"><h2>{{ rows.total }} event{{ 's' if rows.total != 1 }}</h2><span class="hint">page {{ rows.page }} of {{ rows.pages or 1 }}</span></div>
+  <div class="table-wrap"><table class="table compact small">
+    <thead><tr><th>Time (UTC)</th><th>Action</th><th>Actor</th><th>Entity</th><th>Details</th><th>IP</th></tr></thead>
+    <tbody>{% for a in rows.items %}
+      <tr><td class="nowrap">{{ a.timestamp|date('%d %b %Y %H:%M:%S') }}</td>
+        <td><span class="badge plain {{ 'bad' if a.action in ['ACCESS_DENIED', 'LOGIN_FAILED', 'LOGIN_LOCKED', 'UPLOAD_FAILED', 'MODEL_UNAVAILABLE'] else ('info' if 'MODEL' in a.action or 'DECISION' in a.action else '') }}">{{ a.action }}</span></td>
+        <td>{{ a.actor.full_name if a.actor else '—' }}{% if a.user_role %}<div class="t-sub">{{ role_label(a.user_role) }}</div>{% endif %}</td>
+        <td>{% if a.entity_type %}<div class="t-sub">{{ a.entity_type }}</div>{% endif %}<span class="id">{{ a.entity_id or '—' }}</span></td>
+        <td style="max-width:420px"><code class="tiny" style="white-space:pre-wrap; word-break:break-word">{{ a.details_json|truncate(260) if a.details_json else '' }}</code></td>
+        <td class="mono tiny">{{ a.ip_address or '' }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% if rows.pages > 1 %}
+  <div class="card-f row between">
+    {% if rows.has_prev %}<a class="btn quiet sm" href="{{ url_with(page=rows.prev_num) }}">← Newer</a>{% else %}<span></span>{% endif %}
+    {% if rows.has_next %}<a class="btn quiet sm" href="{{ url_with(page=rows.next_num) }}">Older →</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

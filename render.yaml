@@ -2,9 +2,11 @@ services:
   - type: web
     name: assurex-claim-engine
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn src.app:app
+    buildCommand: pip install -r requirements.txt && python database/seed.py --if-empty
+    startCommand: gunicorn wsgi:app --workers 2 --timeout 60
     plan: free
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true

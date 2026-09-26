@@ -1,0 +1,52 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import status, decision %}
+{% block title %}Track {{ claim.claim_id }}{% endblock %}
+{% block content %}
+{% set reached = claim.status_history|map(attribute='new_status')|list %}
+{% set order = stages.index(claim.status) %}
+<div class="page-head">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}"><span class="id">{{ claim.claim_id }}</span></a><i class="bi bi-chevron-right"></i><span>Tracking</span></div>
+    <h1>Where is my claim?</h1>
+    <p class="lede">{{ claim.product.product_name }} · {{ claim.fault_category }}</p>
+  </div>
+  <a class="btn quiet" href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}">Open full claim</a>
+</div>
+
+<section class="card"><div class="card-b" style="padding: 28px 24px">
+  <ol class="stages" aria-label="Claim progress">
+    {% for s in stages %}<li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'skip') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>{% endfor %}
+  </ol>
+</div></section>
+
+<div class="grid grid-2 mt-3">
+  <section class="card">
+    <div class="card-h"><h2>Right now</h2>{{ status(claim.status) }}</div>
+    <div class="card-b stack-sm">
+      {% set explain_status = {
+        'Draft': 'The claim is saved but not submitted. Open it to add evidence and submit.',
+        'Submitted': 'We received the claim and are about to evaluate it.',
+        'Under Evaluation': 'Both models and the warranty rules are running.',
+        'Additional Information Required': 'A reviewer needs more information from you. Open the claim, upload what was asked for and resubmit.',
+        'Manual Review': 'A claim reviewer is checking the evidence. You will be notified of the decision.',
+        'Approved': 'The claim was approved. The service center will contact you about the repair or replacement.',
+        'Rejected': 'The claim was rejected. The reason is shown on the claim page.',
+        'Closed': 'The claim is closed. No further action is needed.'} %}
+      <p class="mb-0">{{ explain_status[claim.status] }}</p>
+      {% if claim.final_decision %}<div class="row"><span class="small muted">Automated recommendation:</span>{{ decision(claim.final_decision) }}</div>{% endif %}
+      {% if claim.status == 'Additional Information Required' and claim.reviewer_notes %}<div class="callout warn small"><b>Reviewer's request:</b> {{ claim.reviewer_notes }}</div>{% endif %}
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-h"><h2>Timeline</h2></div>
+    <div class="card-b">
+      <ol class="timeline">
+        {% for h in claim.status_history|reverse %}
+          <li><span class="dot {{ tone('status', h.new_status) }}"></span><div class="small"><b>{{ h.new_status }}</b></div>
+            <div class="tiny muted">{{ h.reason_comment }}</div><div class="when">{{ h.created_at|date('%d %b %Y %H:%M') }}</div></li>
+        {% endfor %}
+      </ol>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import csrf %}
+{% block title %}Models{% endblock %}
+{% block content %}
+{% set card = m.card %}{% set t = card.get('test', {}) %}{% set ge = m.gtm_eval %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Configuration</div>
+    <h1>Models</h1>
+    <p class="lede">Both models are versioned by the hash of their file. Every stored prediction records the version that made it, so installing a new model never changes past results.</p>
+  </div>
+</div>
+
+<div class="grid grid-2">
+  <section class="card">
+    <div class="card-h"><h2 class="section-title"><i class="bi bi-table"></i>Python classification model</h2>
+      <span class="badge {{ 'good' if m.python.ok else 'bad' }}">{{ 'Loaded' if m.python.ok else 'Unavailable' }}</span></div>
+    <div class="card-b">
+      {% if m.python.ok %}
+      <dl class="kv">
+        <dt>Version</dt><dd class="mono">{{ m.python.version }}</dd>
+        <dt>Algorithm</dt><dd>{{ (t.get('selected_model') or '')|replace('_', ' ')|title }}, sigmoid-calibrated (5-fold)</dd>
+        <dt>Trained with</dt><dd>scikit-learn {{ card.get('sklearn_version') }} · seed {{ card.get('seed') }}</dd>
+        <dt>Inputs</dt><dd>{{ card.get('features', [])|length }} features (8 numeric, 10 binary, 2 categorical)</dd>
+        <dt>Test accuracy</dt><dd>{{ t.get('accuracy')|pct(1) }} <span class="muted">(SRS target 85%)</span></dd>
+        <dt>Macro F1 / ROC-AUC</dt><dd>{{ t.get('f1_macro')|pct(1) }} / {{ t.get('roc_auc_ovr_macro') }}</dd>
+        <dt>Calibration (ECE)</dt><dd>{{ t.get('ece') }} <span class="muted">· mean top confidence {{ t.get('mean_top_confidence')|pct(1) }}</span></dd>
+      </dl>
+      {% else %}<div class="unavailable">{{ m.python.error }}</div>{% endif %}
+    </div>
+    <div class="card-f small muted">Retrain: <code>python notebooks/train_python_v2.py</code> · full evidence on <a href="{{ url_for('admin.analytics') }}">Analytics</a></div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2 class="section-title"><i class="bi bi-image"></i>Google Teachable Machine</h2>
+      <span class="badge {{ 'good' if m.gtm.ok else 'warn' }}">{{ 'Loaded' if m.gtm.ok else 'Not installed' }}</span></div>
+    <div class="card-b stack">
+      {% if m.gtm.ok %}
+        <dl class="kv">
+          <dt>Version</dt><dd class="mono">{{ m.gtm.version }}</dd>
+          <dt>File</dt><dd>{{ m.gtm.file }} · {{ 'quantized' if m.gtm.quantized else 'float' }} · input {{ m.gtm.input }}</dd>
+          {% if ge %}
+          <dt>Test accuracy</dt><dd>{{ ge.test.gtm_accuracy|pct(1) }} <span class="muted">macro F1 {{ ge.test.gtm_f1_macro|pct(1) }}</span></dd>
+          <dt>Validation accuracy</dt><dd>{{ ge.val.gtm_accuracy|pct(1) }}</dd>
+          <dt>Agrees with Python</dt><dd>{{ ge.test.agreement_rate|pct(1) }} of test claims</dd>
+          {% endif %}
+        </dl>
+        <form method="post" action="{{ url_for('admin.evaluate_gtm') }}">{{ csrf() }}<button class="btn quiet" type="submit"><i class="bi bi-clipboard-data"></i>{{ 'Re-run' if ge else 'Run' }} evaluation on validation + test cards</button></form>
+      {% else %}
+        <div class="unavailable"><b>{{ m.gtm.error }}</b><span>Until it is installed, the comparison reports “Uncertain Result” and every claim goes to manual review — the system never decides on one model.</span></div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="card mt-3">
+  <div class="card-h"><h2 class="section-title"><i class="bi bi-mortarboard"></i>Train and install the Teachable Machine model</h2></div>
+  <div class="card-b grid grid-2">
+    <ol class="stack-sm small" style="padding-left:18px; margin:0">
+      <li><b>Download the training cards</b> — {{ dataset.get('splits', {}).get('train', {}).get('rows', 1050) * 2 }} images in three class folders (two variations per training claim). Validation and test cards are not included.
+        <div class="mt-1"><a class="btn quiet sm" href="{{ url_for('admin.training_cards') }}"><i class="bi bi-file-zip"></i>Download training cards (.zip)</a></div></li>
+      <li>Open <b>teachablemachine.withgoogle.com</b> → Image Project → Standard image model.</li>
+      <li>Rename the classes to <b>Valid Claim</b>, <b>Invalid Claim</b> and <b>Manual Review</b> and upload each folder into its class.</li>
+      <li>Train (defaults: 50 epochs, batch 16, learning rate 0.001 are a good start).</li>
+      <li>Export Model → <b>Tensorflow Lite</b> → Floating point → Download. Unzip it.</li>
+      <li>Upload <code>model_unquant.tflite</code> and <code>labels.txt</code> here, then run the evaluation.</li>
+    </ol>
+    <form class="stack" method="post" enctype="multipart/form-data" action="{{ url_for('admin.upload_gtm') }}">{{ csrf() }}
+      <label class="dropzone" data-dropzone><span class="ico"><i class="bi bi-cpu"></i></span><span><b class="small">Model file (.tflite)</b><input type="file" name="model" accept=".tflite" required></span></label>
+      <label class="dropzone" data-dropzone><span class="ico"><i class="bi bi-tags"></i></span><span><b class="small">labels.txt</b><input type="file" name="labels" accept=".txt" required></span></label>
+      <div class="callout small">The file is checked (TensorFlow Lite header, three labels matching the classes, loads and runs) before it replaces the current model. The previous model is archived{% if gtm_versions %} — {{ gtm_versions|length }} archived version{{ 's' if gtm_versions|length != 1 }}{% endif %}.</div>
+      <button class="btn" type="submit"><i class="bi bi-upload"></i>Install model</button>
+    </form>
+  </div>
+</section>
+
+<section class="card mt-3">
+  <div class="card-h"><h2>Sample Claim Summary Cards</h2><span class="hint">600×600 · facts only · same renderer for training and live claims</span></div>
+  <div class="card-b tiles" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
+    {% for folder, label in [('valid', 'Valid Claim'), ('invalid', 'Invalid Claim'), ('manual_review', 'Manual Review')] %}
+      {% set sample = sample_cards[folder] %}
+      {% if sample %}<figure style="margin:0"><img class="summary-card-img" src="{{ url_for('admin.sample_card', split='train', name=sample) }}" alt="{{ label }} training card" loading="lazy" width="600" height="600">
+        <figcaption class="small mt-1"><span class="badge {{ tone('class', label) }}">{{ label }}</span> <span class="id">{{ sample }}</span></figcaption></figure>{% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

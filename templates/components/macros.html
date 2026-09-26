@@ -1,0 +1,62 @@
+{% macro badge(text, kind=None, value=None, extra='') -%}
+  <span class="badge {{ tone(kind, value if value is not none else text) if kind else 'neutral' }} {{ extra }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro status(s) -%}{{ badge(s, 'status') }}{%- endmacro %}
+{% macro decision(d) -%}{% if d %}{{ badge(d, 'decision') }}{% else %}<span class="badge plain">Not evaluated</span>{% endif %}{%- endmacro %}
+{% macro klass(c) -%}{% if c %}{{ badge(c, 'class') }}{% else %}<span class="badge warn plain">Unavailable</span>{% endif %}{%- endmacro %}
+{% macro risk(r) -%}{% if r %}{{ badge(r ~ ' risk', 'risk', r) }}{% endif %}{%- endmacro %}
+
+{% macro csrf() -%}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{%- endmacro %}
+
+{% macro probs(scores) -%}
+  {% set top = scores|dictsort(by='value')|last %}
+  <div class="probs">
+  {% for name in ['Valid Claim', 'Invalid Claim', 'Manual Review'] %}
+    {% set v = scores.get(name) or 0 %}
+    <div class="prob {{ 'top' if name == top[0] }}">
+      <span class="name">{{ name }}</span>
+      <div class="meter {{ tone('class', name) }}"><i style="width: {{ (v * 100)|round(1) }}%"></i></div>
+      <span class="val">{{ (v * 100)|round(1) }}%</span>
+    </div>
+  {% endfor %}
+  </div>
+{%- endmacro %}
+
+{% macro empty(icon, title, text='', action_url=None, action_label=None) -%}
+  <div class="empty">
+    <i class="bi {{ icon }}" aria-hidden="true"></i>
+    <b>{{ title }}</b>
+    {% if text %}<div class="small">{{ text }}</div>{% endif %}
+    {% if action_url %}<a class="btn sm mt-2" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro claim_row(c, show_customer=False) -%}
+  <tr>
+    <td>
+      <a class="row-link" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}">
+        <div class="t-main">{{ c.product.product_name }}</div>
+        <div class="t-sub"><span class="id">{{ c.claim_id }}</span> · {{ c.fault_category }}</div>
+      </a>
+    </td>
+    {% if show_customer %}<td><div>{{ c.claimant.full_name }}</div><div class="t-sub">{{ c.product.category }}</div></td>{% endif %}
+    <td>{{ status(c.status) }}</td>
+    <td>{{ decision(c.final_decision) }}</td>
+    <td class="nowrap small muted">{{ c.claim_submission_date|date if c.claim_submission_date else 'Draft' }}</td>
+  </tr>
+{%- endmacro %}
+
+{% macro field(name, label, value='', type='text', required=False, help=None, attrs='') -%}
+  <label class="field">
+    <span>{{ label }}{% if required %} <span class="req">*</span>{% endif %}</span>
+    <input class="input" type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}" {{ 'required' if required }} {{ attrs|safe }}>
+    {% if help %}<span class="help">{{ help }}</span>{% endif %}
+  </label>
+{%- endmacro %}
+
+{% macro doc_icon(kind) -%}
+  {{ {'receipt': 'bi-receipt', 'warranty_card': 'bi-card-heading', 'damage_photo': 'bi-image', 'serial_photo': 'bi-upc-scan',
+      'product_photo': 'bi-camera', 'fault_video': 'bi-camera-video', 'diagnostic_report': 'bi-clipboard2-pulse',
+      'other_evidence': 'bi-paperclip'}.get(kind, 'bi-file-earmark') }}
+{%- endmacro %}

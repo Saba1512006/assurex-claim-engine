@@ -1,48 +1,65 @@
 {
-  "category": "Industrial & Automotive Tools",
+  "category": "Industrial Tools",
   "policy_name": "Heavy Duty Industrial Equipment & Power Tools Policy",
-  "coverage_duration_months": 36,
-  "start_conditions": "Commences upon equipment dispatch and registration in commercial distributor portal.",
+  "coverage_duration_months": 24,
+  "standard_terms_months": [
+    24,
+    36
+  ],
+  "extended_extra_months": 12,
+  "start_conditions": "Coverage starts on the purchase date shown on the verified invoice.",
+  "grace_period_days": 14,
+  "claim_reporting_period_days": 30,
   "covered_faults": [
-    "Armature burning",
-    "Hydraulic pressure seal failure",
+    "Armature burnout",
+    "Seal failure",
     "Gearbox seizure",
-    "Chuck bearing breakdown",
-    "Trigger switch failure",
-    "Internal clutch breakdown",
-    "Pneumatic cylinder air leak"
+    "Chuck bearing failure",
+    "Trigger switch failure"
+  ],
+  "excluded_damage_types": [
+    "Accidental Drop",
+    "Water Ingress"
   ],
   "exclusions": [
-    "Abnormal overload beyond specified torque limits",
-    "Normal consumable wear (carbon brushes, chuck teeth, power cords)",
-    "Unlubricated operation",
-    "Use of non-spec hydraulic oil",
-    "Tool dropped into wet concrete slurry or submerged in solvent",
-    "Serial plate defaced, stamped over, or removed"
+    "Tool dropped from height",
+    "Submersion in water, slurry or solvent",
+    "Overload beyond rated torque",
+    "Consumable wear (brushes, chuck teeth, cords)"
   ],
-  "claim_reporting_period_days": 30,
-  "repair_conditions": "Tool must be submitted to accredited regional warranty depot with complete original gear casing intact.",
+  "exclusion_min_diagnostic_confidence": 0.55,
+  "repeat_repair_review_threshold": 2,
   "authorized_service_center_required": true,
-  "replacement_conditions": "Unit replacement approved only for catastrophic gearbox fracture occurring within initial 6 months of delivery.",
-  "grace_period_days": 10,
+  "repair_conditions": "Repairs must be carried out by an authorised service center using genuine parts.",
+  "replacement_conditions": "Unit replacement is considered only after a repeated failure of the same component.",
   "mandatory_documents": [
-    "Commercial Tax Invoice",
-    "Authorized Service Logbook",
-    "Damage Site Photo"
+    "receipt"
+  ],
+  "supporting_documents": [
+    "warranty_card",
+    "serial_photo",
+    "damage_photo"
   ],
   "hard_fail_rules": [
-    "Operating hydraulic or pneumatic system without manufacturer approved lubrication",
-    "Serial plate completely defaced, drilled out, or altered",
-    "Defect caused by documented mechanical overload exceeding tool duty-cycle rating",
-    "Disassembly performed by non-certified workshop facility"
-  ],
-  "warning_rules": [
-    "Tool operating hours exceed scheduled preventative maintenance cycle",
-    "High frequency heavy vibration marks observed on motor casing"
+    "WARRANTY_EXPIRED",
+    "UNAUTHORIZED_REPAIR",
+    "EXCLUDED_DAMAGE",
+    "SERIAL_MISMATCH",
+    "LATE_REPORTING"
   ],
   "manual_review_rules": [
-    "Discrepancy in recorded operating duty hours versus date of purchase",
-    "Ambiguous diagnostic report on whether failure was carbon brush wear or motor defect",
-    "Dual-model agreement is Uncertain or Disagreement"
+    "GRACE_PERIOD",
+    "EXCLUDED_DAMAGE_UNCONFIRMED",
+    "SERIAL_UNVERIFIED",
+    "INCOMPLETE_EVIDENCE",
+    "UNKNOWN_CAUSE",
+    "REPEAT_REPAIRS",
+    "PRIOR_REPLACEMENT",
+    "UNCOVERED_FAULT"
+  ],
+  "warning_rules": [
+    "NEAR_REPORTING_DEADLINE",
+    "WARRANTY_ENDING_SOON",
+    "SUPPORTING_DOCUMENT_MISSING"
   ]
 }

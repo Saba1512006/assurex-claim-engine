@@ -1,0 +1,93 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import csrf %}
+{% block title %}Register product{% endblock %}
+{% block content %}
+{% set staff = current_user.role == 'service_center_staff' %}
+<div class="page-head">
+  <div>
+    <div class="crumbs"><a href="{{ url_for('products.list_products') }}">Products</a><i class="bi bi-chevron-right"></i><span>Register</span></div>
+    <h1>Register a product</h1>
+    <p class="lede">Upload the receipt first — we'll read it and fill in what we can. Check everything before saving.</p>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" data-product-form data-scan-url="{{ url_for('products.scan_receipt') }}">
+  {{ csrf() }}
+  <div class="split">
+    <div class="stack">
+      <section class="card">
+        <div class="card-h"><h2 class="section-title"><i class="bi bi-receipt"></i>Receipt</h2><span class="hint">PDF, JPG or PNG · up to 10 MB</span></div>
+        <div class="card-b stack-sm">
+          <label class="dropzone" data-dropzone>
+            <span class="ico"><i class="bi bi-cloud-arrow-up"></i></span>
+            <span style="flex:1"><b class="small">Purchase receipt or tax invoice</b><div class="tiny muted">Stored securely and fingerprinted (SHA-256) to catch reused receipts.</div>
+              <input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png" data-scan-input></span>
+          </label>
+          <div class="small" data-scan-status></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Product</h2></div>
+        <div class="card-b form-grid">
+          {% if staff %}
+          <label class="field full"><span>Customer's email <span class="req">*</span></span>
+            <input class="input" type="email" name="customer_email" value="{{ form.get('customer_email', '') }}" required placeholder="The customer's AssureX account email">
+            <span class="help">The product is registered to the customer and linked to {{ current_user.service_center.name if current_user.service_center else 'your service center' }}.</span></label>
+          {% endif %}
+          <label class="field full"><span>Product name <span class="req">*</span></span><input class="input" name="product_name" value="{{ form.get('product_name', '') }}" required data-fill="product_name"></label>
+          <label class="field"><span>Category <span class="req">*</span></span>
+            <select class="select" name="category" required data-category>
+              <option value="">Choose…</option>
+              {% for c, pol in policies.items() %}<option value="{{ c }}" {{ 'selected' if form.get('category') == c }} data-months="{{ pol.coverage_duration_months }}">{{ c }}</option>{% endfor %}
+            </select></label>
+          <label class="field"><span>Brand <span class="req">*</span></span><input class="input" name="brand" value="{{ form.get('brand', '') }}" required></label>
+          <label class="field"><span>Model number <span class="req">*</span></span><input class="input" name="model_number" value="{{ form.get('model_number', '') }}" required data-fill="model_number"></label>
+          <label class="field"><span>Serial number <span class="req">*</span></span><input class="input mono" name="serial_number" value="{{ form.get('serial_number', '') }}" required minlength="4" data-fill="serial_number"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Purchase</h2></div>
+        <div class="card-b form-grid">
+          <label class="field"><span>Purchase date <span class="req">*</span></span><input class="input" type="date" name="purchase_date" value="{{ form.get('purchase_date', '') }}" max="{{ today.isoformat() }}" required data-fill="purchase_date"></label>
+          <label class="field"><span>Price paid <span class="req">*</span></span><input class="input" name="purchase_price" value="{{ form.get('purchase_price', '') }}" inputmode="decimal" required data-fill="purchase_amount"></label>
+          <label class="field"><span>Retailer <span class="req">*</span></span><input class="input" name="retailer" value="{{ form.get('retailer', '') }}" required data-fill="retailer"></label>
+          <label class="field"><span>Invoice number</span><input class="input mono" name="invoice_number" value="{{ form.get('invoice_number', '') }}" data-fill="invoice_number"></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-h"><h2>Warranty</h2></div>
+        <div class="card-b form-grid">
+          <div class="field full"><span class="label">Type</span>
+            <div class="seg">
+              <label><input type="radio" name="warranty_type" value="standard" {{ 'checked' if form.get('warranty_type', 'standard') == 'standard' }}><span>Standard</span></label>
+              <label><input type="radio" name="warranty_type" value="extended" {{ 'checked' if form.get('warranty_type') == 'extended' }}><span>Extended</span></label>
+            </div></div>
+          <label class="field"><span>Length (months) <span class="req">*</span></span><input class="input" type="number" min="1" max="120" name="warranty_months" value="{{ form.get('warranty_months', '') }}" data-fill="warranty_duration_months" data-months required></label>
+          <label class="field"><span>Warranty provider</span><input class="input" name="warranty_provider" value="{{ form.get('warranty_provider', '') }}" placeholder="Defaults to the brand's manufacturer warranty"></label>
+          {% if not staff %}
+          <label class="field full"><span>Preferred authorised service center</span>
+            <select class="select" name="service_center_id"><option value="">No preference</option>{% for c in centers %}<option value="{{ c.id }}" {{ 'selected' if form.get('service_center_id') == c.id|string }}>{{ c.name }} — {{ c.city }}</option>{% endfor %}</select></label>
+          {% endif %}
+        </div>
+        <div class="card-f row between"><span class="small muted">Coverage starts on the purchase date. Expiry is calculated for you.</span><button class="btn" type="submit"><i class="bi bi-check2"></i>Register product</button></div>
+      </section>
+    </div>
+
+    <aside class="stack sticky">
+      <section class="card soft">
+        <div class="card-h"><h2>Category policies</h2></div>
+        <ul class="list">
+          {% for c, pol in policies.items() %}
+          <li><div class="grow"><div class="ttl small">{{ c }}</div>
+            <div class="sub">{{ pol.coverage_duration_months }} months standard · report within {{ pol.claim_reporting_period_days }} days · {{ pol.grace_period_days }}-day grace</div>
+            <div class="sub">Not covered: {{ pol.excluded_damage_types|join(', ')|lower }}</div></div></li>
+          {% endfor %}
+        </ul>
+      </section>
+    </aside>
+  </div>
+</form>
+{% endblock %}

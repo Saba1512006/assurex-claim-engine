@@ -1,128 +1,44 @@
 {% extends "components/base.html" %}
-
-{% block title %}Sign In{% endblock %}
-
-{% block content %}
-<div class="row justify-content-center py-4">
-    <div class="col-md-6 col-lg-5">
-        <!-- Main Login Card -->
-        <div class="card shadow-sm border-0 rounded-4 bg-white overflow-hidden">
-            <div class="bg-white border-bottom border-light-subtle p-4 text-center">
-                <div class="brand-combo brand-combo-lg mb-2">
-                    <img src="{{ url_for('static', filename='img/logoicon.png') }}" alt="AssureX Shield" class="brand-combo-icon">
-                    <div class="brand-combo-text text-start">
-                        <img src="{{ url_for('static', filename='img/assurex_wordmark.png') }}" alt="AssureX Claim Engine" class="brand-wordmark-img">
-                        <div class="brand-subtitle-wrapper">
-                            <span class="brand-subtitle-line"></span>
-                            <span class="brand-subtitle-text">WARRANTY INTELLIGENCE</span>
-                            <span class="brand-subtitle-line"></span>
-                        </div>
-                    </div>
-                </div>
-                <p class="mb-0 text-muted small fw-medium mt-2">Secure Authentication & Warranty Intelligence Portal</p>
-            </div>
-
-            <div class="card-body p-4 p-md-5">
-                <form id="loginForm" method="POST" action="{{ url_for('auth.login') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label for="email" class="form-label fw-semibold small text-slate-700">Email Address</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-envelope"></i></span>
-                            <input type="email" class="form-control bg-light border-start-0 ps-0" id="email" name="email" required placeholder="name@domain.com">
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="password" class="form-label fw-semibold small text-slate-700">Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-key"></i></span>
-                            <input type="password" class="form-control bg-light border-start-0 ps-0" id="password" name="password" required placeholder="Enter password">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2">
-                        <i class="bi bi-box-arrow-in-right"></i> Sign In to Portal
-                    </button>
-                </form>
-
-                <div class="text-center mt-4 pt-3 border-top border-light-subtle">
-                    <span class="text-muted small">Don't have an account?</span>
-                    <a href="{{ url_for('auth.register') }}" class="text-primary small fw-semibold ms-1">Create an Account &rarr;</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Demo Credentials Box -->
-        <div class="card border-0 bg-white shadow-sm rounded-4 mt-4 p-3">
-            <div class="d-flex align-items-center gap-2 mb-2 text-primary fw-semibold small">
-                <i class="bi bi-lightning-charge-fill"></i> 1-Click Instant Demo Login
-            </div>
-            <p class="text-muted extra-small mb-3">Click any role below to instantly log in as that user:</p>
-            <div class="d-grid gap-2">
-                <button type="button" class="btn btn-sm btn-outline-primary text-start d-flex justify-content-between align-items-center quick-login-btn" data-email="admin@assurex.local" data-password="AdminPass123!" onclick="quickLogin('admin@assurex.local', 'AdminPass123!')">
-                    <span><i class="bi bi-person-badge-fill me-1"></i> <b>System Administrator</b> (admin@assurex.local)</span>
-                    <span class="badge bg-primary">1-Click Sign In</span>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-dark text-start d-flex justify-content-between align-items-center quick-login-btn" data-email="reviewer@assurex.local" data-password="ReviewerPass123!" onclick="quickLogin('reviewer@assurex.local', 'ReviewerPass123!')">
-                    <span><i class="bi bi-shield-check me-1"></i> <b>Staff Claim Reviewer</b> (reviewer@assurex.local)</span>
-                    <span class="badge bg-dark">1-Click Sign In</span>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary text-start d-flex justify-content-between align-items-center quick-login-btn" data-email="staff@assurex.local" data-password="StaffPass123!" onclick="quickLogin('staff@assurex.local', 'StaffPass123!')">
-                    <span><i class="bi bi-tools me-1"></i> <b>Service Staff</b> (staff@assurex.local)</span>
-                    <span class="badge bg-secondary">1-Click Sign In</span>
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success text-start d-flex justify-content-between align-items-center quick-login-btn" data-email="customer@assurex.local" data-password="CustomerPass123!" onclick="quickLogin('customer@assurex.local', 'CustomerPass123!')">
-                    <span><i class="bi bi-person-circle me-1"></i> <b>Verified Customer</b> (customer@assurex.local)</span>
-                    <span class="badge bg-success">1-Click Sign In</span>
-                </button>
-            </div>
-            <div class="mt-2 text-center text-muted extra-small">
-                Default password for all demo accounts: <code>AdminPass123!</code> / <code>ReviewerPass123!</code> / <code>StaffPass123!</code> / <code>CustomerPass123!</code>
-            </div>
-        </div>
+{% block title %}Sign in{% endblock %}
+{% block main %}
+<div class="auth">
+  <div class="auth-art">
+    <div>
+      <h2>Every claim, explained.</h2>
+      <p>See what each model predicted, which warranty rules passed, and why a claim was approved, rejected or sent for review.</p>
+      <div class="points">
+        <div><i class="bi bi-check2-circle"></i><span>Two independent models compared on every claim</span></div>
+        <div><i class="bi bi-check2-circle"></i><span>Receipts read by OCR and confirmed by you</span></div>
+        <div><i class="bi bi-check2-circle"></i><span>Track your claim through all eight stages</span></div>
+      </div>
     </div>
+    <p class="small">Accounts lock for 15 minutes after five wrong passwords.</p>
+  </div>
+  <div class="auth-form">
+    <div class="box stack">
+      <div>
+        <h1>Sign in</h1>
+        <p class="muted mt-1">Welcome back. Use the email you registered with.</p>
+      </div>
+      <form method="post" class="stack" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field"><span>Email</span>
+          <input class="input" type="email" name="email" value="{{ email or request.args.get('email', '') }}" autocomplete="username" required autofocus></label>
+        <label class="field"><span>Password</span>
+          <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+        <button class="btn lg block" type="submit">Sign in</button>
+      </form>
+      <p class="small muted center">New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>. Staff, reviewers and administrators are invited by an administrator.</p>
+      {% if config.get('SHOW_DEMO_ACCOUNTS', True) %}
+      <details class="card soft"><summary class="card-b tight" style="cursor:pointer"><b class="small">Evaluator accounts</b></summary>
+        <div class="card-b demo-grid" style="padding-top:0">
+          {% for role, email_, pw in [('Customer', 'customer@assurex.local', 'CustomerPass123!'), ('Service-center staff', 'staff@assurex.local', 'StaffPass123!'), ('Claim reviewer', 'reviewer@assurex.local', 'ReviewerPass123!'), ('Administrator', 'admin@assurex.local', 'AdminPass123!')] %}
+            <button class="demo" type="button" data-fill-login="{{ email_ }}|{{ pw }}"><span><b>{{ role }}</b><span>{{ email_ }}</span></span><i class="bi bi-arrow-right"></i></button>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </div>
 </div>
-
-<script>
-// Immediate self-contained definition to guarantee availability even before external JS loads or if cached
-function quickLogin(email, password) {
-    try {
-        var emailInput = document.getElementById("email");
-        var passwordInput = document.getElementById("password");
-        var form = document.getElementById("loginForm");
-        if (emailInput) {
-            emailInput.value = email;
-            try { emailInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e){}
-            try { emailInput.dispatchEvent(new Event('change', { bubbles: true })); } catch(e){}
-        }
-        if (passwordInput) {
-            passwordInput.value = password;
-            try { passwordInput.dispatchEvent(new Event('input', { bubbles: true })); } catch(e){}
-            try { passwordInput.dispatchEvent(new Event('change', { bubbles: true })); } catch(e){}
-        }
-        if (form) {
-            form.submit();
-        }
-    } catch(err) {
-        console.error("quickLogin execution error:", err);
-    }
-}
-window.quickLogin = quickLogin;
-window.fillCredentials = quickLogin;
-
-// Delegated click handler as an additional fallback for button clicks
-document.addEventListener("DOMContentLoaded", function() {
-    var buttons = document.querySelectorAll(".quick-login-btn");
-    buttons.forEach(function(btn) {
-        btn.addEventListener("click", function(e) {
-            var em = this.getAttribute("data-email");
-            var pw = this.getAttribute("data-password");
-            if (em && pw) {
-                quickLogin(em, pw);
-            }
-        });
-    });
-});
-</script>
 {% endblock %}
