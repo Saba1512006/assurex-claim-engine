@@ -1,10 +1,13 @@
 """Integration tests through HTTP: the full claim journey, reviewer workflow, admin tools, security controls."""
 import io
+
+from PIL import Image
 from datetime import date, timedelta
 
 from config.config import TestConfig
 from database.db import db
 from src.app import create_app
+from src.core.vocab import CLASSES
 from src.models.entities import AuditLog, Claim, Notification, Product, ReviewerAction, User
 from tests.conftest import (PASSWORD, login, make_center, make_claim, make_product, make_user, png_bytes,
                             standard_receipt)
@@ -285,3 +288,27 @@ def test_database_constraints(app):
     with pytest.raises(IntegrityError):
         db.session.commit()
     db.session.rollback()
+
+
+def test_gtm_upload_replaces_and_archives_running_model(app, client, tmp_path, monkeypatch):
+    """Installing over a loaded model must archive the old one (regression: Windows refused to delete the
+    memory-mapped .tflite, returning a 500). Models are loaded from bytes, so no file handle is held."""
+    from pathlib import Path
+    from src.core import gtm_classifier_v2 as gtm_mod
+    monkeypatch.setattr("src.api.admin.GTM_DIR", tmp_path)
+    fixtures = Path(__file__).parent / "fixtures"
+    labels = b"0 Valid Claim\n1 Invalid Claim\n2 Manual Review\n"
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    versions = []
+    for name in ("tiny_gtm_a.tflite", "tiny_gtm_b.tflite"):
+        blob = (fixtures / name).read_bytes()
+        r = client.post("/admin/models/gtm", data={"model": file(blob, name), "labels": file(labels, "labels.txt")},
+                        content_type="multipart/form-data", follow_redirects=True)
+        assert r.status_code == 200 and b"installed" in r.data
+        versions.append(gtm_mod.version_of(blob))
+        loaded = gtm_mod.TeachableMachineClassifier(tmp_path)          # keep it loaded while the next install runs
+        assert loaded.version == versions[-1]
+        assert set(loaded.predict(Image.new("RGB", (600, 600)))["confidence_scores"]) == set(CLASSES)
+    assert (tmp_path / "versions" / versions[0] / "model_unquant.tflite").exists()
+    assert gtm_mod.version_of((tmp_path / "model_unquant.tflite").read_bytes()) == versions[1]

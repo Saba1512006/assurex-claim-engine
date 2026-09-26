@@ -194,18 +194,23 @@ def upload_gtm():
         except GTMUnavailable as exc:
             flash(f"The model could not be loaded: {exc}", "danger")
             return redirect(url_for("admin.models"))
-        current = find_model_file()
-        if current is not None:                                 # archive the model being replaced
-            old = gtm_mod.TeachableMachineClassifier(GTM_DIR).version
-            archive = GTM_DIR / "versions" / old
-            archive.mkdir(parents=True, exist_ok=True)
-            for name in (current.name, "labels.txt", "evaluation.json"):
-                if (GTM_DIR / name).exists():
-                    shutil.copy2(GTM_DIR / name, archive / name)
-                    (GTM_DIR / name).unlink()
-        GTM_DIR.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(staging / "model_unquant.tflite", GTM_DIR / "model_unquant.tflite")
-        shutil.copy2(staging / "labels.txt", GTM_DIR / "labels.txt")
+        gtm_mod.reset()                                         # release the running model before touching files
+        try:
+            current = find_model_file(GTM_DIR)
+            if current is not None:                             # archive the model being replaced
+                archive = GTM_DIR / "versions" / gtm_mod.version_of(current.read_bytes())
+                archive.mkdir(parents=True, exist_ok=True)
+                for name in (current.name, "labels.txt", "evaluation.json"):
+                    if (GTM_DIR / name).exists():
+                        shutil.copy2(GTM_DIR / name, archive / name)
+                        (GTM_DIR / name).unlink()
+            GTM_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(staging / "model_unquant.tflite", GTM_DIR / "model_unquant.tflite")
+            shutil.copy2(staging / "labels.txt", GTM_DIR / "labels.txt")
+        except OSError as exc:
+            flash(f"The model files could not be written ({exc.strerror or exc}). Stop the app, then try again.",
+                  "danger")
+            return redirect(url_for("admin.models"))
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     gtm_mod.reset()

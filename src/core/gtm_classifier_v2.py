@@ -41,7 +41,7 @@ def _interpreter_cls():
                       ("tensorflow.lite", "Interpreter")):
         try:
             return getattr(__import__(mod, fromlist=[attr]), attr)
-        except ImportError:
+        except (ImportError, AttributeError):          # TensorFlow >= 2.20 no longer ships tf.lite.Interpreter
             continue
     raise GTMUnavailable("No TensorFlow Lite runtime installed (pip install ai-edge-litert).")
 
@@ -65,6 +65,10 @@ def parse_labels(text: str) -> list[str]:
     return labels
 
 
+def version_of(model_bytes: bytes) -> str:
+    return "gtm-" + hashlib.sha256(model_bytes).hexdigest()[:12]
+
+
 def find_model_file(model_dir: Path = GTM_DIR) -> Path | None:
     return next((model_dir / f for f in MODEL_FILES if (model_dir / f).exists()), None)
 
@@ -81,10 +85,12 @@ class TeachableMachineClassifier:
         if sorted(self.labels) != sorted(CLASSES):
             raise GTMUnavailable(f"Teachable Machine labels {self.labels} must be exactly {list(CLASSES)}.")
         raw = model_path.read_bytes()
-        self.version = "gtm-" + hashlib.sha256(raw).hexdigest()[:12]   # immutable version id
+        self.version = version_of(raw)                   # immutable version id
         self.model_file = model_path.name
         try:
-            self._interp = _interpreter_cls()(model_path=str(model_path))
+            # Load from bytes, not from the path: an interpreter built from a path memory-maps the file,
+            # and Windows then refuses to replace or archive it while the app is running.
+            self._interp = _interpreter_cls()(model_content=raw)
             self._interp.allocate_tensors()
         except GTMUnavailable:
             raise
