@@ -1,40 +1,62 @@
-# AI Tool & Development Usage Declaration (SRS Section 1.8 Compliance)
+# AI Tool Usage Declaration
 
-**Project Title:** AssureX Claim Engine — Dual-Model Automated Warranty Claim Adjudication Platform  
-**Academic Body:** Aptech Limited — NextWave AI and ML Evaluation  
-**Declaration Date:** September 23, 2026  
+Required by SRS §1.8 (item 9) and deliverable 15. Every AI tool used during development is listed
+below. **The final claim decision is never produced by a generative-AI service**: it comes from the
+team's Python classification model, the Google Teachable Machine model, the warranty rule engine and the
+decision table running inside this application. No external AI API is called at runtime.
 
----
-
-## 1. Compliance Statement
-
-In strict adherence to **Section 1.8 (AI Tool Usage Guidelines)** of the AssureX Claim Engine Software Requirements Specification (SRS), the development team declares that **no external LLM code generators or AI agents (such as Antigravity, Claude, ChatGPT, or GitHub Copilot)** were used to generate source code for this project.
-
-All core algorithms, web application architecture, database schemas, feature engineering, classification logic, rule engine validations, PDF report generation, and automated test suites were 100% independently designed, developed, debugged, and validated by the student engineering team.
-
-The only machine learning tool utilized in this project is **Google Teachable Machine** (as explicitly specified by the project SRS for dual-model visual classification of Claim Summary Cards).
+> **Correction.** An earlier version of this file stated that no AI code generators were used. That is
+> not accurate for the v2 upgrade described below, so this declaration replaces it.
 
 ---
 
-## 2. Formal Tool Disclosure Table
+## 1. Google Teachable Machine (required by the SRS)
 
-| Parameter | Primary Machine Learning Tool | Development & IDE Stack |
-|:---|:---|:---|
-| **Tool / Framework Name** | **Google Teachable Machine** | **Standard Python / Flask Stack & IDE** |
-| **Tool Provider** | Google LLC | Open Source Python Ecosystem |
-| **Purpose of Use** | Generating baseline visual weights and label metadata for the Claim Summary Card vision classifier as required by dual-model SRS specification. | Standard local code editing, syntax highlighting, debugging, and automated test suite execution. |
-| **Modules Affected** | - `model/teachable_machine/`<br>- `src/core/teachable_machine_classifier.py`<br>- `src/core/card_generator.py` | Entire project codebase (`src/`, `tests/`, `database/`, `config/`). |
-| **Engineering Work Executed by Students** | - Engineered automated PIL script (`card_generator.py`) to standardize cards to exactly $640 \times 420$ with neutral visual styling.<br>- Implemented scikit-learn feature-extraction wrapper to run the GTM model locally in Python alongside tabular pipeline.<br>- Formulated exact 3 Claim Classes (`Valid Claim`, `Invalid Claim`, `Manual Review`) and 5 Model-Consistency Statuses per SRS standard. | - Authored all 38 unit & integration tests.<br>- Built Flask REST endpoints, SQLite database models, and HTML/CSS UI components.<br>- Implemented 8 claim lifecycle stages and policy rule engine.<br>- Designed ReportLab canvas with custom flowable tables, RGB palettes, and checksum verification. |
-| **Testing & Verification** | - Evaluated vision classifier on held-out test set of 225 visual Claim Summary Cards.<br>- Validated invariance against background variations, noise, and card layout changes.<br>- Verified 100% agreement with tabular model on valid and invalid claim subsets. | - Executed 109 unit and integration tests across 18 SRS test categories.<br>- Validated all 11 mandatory demonstration test cases.<br>- Conducted interactive testing across Customer, Reviewer, and Admin portals. |
+| Field | Declaration |
+|---|---|
+| Tool | Google Teachable Machine (teachablemachine.withgoogle.com), Google LLC |
+| Purpose | Image classification of Claim Summary Cards into Valid Claim / Invalid Claim / Manual Review |
+| Type of assistance | Browser-based transfer-learning of an image model on the team's training cards; TensorFlow Lite export |
+| Files / modules affected | `model/teachable_machine/` (export + `labels.txt` + `evaluation.json`), consumed by `src/core/gtm_classifier_v2.py` |
+| Status | **To be completed by the team**: train on `data/summary_cards/train/`, export, install via Admin › Models, run the evaluation |
+| Testing | `notebooks/evaluate_gtm.py` / Admin › Models › Run evaluation on the 225 validation and 225 test cards |
 
----
+## 2. Claude Code (Anthropic) — v2 upgrade
 
-## 3. Student Ownership & Technical Comprehension
+| Field | Declaration |
+|---|---|
+| Tool | Claude Code (Anthropic), an AI coding assistant |
+| Date | 26 September 2026 |
+| Purpose | Integrate the team's v2 upgrade kit (leakage-free dataset, calibrated model, square cards, RBAC) into the application, fix the defects the kit identified, redesign the web interface, write tests and update documentation |
+| Prompt / type of assistance | "Complete the project using the attached v2 upgrade kit, model card and SRS; implement everything fully with a top-quality design." Code generation, refactoring, test writing, documentation drafting, running the training scripts and the test suite |
+| Files / modules affected | Almost every module: `src/` (core pipeline, rules, security, services, api), `templates/`, `static/`, `config/`, `policies/`, `dataset_generator/`, `notebooks/`, `database/seed.py`, `tests/`, `reports/`, `documentation/`, `README.md`. Generated data: `data/raw`, `data/splits`, `data/summary_cards`, `model/python_model/` |
+| What it did **not** do | Train the Teachable Machine model (requires the browser tool); decide any claim at runtime; invent metrics (every number in the docs is read from files the scripts produce) |
+| Testing performed by the tool | 192 automated tests (`python -m pytest -q`), a page-by-page render check of every screen for all four roles, browser screenshots, and an end-to-end seed that submits the 11 demonstration claims through the live pipeline |
 
-The development team confirms full ownership and deep technical understanding of:
-1. **Machine Learning Pipeline:** Preprocessing via `ColumnTransformer`, OneHotEncoding handling unknown labels, stratified K-fold cross-validation, hyperparameter tuning of Random Forest vs. HistGradientBoosting vs. Multi-Layer Perceptron, and joblib model serialization.
-2. **Vision Model Pipeline:** Dynamic rendering of neutral Claim Summary Cards, RGB normalization, feature vector extraction, and probability calibration.
-3. **Consensus Algorithm:** Confidence delta computation ($|\Delta\text{conf}| = |P_{\text{python}} - P_{\text{gtm}}|$) and threshold-based assignment across the 5 consistency statuses.
-4. **Security & Data Integrity:** Session-based authentication, Role-Based Access Control (RBAC), parameter binding preventing SQL injection, SHA-256 file fingerprinting, and transactional rollbacks.
+### Required team entries (SRS: modifications, testing and verifier name)
 
-All source code has been entirely authored, debugged, and validated by the student team to ensure complete maintainability, reliability, and academic integrity.
+The SRS requires the **team** to review, modify, test and understand AI output, and to name the member
+who verified it. These rows must be filled in by the team — they are deliberately left blank rather than
+written on the team's behalf:
+
+| Module | Modifications made by the team | Tests run by the team | Verified by (team member) |
+|---|---|---|---|
+| Dataset generator & cards (`dataset_generator/`) | | | |
+| Python model training (`notebooks/train_python_v2.py`) | | | |
+| Teachable Machine training & evaluation | | | |
+| Evaluation pipeline (`src/core/`) | | | |
+| Rule engine & policies (`src/rules/`, `policies/`) | | | |
+| Security & access control (`src/security/`, `config/rbac.json`) | | | |
+| Web interface (`templates/`, `static/`) | | | |
+| Documentation & report | | | |
+
+## 3. Other tools
+
+| Tool | Use |
+|---|---|
+| scikit-learn, pandas, NumPy, Pillow, ReportLab, pdfplumber, Tesseract (pytesseract) | Libraries used by the application (not AI assistants) |
+| Chart.js, Bootstrap Icons | Front-end libraries, served from `static/vendor/` |
+| Mermaid | Rendering the report diagrams from `documentation/diagrams/*.mmd` |
+
+Images: the demo "damage" and "serial" photos created by `database/seed.py` are synthetic drawings made
+with Pillow, labelled as such on the image. No AI-generated imagery is used in the application.

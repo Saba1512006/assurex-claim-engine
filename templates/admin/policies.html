@@ -1,187 +1,92 @@
 {% extends "components/base.html" %}
-
-{% block title %}Warranty Policies Configuration{% endblock %}
-
+{% from "components/macros.html" import csrf %}
+{% block title %}Policies &amp; decision settings{% endblock %}
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
-    <div>
-        <h2 class="fw-bold text-slate-900 mb-1">Dynamic Warranty Policies Editor</h2>
-        <p class="text-muted mb-0">Configure category-specific warranty terms, grace periods, fault coverage, and exclusion matrices</p>
-    </div>
-    <div>
-        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
-        </a>
-    </div>
+{% set p = policies[selected] %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Configuration</div>
+    <h1>Warranty policies &amp; decision settings</h1>
+    <p class="lede">Rules live in <code>policies/*.json</code> and <code>config/decision_policy.json</code>. Changes apply to new evaluations immediately; recorded results never change. Every save is audited.</p>
+  </div>
 </div>
 
-<!-- Warranty Expiry Alerts Configuration -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4 border-start border-4 border-warning">
-    <div class="card-header-styled bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-warning-subtle text-warning-emphasis p-2 rounded-circle fs-6">
-                <i class="bi bi-bell-fill"></i>
-            </span>
-            <div>
-                <span class="fw-bold text-slate-900 fs-6">Warranty Expiry Alerts Configuration</span>
-                <span class="badge bg-light text-secondary border font-mono ms-2">Admin Controlled</span>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2">
-                <i class="bi bi-clock-history me-1"></i>Active Alert Window: <strong>{{ alert_threshold_days }} Days</strong>
-            </span>
-            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">
-                <i class="bi bi-shield-exclamation me-1"></i><strong>{{ approaching_warranties_count }}</strong> Products Nearing Expiry
-            </span>
-        </div>
-    </div>
-    <div class="card-body p-4">
-        <p class="text-muted small mb-3">
-            The application automatically monitors warranty expiration dates and generates alerts for users when coverage is nearing its end. As an Administrator, configure how many days prior to expiry alerts should be generated across the equipment fleet:
-        </p>
-        <div class="row g-3 align-items-end">
-            <div class="col-md-7">
-                <form method="POST" action="{{ url_for('admin.configure_warranty_alerts') }}" class="d-flex flex-wrap align-items-end gap-2">
-                    <div class="flex-grow-1" style="min-width: 220px;">
-                        <label class="form-label fw-semibold small text-slate-700">Days Before Expiry (Alert Generation Threshold)</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light"><i class="bi bi-calendar-event"></i></span>
-                            <input type="number" class="form-control" name="alert_days" value="{{ alert_threshold_days }}" min="1" max="365" required>
-                            <span class="input-group-text bg-light">Days</span>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-warning text-dark fw-bold px-3 py-2 d-inline-flex align-items-center gap-1 shadow-xs">
-                        <i class="bi bi-check2-circle fs-6"></i> Update Alert Window
-                    </button>
-                </form>
-            </div>
-            <div class="col-md-5 d-flex justify-content-md-end align-items-center gap-2 pt-2 pt-md-0">
-                <form method="POST" action="{{ url_for('admin.dispatch_warranty_alerts') }}">
-                    <button type="submit" class="btn btn-outline-primary fw-semibold px-3 py-2 d-inline-flex align-items-center gap-1 shadow-xs" title="Scan and dispatch notifications immediately to all eligible customers">
-                        <i class="bi bi-broadcast"></i> Dispatch Fleet Alerts Now
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-<!-- Model Consistency Status Thresholds Configuration -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4 border-start border-4 border-primary">
-    <div class="card-header-styled bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary-subtle text-primary p-2 rounded-circle fs-6">
-                <i class="bi bi-sliders2-vertical"></i>
-            </span>
-            <div>
-                <span class="fw-bold text-slate-900 fs-6">Dual-Model Consistency Thresholds</span>
-                <span class="badge bg-light text-secondary border font-mono ms-2">Configurable Matrix</span>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
-                Strong: ≤ <strong>{{ "%.2f"|format(strong_diff_val) }}</strong>
-            </span>
-            <span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-2">
-                Acceptable: ≤ <strong>{{ "%.2f"|format(acceptable_diff_val) }}</strong>
-            </span>
-            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2">
-                Min Conf: <strong>{{ "%.2f"|format(min_conf_val) }}</strong>
-            </span>
-        </div>
-    </div>
-    <div class="card-body p-4">
-        <p class="text-muted small mb-3">
-            The application dynamically evaluates dual-model consensus across 5 standardized statuses (<em>Strong Match</em>, <em>Acceptable Match</em>, <em>Weak Match</em>, <em>Model Disagreement</em>, and <em>Uncertain Result</em>) based on the confidence difference (|Δconf|) and minimum confidence criteria:
-        </p>
-        <form method="POST" action="{{ url_for('admin.configure_model_thresholds') }}">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold small text-slate-700">Minimum Confidence Threshold</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light font-mono">conf ≥</span>
-                        <input type="number" step="0.01" min="0.10" max="0.99" class="form-control" name="min_confidence" value="{{ min_conf_val }}" required>
-                    </div>
-                    <div class="extra-small text-muted mt-1">Below this triggers <em>Uncertain Result</em></div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold small text-slate-700">Strong Match Difference</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light font-mono">|Δ| ≤</span>
-                        <input type="number" step="0.01" min="0.01" max="0.50" class="form-control" name="strong_diff" value="{{ strong_diff_val }}" required>
-                    </div>
-                    <div class="extra-small text-muted mt-1">Threshold for <em>Strong Match</em> rating</div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold small text-slate-700">Acceptable Match Difference</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light font-mono">|Δ| ≤</span>
-                        <input type="number" step="0.01" min="0.02" max="0.90" class="form-control" name="acceptable_diff" value="{{ acceptable_diff_val }}" required>
-                    </div>
-                    <div class="extra-small text-muted mt-1">Beyond this triggers <em>Weak Match</em></div>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary fw-bold w-100 py-2 d-inline-flex align-items-center justify-content-center gap-1 shadow-xs">
-                        <i class="bi bi-check2-circle"></i> Save Model Thresholds
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
+<nav class="tabs" aria-label="Categories">
+  {% for c in categories %}<a href="{{ url_for('admin.policies', category=c) }}" {% if c == selected %}aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  <a href="#decision">Decision settings</a>
+</nav>
 
-<div class="row g-4">
-    {% for policy in policies %}
-        <div class="col-12">
-            <div class="card border-0 shadow-sm rounded-4 bg-white mb-3">
-                <div class="card-header-styled bg-light d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="fw-bold text-slate-900 fs-6"><i class="bi bi-sliders text-primary me-2"></i>{{ policy.policy_name }}</span>
-                        <span class="badge bg-primary ms-2">{{ policy.category }}</span>
-                        <span class="badge bg-light text-muted border font-mono ms-1">{{ policy.policy_id }}</span>
-                    </div>
-                    <span class="text-muted extra-small">Last Updated: {{ policy.created_at.strftime('%Y-%m-%d') if policy.created_at else 'Active' }}</span>
-                </div>
+<form method="post" action="{{ url_for('admin.policies') }}" class="split">{{ csrf() }}
+  <input type="hidden" name="category" value="{{ selected }}">
+  <div class="stack">
+    <section class="card">
+      <div class="card-h"><h2>{{ p.policy_name }}</h2><span class="hint">{{ selected }}</span></div>
+      <div class="card-b form-grid">
+        <label class="field"><span>Standard coverage (months)</span><input class="input" type="number" min="1" max="120" name="coverage_duration_months" value="{{ p.coverage_duration_months }}" required></label>
+        <label class="field"><span>Grace period after expiry (days)</span><input class="input" type="number" min="0" max="90" name="grace_period_days" value="{{ p.grace_period_days }}" required></label>
+        <label class="field"><span>Report faults within (days)</span><input class="input" type="number" min="1" max="365" name="claim_reporting_period_days" value="{{ p.claim_reporting_period_days }}" required></label>
+        <label class="field"><span>Repeat-repair review threshold</span><input class="input" type="number" min="1" max="10" name="repeat_repair_review_threshold" value="{{ p.repeat_repair_review_threshold }}" required></label>
+        <label class="field full"><span>Diagnosis needed to confirm an exclusion</span><input class="input" type="number" step="0.01" min="0" max="1" name="exclusion_min_diagnostic_confidence" value="{{ p.exclusion_min_diagnostic_confidence }}" required>
+          <span class="help">An excluded cause with diagnostic confidence at or above this is a hard fail; below it, the claim goes to a reviewer.</span></label>
+        <div class="field full"><span>Excluded damage causes</span>
+          <div class="row" style="gap:8px 18px">{% for d in damage_types %}<label class="check"><input type="checkbox" name="excluded_damage_types" value="{{ d }}" {{ 'checked' if d in p.excluded_damage_types }}>{{ d }}</label>{% endfor %}</div></div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>Rules &amp; severity</h2><span class="hint">Hard fail → Likely Invalid · Manual review → reviewer · Warning → shown, never blocks</span></div>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th>Rule</th><th>Severity</th></tr></thead>
+        <tbody>{% for rid, title in catalog.items() %}
+          {% set sev = 'hard_fail' if rid in p.hard_fail_rules else ('manual_review' if rid in p.manual_review_rules else ('warning' if rid in p.warning_rules else 'off')) %}
+          <tr><td><div class="t-main small">{{ title }}</div><div class="t-sub mono">{{ rid }}</div></td>
+            <td style="width:200px"><select class="select sm" name="rule_{{ rid }}">{% for v, l in [('hard_fail', 'Hard fail'), ('manual_review', 'Manual review'), ('warning', 'Warning'), ('off', 'Off')] %}<option value="{{ v }}" {{ 'selected' if sev == v }}>{{ l }}</option>{% endfor %}</select></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      <div class="card-f row between"><span class="small muted">Saved to <code>policies/{{ selected|lower|replace(' ', '_') }}.json</code></span><button class="btn" type="submit"><i class="bi bi-save"></i>Save {{ selected }} policy</button></div>
+    </section>
+  </div>
+  <aside class="stack">
+    <section class="card soft"><div class="card-b stack-sm small">
+      <b>Covered faults</b><div class="muted">{{ p.covered_faults|join(', ') }}</div>
+      <b class="mt-1">Mandatory documents</b><div class="muted">{{ p.mandatory_documents|map('replace', '_', ' ')|join(', ') }}</div>
+      <b class="mt-1">Supporting documents</b><div class="muted">{{ p.supporting_documents|map('replace', '_', ' ')|join(', ') }}</div>
+      <b class="mt-1">Exclusions (wording)</b><div class="muted">{{ p.exclusions|join('; ') }}</div>
+    </div></section>
+  </aside>
+</form>
 
-                <div class="card-body p-4">
-                    <form method="POST" action="{{ url_for('admin.manage_policies') }}">
-                        <input type="hidden" name="category" value="{{ policy.category }}">
-
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold small text-slate-700">Official Policy Name</label>
-                                <input type="text" class="form-control bg-light" name="policy_name" value="{{ policy.policy_name }}" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold small text-slate-700">Duration (Months)</label>
-                                <input type="number" class="form-control bg-light" name="duration" value="{{ policy.coverage_duration_months }}" required min="1">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold small text-slate-700">Grace Period (Days)</label>
-                                <input type="number" class="form-control bg-light" name="grace" value="{{ policy.grace_period_days }}" required min="0">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label fw-semibold small text-slate-700">Claim Window (Days)</label>
-                                <input type="number" class="form-control bg-light" name="reporting" value="{{ policy.claim_reporting_period_days }}" required min="1">
-                            </div>
-
-                            <div class="col-12">
-                                <label class="form-label fw-semibold small text-slate-700 d-flex justify-content-between">
-                                    <span>Rules Configuration Payload (JSON Format)</span>
-                                    <span class="extra-small text-muted">Includes exclusions, covered faults, and document requirements</span>
-                                </label>
-                                <textarea class="form-control bg-light font-mono small" name="rules_json" rows="8" required>{{ policy.policy_rules_json }}</textarea>
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary btn-sm px-4 fw-semibold shadow-sm d-inline-flex align-items-center gap-2">
-                                <i class="bi bi-save-fill"></i> Save Policy Adjustments
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    {% endfor %}
+<div class="grid grid-2 mt-3" id="decision">
+  <section class="card">
+    <div class="card-h"><h2>Model consistency &amp; routing</h2><span class="hint">version {{ decision.version }}</span></div>
+    <form class="card-b stack" method="post" action="{{ url_for('admin.decision_settings') }}">{{ csrf() }}
+      <div class="form-grid">
+        <label class="field"><span>Minimum confidence</span><input class="input" type="number" step="0.01" min="0" max="1" name="min_confidence" value="{{ decision.consistency.min_confidence }}"><span class="help">Below this either model's result is “Uncertain”.</span></label>
+        <label class="field"><span>Strong match if |Δ| ≤</span><input class="input" type="number" step="0.01" min="0" max="1" name="strong_max_diff" value="{{ decision.consistency.strong_max_diff }}"></label>
+        <label class="field"><span>Acceptable match if |Δ| ≤</span><input class="input" type="number" step="0.01" min="0" max="1" name="acceptable_max_diff" value="{{ decision.consistency.acceptable_max_diff }}"><span class="help">Above this, same class is a “Weak Match”.</span></label>
+      </div>
+      <div class="table-wrap"><table class="table compact small">
+        <thead><tr><th>Recommendation</th><th>Automatically moves the claim to</th></tr></thead>
+        <tbody>{% for d, s in decision.routing.items() %}<tr><td>{{ d }}</td><td><select class="select sm" name="route_{{ d }}">{% for opt in ['Approved', 'Rejected', 'Manual Review'] %}<option {{ 'selected' if opt == s }}>{{ opt }}</option>{% endfor %}</select></td></tr>{% endfor %}</tbody>
+      </table></div>
+      <div><button class="btn" type="submit">Save decision settings</button></div>
+    </form>
+  </section>
+  <section class="card">
+    <div class="card-h"><h2>Decision table</h2><span class="hint">first matching row wins</span></div>
+    <div class="table-wrap"><table class="table compact small">
+      <thead><tr><th>Row</th><th>When</th><th>Recommendation</th></tr></thead>
+      <tbody>{% for r in decision.decision_table %}<tr><td class="mono">{{ r.id }}</td>
+        <td>{% for k, cs in r.when.items() %}<span class="muted">{{ k }}:</span> {% for c in cs %}<code>{{ c[0] }} {{ c[1] }} {{ c[2] if c[2] is string else c[2]|join(', ') if c[2] is iterable else c[2] }}</code>{{ ', ' if not loop.last }}{% endfor %}{% endfor %}</td>
+        <td>{{ r.decision }}</td></tr>{% endfor %}
+        <tr><td class="mono">{{ decision.default.id }}</td><td class="muted">otherwise</td><td>{{ decision.default.decision }}</td></tr></tbody>
+    </table></div>
+  </section>
+  <section class="card" id="alerts">
+    <div class="card-h"><h2>Warranty expiry alerts</h2></div>
+    <form class="card-b row" method="post" action="{{ url_for('admin.alert_settings') }}">{{ csrf() }}
+      <label class="field" style="flex:1"><span>Alert owners this many days before a warranty ends</span><input class="input" type="number" min="1" max="365" name="days" value="{{ window }}"></label>
+      <button class="btn" type="submit" style="align-self:flex-end">Save</button>
+    </form>
+  </section>
 </div>
 {% endblock %}

@@ -2,51 +2,66 @@
   "category": "Home Appliances",
   "policy_name": "Major Home Appliances Comprehensive Protection Policy",
   "coverage_duration_months": 24,
-  "start_conditions": "Commences upon certified delivery and verified technician installation date.",
+  "standard_terms_months": [
+    24,
+    36
+  ],
+  "extended_extra_months": 12,
+  "start_conditions": "Coverage starts on the purchase date shown on the verified invoice.",
+  "grace_period_days": 14,
+  "claim_reporting_period_days": 45,
   "covered_faults": [
     "Compressor failure",
     "Motor burnout",
     "Thermostat failure",
     "Drum spin malfunction",
-    "Electronic PCB failure",
-    "Water pump leakage",
-    "Heating element failure",
-    "Door gasket hermetic seal failure"
+    "PCB failure",
+    "Water pump leakage"
+  ],
+  "excluded_damage_types": [
+    "Water Ingress",
+    "Accidental Drop"
   ],
   "exclusions": [
-    "Commercial heavy utilization",
-    "Pest infestation inside chassis",
-    "Rust and environmental corrosion",
+    "External water / flood damage",
+    "Impact damage during relocation",
     "Improper electrical supply rating",
-    "Third-party modifications",
-    "External water pipe burst impact",
-    "Installation by non-certified technician"
+    "Pest infestation",
+    "Commercial heavy utilisation"
   ],
-  "claim_reporting_period_days": 45,
-  "repair_conditions": "On-site diagnostic inspection by certified brand technician required prior to part dispatch.",
+  "exclusion_min_diagnostic_confidence": 0.55,
+  "repeat_repair_review_threshold": 2,
   "authorized_service_center_required": true,
-  "replacement_conditions": "Sealed system compressor failure within 180 days entitles claimant to replacement compressor assembly with extended seal warranty.",
-  "grace_period_days": 14,
+  "repair_conditions": "Repairs must be carried out by an authorised service center using genuine parts.",
+  "replacement_conditions": "Unit replacement is considered only after a repeated failure of the same component.",
   "mandatory_documents": [
-    "Original Tax Invoice",
-    "Installation Certificate",
-    "Model Serial Plate Photo"
+    "receipt"
+  ],
+  "supporting_documents": [
+    "warranty_card",
+    "serial_photo",
+    "damage_photo"
   ],
   "hard_fail_rules": [
-    "Appliance operated beyond residential domestic parameters",
-    "Severe rust or chemical corrosion caused by harsh industrial detergents",
-    "Electrical motor burnout resulting from ungrounded high-voltage power lines",
-    "Attempted compressor repair or gas refilling by unauthorized local mechanic"
-  ],
-  "warning_rules": [
-    "Multiple service visits logged for cooling or vibration within 90 days",
-    "Installation certificate submitted without technician signature stamp",
-    "Claim submitted in the second year with no routine filter maintenance logged"
+    "WARRANTY_EXPIRED",
+    "UNAUTHORIZED_REPAIR",
+    "EXCLUDED_DAMAGE",
+    "SERIAL_MISMATCH",
+    "LATE_REPORTING"
   ],
   "manual_review_rules": [
-    "Conflict between customer reported failure date and telemetry log",
-    "Disputed previous compressor replacement history",
-    "Document hash matches an existing processed claim record in another household",
-    "Model consistency status is Weak Match or Model Disagreement"
+    "GRACE_PERIOD",
+    "EXCLUDED_DAMAGE_UNCONFIRMED",
+    "SERIAL_UNVERIFIED",
+    "INCOMPLETE_EVIDENCE",
+    "UNKNOWN_CAUSE",
+    "REPEAT_REPAIRS",
+    "PRIOR_REPLACEMENT",
+    "UNCOVERED_FAULT"
+  ],
+  "warning_rules": [
+    "NEAR_REPORTING_DEADLINE",
+    "WARRANTY_ENDING_SOON",
+    "SUPPORTING_DOCUMENT_MISSING"
   ]
 }

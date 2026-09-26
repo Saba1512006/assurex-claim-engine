@@ -1,510 +1,96 @@
 {% extends "components/base.html" %}
-
-{% block title %}Executive Analytics Dashboard{% endblock %}
-
+{% from "components/macros.html" import csrf %}
+{% block title %}Overview{% endblock %}
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
-    <div>
-        <h2 class="fw-bold text-slate-900 mb-1">Executive Analytics & System Intelligence</h2>
-        <p class="text-muted mb-0">High-level operational metrics, dual-model consensus benchmarks, and fraud rate monitoring</p>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ url_for('claims.search_records') }}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-search"></i> Search Records
-        </a>
-        <a href="{{ url_for('admin.analytics_dashboard') }}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-bar-chart-line-fill"></i> Analytics &amp; Reports
-        </a>
-        <a href="{{ url_for('admin.users_directory') }}" class="btn btn-outline-dark btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-people-fill"></i> Manage Users (RBAC)
-        </a>
-        <a href="{{ url_for('admin.export_data', export_type='claims') }}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-file-earmark-spreadsheet"></i> Claims CSV
-        </a>
-        <a href="{{ url_for('admin.export_data', export_type='products') }}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-box-seam"></i> Products CSV
-        </a>
-        <a href="{{ url_for('admin.export_data', export_type='warranties') }}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-shield-check"></i> Warranties CSV
-        </a>
-        <a href="{{ url_for('admin.export_data', export_type='analytics') }}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-graph-up"></i> Analytics CSV
-        </a>
-        <a href="{{ url_for('admin.export_data', export_type='audit') }}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 shadow-sm">
-            <i class="bi bi-shield-lock"></i> Audit Logs
-        </a>
-    </div>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Administrator</div>
+    <h1>Operations overview</h1>
+    <p class="lede">Claims, decisions, model health and monitoring alerts. Filters apply to every number on this page.</p>
+  </div>
+  <div class="row">
+    <form method="post" action="{{ url_for('admin.dispatch_alerts') }}">{{ csrf() }}<button class="btn quiet" type="submit"><i class="bi bi-send"></i>Send due alerts</button></form>
+    <a class="btn quiet" href="{{ url_for('admin.export', kind='claims', **filters) }}"><i class="bi bi-filetype-csv"></i>Export claims</a>
+  </div>
 </div>
 
-<!-- Executive Metric Cards (Row 1: Claims Lifecycle - Req xli) -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-primary-subtle text-primary">
-                <i class="bi bi-journal-check"></i>
-            </div>
-            <div>
-                <div class="text-muted small fw-semibold">Total Claims Intake</div>
-                <div class="fs-4 fw-bold text-slate-900">{{ total_claims }}</div>
-            </div>
-        </div>
+<form class="card" method="get"><div class="card-b filters">
+  <label class="field"><span>Category</span><select class="select sm" name="category"><option value="">All categories</option>{% for c in categories %}<option {{ 'selected' if filters.get('category') == c }}>{{ c }}</option>{% endfor %}</select></label>
+  <label class="field"><span>Status</span><select class="select sm" name="status"><option value="">Any status</option>{% for s in statuses %}<option {{ 'selected' if filters.get('status') == s }}>{{ s }}</option>{% endfor %}</select></label>
+  <label class="field"><span>Submitted from</span><input class="input sm" type="date" name="start" value="{{ filters.get('start', '') }}"></label>
+  <label class="field"><span>to</span><input class="input sm" type="date" name="end" value="{{ filters.get('end', '') }}"></label>
+  <div class="row"><button class="btn sm" type="submit">Apply</button><a class="btn ghost sm" href="{{ url_for('admin.dashboard') }}">Reset</a></div>
+</div></form>
+
+<section class="stats mt-3">
+  <a class="stat" href="{{ url_for('claims.search') }}"><div class="v">{{ o.total }}</div><div class="l">Claims submitted</div></a>
+  <a class="stat good" href="{{ url_for('claims.search', decision='Likely Valid') }}"><div class="v">{{ o.likely_valid }}</div><div class="l">Likely valid</div></a>
+  <a class="stat bad" href="{{ url_for('claims.search', decision='Likely Invalid') }}"><div class="v">{{ o.likely_invalid }}</div><div class="l">Likely invalid</div></a>
+  <a class="stat warn" href="{{ url_for('claims.search', decision='Manual Review Required') }}"><div class="v">{{ o.manual_review }}</div><div class="l">Manual review</div></a>
+  <a class="stat info" href="{{ url_for('reviewer.queue') }}"><div class="v">{{ o.pending }}</div><div class="l">Pending ({{ o.in_queue }} in queue)</div></a>
+</section>
+<section class="stats mt-2">
+  <div class="stat"><div class="v">{{ o.duplicates }}</div><div class="l"><i class="bi bi-files"></i>Duplicate alerts</div></div>
+  <div class="stat"><div class="v">{{ o.disagreements }}<small>/ {{ o.compared }}</small></div><div class="l"><i class="bi bi-arrow-left-right"></i>Model disagreements</div></div>
+  <div class="stat"><div class="v">{{ o.avg_python_conf|pct(1) }}</div><div class="l">Avg Python confidence</div></div>
+  <div class="stat"><div class="v">{{ o.avg_gtm_conf|pct(1) }}</div><div class="l">Avg Teachable Machine confidence</div></div>
+  <div class="stat"><div class="v">{{ '%.3f'|format(o.avg_conf_diff) if o.avg_conf_diff is not none else '—' }}</div><div class="l">Avg |Δ confidence|</div></div>
+</section>
+
+<div class="split mt-3">
+  <div class="stack">
+    <section class="card">
+      <div class="card-h"><h2>Claim trend</h2><span class="hint">Recommendations per week, last 12 weeks</span></div>
+      <div class="card-b"><div class="chart"><canvas data-chart="trend" aria-label="Weekly claims by recommendation" role="img"></canvas></div></div>
+    </section>
+    <div class="grid grid-2">
+      <section class="card">
+        <div class="card-h"><h2>Status mix</h2></div>
+        <div class="card-b"><div class="chart sm"><canvas data-chart="status" role="img" aria-label="Claims by status"></canvas></div></div>
+      </section>
+      <section class="card">
+        <div class="card-h"><h2>Recommendations</h2></div>
+        <div class="card-b"><div class="chart sm"><canvas data-chart="decisions" role="img" aria-label="Claims by recommendation"></canvas></div></div>
+      </section>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-success-subtle text-success">
-                <i class="bi bi-check-circle"></i>
-            </div>
-            <div>
-                <div class="text-muted small fw-semibold">Valid / Approved</div>
-                <div class="fs-4 fw-bold text-slate-900">{{ valid_claims }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-danger-subtle text-danger">
-                <i class="bi bi-x-circle"></i>
-            </div>
-            <div>
-                <div class="text-muted small fw-semibold">Rejected (Invalid)</div>
-                <div class="fs-4 fw-bold text-slate-900">{{ invalid_claims }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-warning-subtle text-warning">
-                <i class="bi bi-hourglass-split"></i>
-            </div>
-            <div>
-                <div class="text-muted small fw-semibold">Manual Triage Queue</div>
-                <div class="fs-4 fw-bold text-slate-900">{{ manual_review_claims }}</div>
-            </div>
-        </div>
-    </div>
+    <section class="card">
+      <div class="card-h"><h2>Recent activity</h2><a class="small" href="{{ url_for('admin.audit_log') }}">Audit trail →</a></div>
+      <div class="table-wrap"><table class="table compact small">
+        <tbody>{% for a in recent %}<tr><td class="nowrap muted">{{ a.timestamp|ago }}</td><td><b>{{ a.action|replace('_', ' ')|capitalize }}</b></td><td>{{ a.actor.full_name if a.actor else 'System' }}</td><td><span class="id">{{ a.entity_id or '—' }}</span></td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+  </div>
+  <aside class="stack">
+    <section class="card">
+      <div class="card-h"><h2>Models</h2><a class="small" href="{{ url_for('admin.models') }}">Manage →</a></div>
+      <ul class="list">
+        <li><span class="ico {{ 'good' if models.python.ok else 'bad' }}"><i class="bi bi-table"></i></span><div class="grow"><div class="ttl small">Python model</div>
+          <div class="sub">{% if models.python.ok %}<span class="mono">{{ models.python.version }}</span> · test accuracy {{ models.card.get('test', {}).get('accuracy')|pct(1) }}{% else %}{{ models.python.error }}{% endif %}</div></div></li>
+        <li><span class="ico {{ 'good' if models.gtm.ok else 'warn' }}"><i class="bi bi-image"></i></span><div class="grow"><div class="ttl small">Teachable Machine</div>
+          <div class="sub">{% if models.gtm.ok %}<span class="mono">{{ models.gtm.version }}</span>{% if models.gtm_eval %} · test accuracy {{ models.gtm_eval.get('test', {}).get('gtm_accuracy')|pct(1) }}{% endif %}{% else %}Not installed — every claim goes to manual review. <a href="{{ url_for('admin.models') }}">Install it</a>{% endif %}</div></div></li>
+      </ul>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>Monitoring</h2><span class="hint">last 72 hours</span></div>
+      <ul class="list">
+        {% for a in anomalies %}
+          <li><span class="ico {{ 'bad' if a.severity == 'critical' else 'warn' }}"><i class="bi {{ 'bi-exclamation-octagon' if a.severity == 'critical' else 'bi-exclamation-triangle' }}"></i></span>
+            <div class="grow"><div class="ttl small">{{ a.title }} <span class="badge plain {{ 'bad' if a.severity == 'critical' else 'warn' }}">{{ a.count }}</span></div><div class="sub">{{ a.description }}</div><div class="sub"><i>{{ a.recommendation }}</i></div></div></li>
+        {% else %}<li class="small muted"><i class="bi bi-check-circle" style="color:var(--good)"></i>&nbsp;No anomalies detected.</li>{% endfor %}
+      </ul>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>Warranties ending</h2><span class="hint">next {{ window }} days</span></div>
+      <ul class="list">
+        {% for w in expiring %}<li><div class="grow"><div class="ttl small">{{ w.product.product_name }}</div><div class="sub">{{ w.product.owner.full_name }} · {{ w.expiry_date|date }}</div></div><span class="badge warn plain">{{ w.remaining_days() }} d</span></li>
+        {% else %}<li class="small muted">None in the alert window.</li>{% endfor %}
+      </ul>
+    </section>
+  </aside>
 </div>
-
-<!-- Executive Metric Cards (Row 2: Dual Consensus, Duplicates & Confidence - Req xli) -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-danger-subtle text-danger">
-                <i class="bi bi-shield-exclamation"></i>
-            </div>
-            <div>
-                <div class="text-muted extra-small fw-semibold">Duplicate Alerts</div>
-                <div class="fs-5 fw-bold text-slate-900">{{ duplicate_alerts }} Flags</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-warning-subtle text-warning">
-                <i class="bi bi-diagram-3"></i>
-            </div>
-            <div>
-                <div class="text-muted extra-small fw-semibold">Model Disagreements</div>
-                <div class="fs-5 fw-bold text-slate-900">{{ disagreements }} <small class="text-muted extra-small fw-normal">({{ disagreement_rate }}%)</small></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-info-subtle text-info">
-                <i class="bi bi-bullseye"></i>
-            </div>
-            <div>
-                <div class="text-muted extra-small fw-semibold">Average Confidence Score</div>
-                <div class="fs-5 fw-bold text-slate-900 font-mono">{{ avg_confidence_score }}%</div>
-                <div class="text-muted extra-small">Py: {{ avg_python_conf }}% &bull; GTM: {{ avg_gtm_conf }}%</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="stat-widget">
-            <div class="stat-icon-wrapper bg-light text-dark">
-                <i class="bi bi-hdd-network"></i>
-            </div>
-            <div>
-                <div class="text-muted extra-small fw-semibold">Hardware Fleet &amp; Users</div>
-                <div class="fs-5 fw-bold text-slate-900">{{ total_products }} Units</div>
-                <div class="text-muted extra-small">{{ total_users }} User Accounts</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Warranty Expiry Alerts Telemetry -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4 border-start border-4 border-warning">
-    <div class="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-warning-subtle text-warning-emphasis p-2 rounded-circle fs-5 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                <i class="bi bi-bell-fill"></i>
-            </div>
-            <div>
-                <div class="fw-bold text-slate-900 small">Warranty Expiry Alerts Telemetry</div>
-                <div class="text-muted extra-small">
-                    Active Alert Window: <strong class="text-dark">{{ alert_threshold_days }} Days</strong> &bull; Fleet Warranties Nearing Expiry: <strong class="text-warning-emphasis">{{ approaching_warranties_count }} Units</strong>
-                </div>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="{{ url_for('admin.manage_policies') }}" class="btn btn-sm btn-outline-warning text-dark fw-semibold">
-                <i class="bi bi-sliders me-1"></i> Configure Alert Threshold
-            </a>
-            <form method="POST" action="{{ url_for('admin.dispatch_warranty_alerts') }}" class="d-inline">
-                <button type="submit" class="btn btn-sm btn-primary fw-semibold">
-                    <i class="bi bi-broadcast me-1"></i> Dispatch Fleet Alerts
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- System Monitoring & Anomaly Alerts Telemetry -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4 border-start border-4 border-danger">
-    <div class="card-body p-3">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-2">
-            <div class="d-flex align-items-center gap-3">
-                <div class="bg-danger-subtle text-danger p-2 rounded-circle fs-5 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
-                    <i class="bi bi-shield-exclamation"></i>
-                </div>
-                <div>
-                    <div class="fw-bold text-slate-900 small">System Monitoring &amp; Anomaly Alerts</div>
-                    <div class="text-muted extra-small">
-                        Continuous telemetry across failed uploads, repeated logins, duplicate documents, unusual claim spikes, and model disagreements.
-                    </div>
-                </div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge {% if anomalies_count > 0 %}bg-danger{% else %}bg-success{% endif %} rounded-pill px-3 py-2 font-mono">
-                    {{ anomalies_count }} Active Anomal{{ 'ies' if anomalies_count != 1 else 'y' }}
-                </span>
-                <form method="POST" action="{{ url_for('admin.dispatch_anomaly_alerts') }}" class="d-inline">
-                    <button type="submit" class="btn btn-sm btn-outline-danger fw-semibold d-inline-flex align-items-center gap-1 shadow-sm">
-                        <i class="bi bi-broadcast-pin"></i> Dispatch Admin Alerts
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        {% if anomalies %}
-            <div class="row g-2 mt-2">
-                {% for a in anomalies %}
-                    <div class="col-md-6 col-lg-4">
-                        <div class="p-2 border rounded-3 bg-light d-flex align-items-start gap-2 h-100">
-                            <span class="badge {% if a.severity == 'Critical' %}bg-danger{% else %}bg-warning text-dark{% endif %} extra-small mt-1">
-                                {{ a.severity }}
-                            </span>
-                            <div class="small">
-                                <div class="fw-bold text-dark">{{ a.title }} ({{ a.count }})</div>
-                                <div class="text-muted extra-small">{{ a.description }}</div>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-muted extra-small d-flex align-items-center gap-2 mt-2">
-                <i class="bi bi-check-circle-fill text-success"></i> All monitoring channels operating normally. No security or model anomalies detected.
-            </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- ML Benchmark & Algorithm Comparison Matrix -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
-    <div class="card-header-styled d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-cpu text-primary me-2"></i>Python Classification Model Benchmark &amp; Algorithm Selection</span>
-        <span class="badge bg-success-subtle text-success border border-success-subtle font-mono">Selected: Random Forest</span>
-    </div>
-    <div class="card-body p-4">
-        <!-- Common Dataset Metrics -->
-        <div class="row g-3 mb-4">
-            <div class="col-sm-6 col-lg-3">
-                <div class="bg-light p-3 rounded-3 border">
-                    <div class="text-muted extra-small fw-semibold text-uppercase">Common Benchmark Dataset</div>
-                    <div class="fs-5 fw-bold text-slate-900 mt-1">{{ dataset_stats.total_records or 1500 }} Claims</div>
-                    <small class="text-muted extra-small">Balanced: 500 Valid / 500 Invalid / 500 Manual</small>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="bg-light p-3 rounded-3 border">
-                    <div class="text-muted extra-small fw-semibold text-uppercase">Training Split (70%)</div>
-                    <div class="fs-5 fw-bold text-slate-900 mt-1">{{ dataset_stats.splits.train.total if dataset_stats.splits else 1050 }} Samples</div>
-                    <small class="text-muted extra-small">350 Valid / 350 Invalid / 350 Manual</small>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="bg-light p-3 rounded-3 border">
-                    <div class="text-muted extra-small fw-semibold text-uppercase">Val &amp; Test Splits (30%)</div>
-                    <div class="fs-5 fw-bold text-slate-900 mt-1">450 Samples</div>
-                    <small class="text-muted extra-small">225 Validation / 225 Held-Out Test</small>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="bg-light p-3 rounded-3 border">
-                    <div class="text-muted extra-small fw-semibold text-uppercase">Teachable Machine Cards</div>
-                    <div class="fs-5 fw-bold text-primary mt-1">1,500 Cards Generated</div>
-                    <small class="text-muted extra-small">Visual card images mapped 1:1 to CSV</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Algorithm Comparison Table -->
-        <div class="table-responsive">
-            <table class="table table-custom align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>Algorithm</th>
-                        <th>5-Fold CV Accuracy</th>
-                        <th>Test Accuracy</th>
-                        <th>Precision (Macro)</th>
-                        <th>Recall (Macro)</th>
-                        <th>F1-Score (Macro)</th>
-                        <th class="text-end">Selection Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if benchmark_data %}
-                        {% for algo_key, algo in benchmark_data.items() %}
-                            <tr class="{% if algo_key == 'Random_Forest' %}table-success-subtle{% endif %}">
-                                <td class="fw-bold text-slate-800">
-                                    {% if algo_key == 'Random_Forest' %}
-                                        <i class="bi bi-check-circle-fill text-success me-2"></i>
-                                    {% else %}
-                                        <i class="bi bi-circle text-muted me-2"></i>
-                                    {% endif %}
-                                    {{ algo.algorithm|replace('_', ' ') }}
-                                </td>
-                                <td class="font-mono small">{{ "%.2f"|format(algo.cv_5fold_mean * 100) }}% (&plusmn;{{ "%.2f"|format(algo.cv_5fold_std) }})</td>
-                                <td class="font-mono fw-bold text-success">{{ "%.2f"|format(algo.test_accuracy * 100) }}%</td>
-                                <td class="font-mono small">{{ "%.2f"|format(algo.test_precision_macro * 100) }}%</td>
-                                <td class="font-mono small">{{ "%.2f"|format(algo.test_recall_macro * 100) }}%</td>
-                                <td class="font-mono fw-bold">{{ "%.2f"|format(algo.test_f1_macro * 100) }}%</td>
-                                <td class="text-end">
-                                    {% if algo_key == 'Random_Forest' %}
-                                        <span class="badge bg-success shadow-xs"><i class="bi bi-trophy-fill me-1"></i>Selected Best Model</span>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">Evaluated Baseline</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="7" class="text-center py-3 text-muted">Benchmark data loading...</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Claim Intake Trends Velocity -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
-    <div class="card-header-styled d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-graph-up text-primary me-2"></i>Claim Intake Trends &amp; Monthly Lifecycle Volume</span>
-        <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-mono small">Intake Velocity</span>
-    </div>
-    <div class="card-body p-4">
-        <div style="height: 280px; width: 100%;">
-            <canvas id="claimTrendsChart"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- Interactive Chart.js Visualizations -->
-<div class="row g-4 mb-4">
-    <!-- Claims by Status Doughnut -->
-    <div class="col-lg-5">
-        <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
-            <div class="card-header-styled">
-                <i class="bi bi-pie-chart text-primary me-2"></i>Claims Status Distribution
-            </div>
-            <div class="card-body p-4 d-flex align-items-center justify-content-center">
-                <div style="max-height: 280px; width: 100%;">
-                    <canvas id="claimsStatusChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Category Fleet Distribution Bar Chart -->
-    <div class="col-lg-7">
-        <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
-            <div class="card-header-styled">
-                <i class="bi bi-bar-chart-line text-primary me-2"></i>Equipment Portfolio by Category
-            </div>
-            <div class="card-body p-4">
-                <div style="max-height: 280px; width: 100%;">
-                    <canvas id="categoryChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Security & Audit Event Log -->
-<div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
-    <div class="card-header-styled d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-fingerprint text-primary me-2"></i>Recent System Activity & Audit Trail</span>
-        <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-sm btn-outline-secondary">View Full Log</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-custom align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Timestamp (UTC)</th>
-                    <th>Action</th>
-                    <th>Entity Type & ID</th>
-                    <th>User Role</th>
-                    <th>IP Address</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if recent_audits %}
-                    {% for a in recent_audits %}
-                        <tr>
-                            <td class="font-mono extra-small text-muted">{{ a.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                            <td><span class="badge bg-light text-dark border font-mono">{{ a.action }}</span></td>
-                            <td>
-                                <span class="fw-semibold">{{ a.entity_type }}</span>:
-                                <span class="font-mono text-muted small">{{ a.entity_id }}</span>
-                            </td>
-                            <td><span class="badge bg-secondary extra-small">{{ a.user_role or 'System' }}</span></td>
-                            <td class="font-mono extra-small text-muted">{{ a.ip_address or 'Local' }}</td>
-                        </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">No audit events recorded yet.</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    // 1. Claims Status Distribution Chart
-    const statusCtx = document.getElementById('claimsStatusChart');
-    if (statusCtx) {
-        new Chart(statusCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Approved', 'Rejected', 'Manual Review', 'Pending / Under Eval'],
-                datasets: [{
-                    data: [
-                        {{ valid_claims }},
-                        {{ invalid_claims }},
-                        {{ manual_review_claims }},
-                        {{ pending_claims }}
-                    ],
-                    backgroundColor: ['#16a34a', '#dc2626', '#d97706', '#0284c7'],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-    }
-
-    // 2. Category Breakdown Chart
-    const catCtx = document.getElementById('categoryChart');
-    if (catCtx) {
-        const catLabels = {{ category_breakdown.keys()|list|tojson }};
-        const catValues = {{ category_breakdown.values()|list|tojson }};
-        new Chart(catCtx, {
-            type: 'bar',
-            data: {
-                labels: catLabels.length ? catLabels : ['Consumer Electronics', 'Home Appliances', 'Industrial Tools'],
-                datasets: [{
-                    label: 'Registered Assets',
-                    data: catValues.length ? catValues : [0, 0, 0],
-                    backgroundColor: '#2563eb',
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, ticks: { precision: 0 } }
-                }
-            }
-        });
-    }
-
-    // 3. Claim Trends Velocity Chart
-    const trendsCtx = document.getElementById('claimTrendsChart');
-    if (trendsCtx) {
-        new Chart(trendsCtx, {
-            type: 'line',
-            data: {
-                labels: {{ trend_labels|tojson }},
-                datasets: [
-                    {
-                        label: 'Total Intake',
-                        data: {{ trend_totals|tojson }},
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                        fill: true,
-                        tension: 0.35,
-                        borderWidth: 2.5
-                    },
-                    {
-                        label: 'Approved',
-                        data: {{ trend_approved|tojson }},
-                        borderColor: '#16a34a',
-                        backgroundColor: 'transparent',
-                        borderDash: [5, 5],
-                        tension: 0.35,
-                        borderWidth: 2
-                    },
-                    {
-                        label: 'Rejected',
-                        data: {{ trend_rejected|tojson }},
-                        borderColor: '#dc2626',
-                        backgroundColor: 'transparent',
-                        borderDash: [5, 5],
-                        tension: 0.35,
-                        borderWidth: 2
-                    },
-                    {
-                        label: 'Manual Review',
-                        data: {{ trend_manual|tojson }},
-                        borderColor: '#d97706',
-                        backgroundColor: 'transparent',
-                        borderDash: [3, 3],
-                        tension: 0.35,
-                        borderWidth: 2
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'top' },
-                    tooltip: { mode: 'index', intersect: false }
-                },
-                scales: {
-                    y: { beginAtZero: true, ticks: { precision: 0 } }
-                }
-            }
-        });
-    }
-});
-</script>
+<script type="application/json" id="chart-data">{{ {
+  'trend': {'type': 'bar', 'labels': o.trend.labels, 'stacked': True, 'series': o.trend.series},
+  'status': {'type': 'hbar', 'labels': o.status_counts.keys()|list, 'values': o.status_counts.values()|list},
+  'decisions': {'type': 'hbar', 'labels': o.decision_counts.keys()|list, 'values': o.decision_counts.values()|list, 'tones': ['good', 'bad', 'warn']}
+}|tojson }}</script>
 {% endblock %}

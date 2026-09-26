@@ -1,281 +1,127 @@
-"""
-AssureX Warranty Alert & Notification Service (Req 1.6.ix)
-Monitors registered equipment warranty lifecycles, detects approaching expirations
-against administrator-configured thresholds, and dispatches real-time user notifications.
-"""
-from datetime import datetime, timezone
-from database.db import db
+"""Warranty-expiry alerts (SRS ix) and monitoring / anomaly alerts (SRS l)."""
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta, timezone
+
+from sqlalchemy import func
+
 from config.config import Config
-from src.models.entities import Product, ProductWarranty, Notification, SystemSetting, AuditLog
+from database.db import db
+from src.core.consistency import thresholds
+from src.models.entities import (AuditLog, Claim, ClaimDocument, ModelEvaluation, Notification, Product,
+                                 ProductWarranty, SystemSetting, User)
+
+ALERT_KEY = "warranty_expiry_alert_days"
 
 
-def get_alert_threshold_days() -> int:
-    """Retrieve administrator-configured expiry alert window in days (default: Config.WARRANTY_EXPIRY_ALERT_DAYS)."""
-    try:
-        return SystemSetting.get_int("warranty_expiry_alert_days", Config.WARRANTY_EXPIRY_ALERT_DAYS)
-    except Exception:
-        return Config.WARRANTY_EXPIRY_ALERT_DAYS
+def alert_days() -> int:
+    return SystemSetting.get_int(ALERT_KEY, Config.WARRANTY_EXPIRY_ALERT_DAYS)
 
 
-def set_alert_threshold_days(days: int, actor_user=None) -> int:
-    """Set the system-wide warranty expiry alert window in days and log audit event."""
+def set_alert_days(days: int) -> int:
     days = max(1, min(int(days), 365))
-    SystemSetting.set_val(
-        "warranty_expiry_alert_days",
-        str(days),
-        "Threshold days before warranty expiration to trigger automated user alerts (Req 1.6.ix)"
-    )
-
-    if actor_user:
-        AuditLog.log_event(
-            action="WARRANTY_ALERT_THRESHOLD_UPDATED",
-            user_id=actor_user.id if hasattr(actor_user, "id") else None,
-            user_role=getattr(actor_user, "role", Config.ROLE_ADMIN),
-            entity_type="SystemSetting",
-            entity_id="warranty_expiry_alert_days",
-            details={
-                "new_threshold_days": days,
-                "configured_by": getattr(actor_user, "email", "Administrator")
-            }
-        )
-        db.session.commit()
-
+    SystemSetting.set_val(ALERT_KEY, days, "Days before warranty expiry when owners are alerted")
     return days
 
 
-def get_approaching_warranties(threshold_days=None, user_id=None) -> list:
-    """Query active warranties approaching expiration within the alert window."""
-    if threshold_days is None:
-        threshold_days = get_alert_threshold_days()
+def expiring_warranties(product_query=None, days: int | None = None) -> list:
+    """Active warranties that end within the alert window (optionally limited to a product query)."""
+    days = alert_days() if days is None else days
+    today = date.today()
+    q = ProductWarranty.query.join(Product).filter(ProductWarranty.expiry_date >= today,
+                                                   ProductWarranty.expiry_date <= today + timedelta(days=days),
+                                                   ProductWarranty.start_date <= today)
+    if product_query is not None:
+        q = q.filter(Product.id.in_(product_query.with_entities(Product.id)))
+    return q.order_by(ProductWarranty.expiry_date).all()
 
-    query = ProductWarranty.query.join(Product)
-    if user_id:
-        query = query.filter(Product.user_id == user_id)
 
-    warranties = query.all()
-    return [w for w in warranties if w.is_approaching_expiry(threshold_days=threshold_days)]
-
-
-def scan_and_generate_warranty_alerts(user_id=None) -> list:
-    """
-    Req 1.6.ix: Warranty Expiry Alerts Engine
-    Scans active warranties nearing expiration against the admin-configured threshold.
-    Dispatches automated Notification records to corresponding users if not already notified.
-    """
-    threshold_days = get_alert_threshold_days()
-    approaching = get_approaching_warranties(threshold_days=threshold_days, user_id=user_id)
-    created_notifications = []
-
-    for w in approaching:
-        product = w.product
-        if not product:
+def dispatch_expiry_alerts(user_id: int | None = None) -> int:
+    """Create one unread expiry notification per expiring product (idempotent). Caller commits."""
+    q = Product.query.filter(Product.user_id == user_id) if user_id else None
+    created = 0
+    for w in expiring_warranties(q):
+        p = w.product
+        exists = Notification.query.filter_by(user_id=p.user_id, notification_type="warranty_expiry",
+                                              related_product_id=p.product_id, is_read=False).first()
+        if exists:
             continue
-
-        rem_days = w.remaining_days()
-
-        # Check if an active unread notification already exists for this product
-        existing = Notification.query.filter_by(
-            user_id=product.user_id,
-            notification_type=Config.NOTIF_TYPE_WARRANTY_EXPIRY,
-            related_product_id=product.product_id,
-            is_read=False
-        ).first()
-
-        if not existing:
-            notif = Notification(
-                user_id=product.user_id,
-                notification_type=Config.NOTIF_TYPE_WARRANTY_EXPIRY,
-                title=f"Warranty Expiry Alert: {product.product_name}",
-                message=(
-                    f"Action Required: The warranty for '{product.product_name}' "
-                    f"(Model: {product.model_number}, Serial: {product.serial_number}) is nearing expiration. "
-                    f"You have {rem_days} day{'s' if rem_days != 1 else ''} remaining before policy expiry "
-                    f"on {w.expiry_date.strftime('%Y-%m-%d')}. Submit any outstanding warranty claims or contact support."
-                ),
-                related_product_id=product.product_id
-            )
-            db.session.add(notif)
-            created_notifications.append(notif)
-
-    if created_notifications:
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-
-    return created_notifications
-
-
-def get_system_anomalies(hours: int = 48) -> list:
-    """
-    Req 1.6.l: Monitoring & Anomaly Alerts Engine.
-    Monitors 7 system security and operational dimensions:
-    1. Failed uploads
-    2. Repeated login attempts
-    3. Duplicate documents
-    4. Unusual claim activity
-    5. Model failures
-    6. Low-confidence predictions
-    7. Excessive disagreement between the two models
-    """
-    from sqlalchemy import func
-    from src.models.entities import Claim, ClaimDocument, ModelEvaluation, User
-
-    anomalies = []
-
-    # 1. Failed Uploads
-    failed_uploads = AuditLog.query.filter(
-        AuditLog.action == "UPLOAD_FAILED"
-    ).all()
-    if failed_uploads:
-        anomalies.append({
-            "type": "failed_uploads",
-            "title": "Failed Document Uploads",
-            "category": "File Ingestion",
-            "severity": "Warning",
-            "count": len(failed_uploads),
-            "description": f"{len(failed_uploads)} failed file upload event(s) logged due to invalid MIME formats or size violations.",
-            "recommendation": "Review document upload logs and ensure clients adhere to supported PDF/PNG/JPEG formats."
-        })
-
-    # 2. Repeated Login Attempts
-    failed_logins = AuditLog.query.filter(
-        AuditLog.action == "LOGIN_FAILED"
-    ).all()
-    login_fails_by_ip = {}
-    for fl in failed_logins:
-        ip = fl.ip_address or "Unknown"
-        login_fails_by_ip[ip] = login_fails_by_ip.get(ip, 0) + 1
-
-    suspicious_ips = [ip for ip, cnt in login_fails_by_ip.items() if cnt >= 3]
-    if suspicious_ips or len(failed_logins) >= 3:
-        anomalies.append({
-            "type": "repeated_logins",
-            "title": "Repeated Failed Login Attempts",
-            "category": "Authentication Security",
-            "severity": "Critical" if suspicious_ips else "Warning",
-            "count": len(failed_logins),
-            "description": f"{len(failed_logins)} failed login attempt(s) detected across {len(login_fails_by_ip)} IP source(s).",
-            "recommendation": "Verify claimant identities and monitor IP sources for potential brute-force activity."
-        })
-
-    # 3. Duplicate Documents
-    dup_claims = Claim.query.filter(Claim.is_duplicate_flag == True).count()
-    dup_hash_counts = db.session.query(
-        ClaimDocument.file_hash_sha256, func.count(ClaimDocument.id)
-    ).group_by(ClaimDocument.file_hash_sha256).having(func.count(ClaimDocument.id) > 1).all()
-    total_dup_docs = sum(cnt for _, cnt in dup_hash_counts) if dup_hash_counts else 0
-
-    if dup_claims > 0 or total_dup_docs > 0:
-        anomalies.append({
-            "type": "duplicate_documents",
-            "title": "Duplicate Document & Claim Inconsistencies",
-            "category": "Fraud Prevention",
-            "severity": "Warning",
-            "count": max(dup_claims, total_dup_docs),
-            "description": f"{max(dup_claims, total_dup_docs)} duplicate document occurrences or duplicate claim flags flagged across the fleet.",
-            "recommendation": "Investigate flagged dossiers to determine whether invoices or serials were reused."
-        })
-
-    # 4. Unusual Claim Activity
-    high_amount_claims = sum(1 for c in Claim.query.all() if c.claim_amount >= 2000.0)
-    claims_by_user = db.session.query(Claim.user_id, func.count(Claim.id)).group_by(Claim.user_id).having(func.count(Claim.id) >= 3).all()
-    burst_filing_users = len(claims_by_user)
-
-    if high_amount_claims > 0 or burst_filing_users > 0:
-        anomalies.append({
-            "type": "unusual_claim_activity",
-            "title": "Unusual Claim Activity",
-            "category": "Risk Management",
-            "severity": "Warning",
-            "count": high_amount_claims + burst_filing_users,
-            "description": f"{high_amount_claims} high-value claim(s) (>= $2,000) and {burst_filing_users} user account(s) with high filing volume detected.",
-            "recommendation": "Perform senior technician review for high-indemnity warranty replacement requests."
-        })
-
-    # 5. Model Failures
-    model_failures = AuditLog.query.filter(AuditLog.action == "MODEL_FAILURE").all()
-    if model_failures:
-        anomalies.append({
-            "type": "model_failures",
-            "title": "Machine Learning Prediction Faults",
-            "category": "AI Health",
-            "severity": "Critical",
-            "count": len(model_failures),
-            "description": f"{len(model_failures)} machine learning pipeline exception(s) logged. Safe fallback heuristics engaged.",
-            "recommendation": "Verify Python model and Teachable Machine weights artifacts in model/ directory."
-        })
-
-    # 6. Low-Confidence Predictions
-    evaluations = ModelEvaluation.query.all()
-    low_confs = [
-        e for e in evaluations
-        if e.model_consistency_status == Config.CONSISTENCY_UNCERTAIN
-        or (e.python_conf_valid < Config.MIN_CONFIDENCE_THRESHOLD and e.python_conf_invalid < Config.MIN_CONFIDENCE_THRESHOLD and e.python_conf_manual < Config.MIN_CONFIDENCE_THRESHOLD)
-    ]
-    if low_confs:
-        anomalies.append({
-            "type": "low_confidence",
-            "title": "Low-Confidence Predictions",
-            "category": "Inference Quality",
-            "severity": "Warning",
-            "count": len(low_confs),
-            "description": f"{len(low_confs)} claim prediction(s) executed with confidence scores below the minimum operating threshold ({Config.MIN_CONFIDENCE_THRESHOLD:.2f}).",
-            "recommendation": "Review edge cases and gather more representative sample data for model retraining."
-        })
-
-    # 7. Excessive Disagreement Between Two Models
-    disagreements = [e for e in evaluations if (not e.is_class_match) or e.model_consistency_status == Config.CONSISTENCY_DISAGREEMENT]
-    disagreement_rate = (len(disagreements) / len(evaluations) * 100) if evaluations else 0.0
-    if len(disagreements) > 0:
-        anomalies.append({
-            "type": "model_disagreement",
-            "title": "Dual-Model Prediction Disagreements",
-            "category": "Model Consensus",
-            "severity": "Critical" if disagreement_rate > 30.0 else "Warning",
-            "count": len(disagreements),
-            "description": f"{len(disagreements)} claim(s) resulted in disagreement between Python ML and Teachable Machine ({disagreement_rate:.1f}% divergence rate).",
-            "recommendation": "Route diverging claims through senior human adjudication to calibrate consensus thresholds."
-        })
-
-    return anomalies
-
-
-def scan_and_generate_anomaly_alerts() -> list:
-    """
-    Req 1.6.l: Scans for all 7 active anomaly dimensions and dispatches notifications to system administrators.
-    """
-    from src.models.entities import User
-    anomalies = get_system_anomalies()
-    admin_users = User.query.filter_by(role=Config.ROLE_ADMIN).all()
-    if not admin_users or not anomalies:
-        return []
-
-    created = []
-    for admin in admin_users:
-        for anom in anomalies:
-            existing = Notification.query.filter_by(
-                user_id=admin.id,
-                notification_type=Config.NOTIF_TYPE_ANOMALY_ALERT,
-                title=f"System Anomaly: {anom['title']}",
-                is_read=False
-            ).first()
-
-            if not existing:
-                notif = Notification(
-                    user_id=admin.id,
-                    notification_type=Config.NOTIF_TYPE_ANOMALY_ALERT,
-                    title=f"System Anomaly: {anom['title']}",
-                    message=f"[{anom['severity']}] {anom['description']} Action: {anom['recommendation']}"
-                )
-                db.session.add(notif)
-                created.append(notif)
-
-    if created:
-        try:
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-
+        left = w.remaining_days()
+        db.session.add(Notification(
+            user_id=p.user_id, notification_type="warranty_expiry", related_product_id=p.product_id,
+            title=f"Warranty for {p.product_name} ends in {left} day{'s' if left != 1 else ''}",
+            message=f"Coverage for serial {p.serial_number} ends on {w.expiry_date:%d %b %Y}. "
+                    "File any claim for an existing fault before then."))
+        created += 1
     return created
 
+
+def anomalies(hours: int = 72) -> list:
+    """Monitoring signals for administrators over a rolling window."""
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    out = []
+
+    def events(*actions):
+        return AuditLog.query.filter(AuditLog.action.in_(actions), AuditLog.timestamp >= since)
+
+    n = events("UPLOAD_FAILED").count()
+    if n:
+        out.append(("Failed uploads", "warning", n, f"{n} upload(s) were refused (wrong type, size or unreadable receipt).",
+                    "Check whether a user needs help or someone is probing the upload endpoint."))
+    fails = events("LOGIN_FAILED", "LOGIN_LOCKED").all()
+    if fails:
+        per_ip = {}
+        for f in fails:
+            per_ip[f.ip_address] = per_ip.get(f.ip_address, 0) + 1
+        worst = max(per_ip.values())
+        out.append(("Repeated sign-in failures", "critical" if worst >= 5 else "warning", len(fails),
+                    f"{len(fails)} failed sign-in(s) from {len(per_ip)} address(es); busiest address {worst}.",
+                    "Accounts lock for 15 minutes after 5 failures. Force a sign-out if an account looks compromised."))
+    reused = db.session.query(ClaimDocument.file_hash_sha256).group_by(ClaimDocument.file_hash_sha256) \
+        .having(func.count(func.distinct(ClaimDocument.product_id)) > 1).count()
+    if reused:
+        out.append(("Duplicate documents", "warning", reused, f"{reused} file(s) appear on more than one product.",
+                    "Open the claims flagged as duplicates and compare the receipts."))
+    bursts = db.session.query(Claim.user_id, func.count(Claim.id)).filter(Claim.created_at >= since) \
+        .group_by(Claim.user_id).having(func.count(Claim.id) >= 3).all()
+    if bursts:
+        out.append(("Unusual claim activity", "warning", len(bursts),
+                    f"{len(bursts)} account(s) filed 3 or more claims in {hours} hours.",
+                    "Review those claimants' recent claims together."))
+    n = events("MODEL_UNAVAILABLE").count()
+    if n:
+        out.append(("Model unavailable", "critical", n, f"{n} evaluation(s) ran without one of the models.",
+                    "Open Admin › Models to see which model is missing and install it."))
+    recent = ModelEvaluation.query.filter(ModelEvaluation.evaluation_timestamp >= since).all()
+    min_conf = thresholds()["min_confidence"]
+    low = [e for e in recent if (e.python_top is not None and e.python_top < min_conf)
+           or (e.gtm_top is not None and e.gtm_top < min_conf)]
+    if low:
+        out.append(("Low-confidence predictions", "warning", len(low),
+                    f"{len(low)} prediction(s) had a top-class confidence below {min_conf:.2f}.",
+                    "These claims are in the manual-review queue; recurring cases may need more training data."))
+    compared = [e for e in recent if e.is_class_match is not None]
+    disagree = [e for e in compared if not e.is_class_match]
+    if disagree:
+        rate = len(disagree) / len(compared)
+        out.append(("Model disagreement", "critical" if rate > 0.3 else "warning", len(disagree),
+                    f"The two models disagreed on {len(disagree)} of {len(compared)} claims ({rate:.0%}).",
+                    "A rate above 30% suggests the Teachable Machine model needs retraining."))
+    return [dict(zip(("title", "severity", "count", "description", "recommendation"), a)) for a in out]
+
+
+def dispatch_anomaly_alerts() -> int:
+    """Notify every active administrator once per unread anomaly title. Caller commits."""
+    items = anomalies()
+    admins = User.query.filter_by(role=Config.ROLE_ADMIN, is_active=True).all()
+    created = 0
+    for admin in admins:
+        for a in items:
+            title = f"Monitoring: {a['title']}"
+            if Notification.query.filter_by(user_id=admin.id, notification_type="anomaly_alert",
+                                            title=title, is_read=False).first():
+                continue
+            db.session.add(Notification(user_id=admin.id, notification_type="anomaly_alert", title=title,
+                                        message=f"{a['description']} {a['recommendation']}"))
+            created += 1
+    return created

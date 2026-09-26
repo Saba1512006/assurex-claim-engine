@@ -1,0 +1,64 @@
+{
+  "version": "2026.09.26",
+  "comment": "Deny by default. A role has ONLY the permissions listed. Scope limits WHICH records: own | service_center | assigned_or_queue | all.",
+  "roles": {
+    "customer": {
+      "label": "Customer",
+      "self_registration": true,
+      "permissions": {
+        "claim.create": "own", "claim.read": "own", "claim.update_draft": "own", "claim.submit": "own",
+        "document.upload": "own", "document.read": "own", "document.replace": "own", "document.delete": "own",
+        "document.correct_ocr": "own", "product.create": "own", "product.read": "own", "product.update": "own",
+        "report.download": "own", "profile.manage": "own"
+      }
+    },
+    "service_center_staff": {
+      "label": "Service-center staff",
+      "self_registration": false,
+      "permissions": {
+        "claim.create": "service_center", "claim.read": "service_center", "claim.update_draft": "service_center",
+        "claim.submit": "service_center", "document.upload": "service_center", "document.read": "service_center",
+        "document.replace": "service_center", "document.correct_ocr": "service_center",
+        "product.create": "service_center", "product.read": "service_center", "product.update": "service_center",
+        "repair.record": "service_center", "warranty.manage": "service_center",
+        "report.download": "service_center", "profile.manage": "own"
+      }
+    },
+    "claim_reviewer": {
+      "label": "Claim reviewer",
+      "self_registration": false,
+      "permissions": {
+        "review.queue": "all", "review.decide": "assigned_or_queue", "review.override": "assigned_or_queue",
+        "claim.read": "assigned_or_queue", "document.read": "assigned_or_queue", "product.read": "assigned_or_queue",
+        "report.download": "assigned_or_queue", "profile.manage": "own"
+      }
+    },
+    "administrator": {
+      "label": "Administrator",
+      "self_registration": false,
+      "permissions": {
+        "admin.dashboard": "all", "analytics.read": "all", "policy.manage": "all", "settings.manage": "all",
+        "user.manage": "all", "audit.read": "all", "export.data": "all", "alert.dispatch": "all",
+        "review.queue": "all", "review.assign": "all", "claim.read": "all", "document.read": "all",
+        "product.read": "all", "report.download": "all", "profile.manage": "own"
+      }
+    }
+  },
+  "separation_of_duties": {
+    "reviewer_cannot_decide_own_claim": true,
+    "admin_can_decide_claims": false,
+    "override_reason_min_chars": 20,
+    "cannot_change_own_role": true,
+    "keep_at_least_one_admin": true
+  },
+  "review_transitions": {
+    "Manual Review": ["Approved", "Rejected", "Additional Information Required"],
+    "Under Evaluation": ["Approved", "Rejected", "Additional Information Required"],
+    "Additional Information Required": ["Manual Review"],
+    "Approved": ["Closed"],
+    "Rejected": ["Closed"],
+    "Closed": []
+  },
+  "editable_claim_statuses": ["Draft", "Additional Information Required"],
+  "login": {"max_failed_attempts": 5, "lockout_minutes": 15, "session_idle_minutes": 30}
+}

@@ -1,407 +1,72 @@
-{% extends 'components/base.html' %}
+{% extends "components/base.html" %}
+{% block title %}Warranty claims, decided with two models and clear rules{% endblock %}
+{% block main %}
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow" style="color:#7dd3fc"><i class="bi bi-shield-check"></i> NextWave AI &amp; ML · AssureX Claim Engine</div>
+      <h1>Warranty claims decided by <em>two independent models</em> and rules you can read.</h1>
+      <p class="lead">Customers and service centers submit claims with receipts and photos. A Python model scores the structured record, a Google Teachable Machine model scores a visual Claim Summary Card, and a configurable rule engine checks the warranty policy. Anything uncertain goes to a human reviewer.</p>
+      <div class="row">
+        <a class="btn lg" href="{{ url_for('auth.register') }}">Create a customer account</a>
+        <a class="btn lg quiet" href="{{ url_for('auth.login') }}">Sign in</a>
+      </div>
+    </div>
+    <div class="hero-panel" aria-label="Measured model results">
+      <div class="row between" style="margin-bottom:8px"><b style="color:#fff">Measured on 225 unseen test claims</b><span class="badge info plain">live from model files</span></div>
+      <div class="rowx"><span>Python model</span><b>{{ (metrics.python_model or '—')|replace('_', ' ')|title }}</b></div>
+      <div class="rowx"><span>Accuracy</span><b>{{ metrics.python_accuracy|pct(1) }}</b></div>
+      <div class="rowx"><span>Macro F1</span><b>{{ metrics.python_f1|pct(1) }}</b></div>
+      <div class="rowx"><span>ROC-AUC (one-vs-rest)</span><b>{{ '%.3f'|format(metrics.python_auc) if metrics.python_auc else '—' }}</b></div>
+      <div class="rowx"><span>Teachable Machine</span><b>{% if metrics.gtm_installed %}{{ metrics.gtm_accuracy|pct(1) if metrics.gtm_accuracy is not none else 'installed, not yet evaluated' }}{% else %}not installed yet{% endif %}</b></div>
+    </div>
+  </div>
+</section>
 
-{% block title %}AssureX | Warranty Claim Management Platform{% endblock %}
+<section class="band" id="how">
+  <div class="wrap">
+    <div class="eyebrow">How a claim is decided</div>
+    <h2 class="big">Five steps, every one recorded</h2>
+    <p class="muted" style="max-width:70ch">The same claim record goes to both models in different formats. Neither model sees the other's answer, and the Claim Summary Card never contains a prediction or decision.</p>
+    <div class="flow mt-3">
+      <div><h3>Collect</h3><p>Product, warranty, fault details and evidence. Receipts are read by OCR and confirmed by the user.</p></div>
+      <div><h3>Check</h3><p>Dates, serial numbers, duplicates and missing documents are compared across every source.</p></div>
+      <div><h3>Predict twice</h3><p>Python model on the structured record; Teachable Machine on the Claim Summary Card image.</p></div>
+      <div><h3>Compare</h3><p>Class match and |confidence difference| give one of five consistency statuses.</p></div>
+      <div><h3>Decide</h3><p>A config-driven decision table combines rules and models: Likely Valid, Likely Invalid or Manual Review Required.</p></div>
+    </div>
+  </div>
+</section>
 
-{% block main_wrapper %}
-<div class="landing-page-clean">
-    <!-- Top Hero Canvas -->
-    <section class="hero-clean pt-3 pb-4 position-relative">
-        <div class="container pt-1 pb-3">
-            {% if current_user %}
-                {% if current_user.role in [app_config.ROLE_REVIEWER, 'reviewer', 'claim_reviewer'] %}
-                    {% set role_label = 'Claim Reviewer' %}
-                    {% set role_badge_class = 'bg-warning-subtle text-warning-emphasis border-warning-subtle' %}
-                    {% set role_icon = 'bi-shield-check' %}
-                    {% set workspace_name = 'Reviewer Workbench' %}
-                {% elif current_user.role in [app_config.ROLE_ADMIN, 'admin', 'administrator'] %}
-                    {% set role_label = 'Administrator' %}
-                    {% set role_badge_class = 'bg-danger-subtle text-danger border-danger-subtle' %}
-                    {% set role_icon = 'bi-sliders' %}
-                    {% set workspace_name = 'Executive Console' %}
-                {% elif current_user.role in [app_config.ROLE_STAFF, 'staff', 'service_center_staff'] %}
-                    {% set role_label = 'Service Staff' %}
-                    {% set role_badge_class = 'bg-info-subtle text-info-emphasis border-info-subtle' %}
-                    {% set role_icon = 'bi-tools' %}
-                    {% set workspace_name = 'Staff Intake Desk' %}
-                {% else %}
-                    {% set role_label = 'Customer' %}
-                    {% set role_badge_class = 'bg-success-subtle text-success border-success-subtle' %}
-                    {% set role_icon = 'bi-person-badge' %}
-                    {% set workspace_name = 'Customer Dashboard' %}
-                {% endif %}
-                <div class="card border-0 shadow-sm rounded-4 bg-white mb-4 overflow-hidden border-start border-4 border-primary">
-                    <div class="card-body p-3 p-md-4 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="avatar-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold shadow-xs fs-5" style="width: 44px; height: 44px;">
-                                {{ current_user.full_name[0]|upper }}
-                            </div>
-                            <div>
-                                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-                                    <span class="fw-bold text-slate-900 fs-6">Welcome back, {{ current_user.full_name }}</span>
-                                    <span class="badge {{ role_badge_class }} border extra-small px-2 py-1">
-                                        <i class="bi {{ role_icon }} me-1"></i>{{ role_label }}
-                                    </span>
-                                </div>
-                                <div class="text-muted extra-small">
-                                    Active authenticated session &bull; Return to your operational workspace or explore platform features below.
-                                </div>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                            <a href="{{ url_for('auth.portal_redirect') }}" class="btn btn-primary btn-sm px-4 py-2 rounded-pill fw-semibold shadow-xs d-inline-flex align-items-center gap-2">
-                                <span>Go to {{ workspace_name }}</span>
-                                <i class="bi bi-arrow-right"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
+<section class="band alt" id="models">
+  <div class="wrap grid grid-3">
+    <div class="feature"><i class="bi bi-diagram-3"></i><h3>Python classification model</h3><p>Three algorithms compared with 5-fold cross-validation, selected on the validation split, then probability-calibrated so confidence scores mean something.</p></div>
+    <div class="feature"><i class="bi bi-image"></i><h3>Google Teachable Machine</h3><p>Trained on 2,100 square Claim Summary Cards (two variations per training claim). Validation and test cards never leave the evaluation set.</p></div>
+    <div class="feature"><i class="bi bi-sliders"></i><h3>Readable warranty rules</h3><p>Coverage, grace periods, reporting deadlines, exclusions and document rules live in one JSON file per category, editable by administrators.</p></div>
+    <div class="feature"><i class="bi bi-fingerprint"></i><h3>Duplicate &amp; fraud checks</h3><p>SHA-256 hashes of every file, invoice-number reuse, open claims on the same serial and near-identical fault descriptions.</p></div>
+    <div class="feature"><i class="bi bi-person-check"></i><h3>Human in the loop</h3><p>Reviewers see both predictions, every rule, contradictions and evidence. Overrides need a written reason and stay in the audit trail.</p></div>
+    <div class="feature"><i class="bi bi-shield-lock"></i><h3>Access by role and record</h3><p>Customers see their own claims, staff their service center's, reviewers the queue. Everything else returns “not found”.</p></div>
+  </div>
+</section>
 
-            <div class="hero-content text-center py-4 my-2">
-                <div class="hero-eyebrow text-uppercase fw-semibold tracking-wider text-primary small mb-3">
-                    AssureX Enterprise &middot; Dual-Model Warranty Engine
-                </div>
-
-                <h1 class="hero-headline fw-bold tracking-tight text-dark mb-3 mx-auto" style="max-width: 860px; font-size: clamp(2.1rem, 3.8vw, 3rem); line-height: 1.2;">
-                    Smart warranty claim processing<br class="d-none d-md-inline"> with dual-model analysis.
-                </h1>
-
-                <p class="lead text-secondary mb-4 mx-auto fs-6 lh-base" style="max-width: 680px;">
-                    Built for high-volume equipment manufacturers. AssureX combines tabular classification with visual analysis, document OCR, and configurable business rules to catch fraudulent claims and speed up approvals.
-                </p>
-
-                <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
-                    <a href="#demo-sandbox" class="btn btn-dark btn-lg px-4 py-2 rounded-pill shadow-sm fs-6 fw-medium">
-                        Launch Demo Sandbox
-                    </a>
-                    <a href="{{ url_for('public.view_blog') }}" class="btn btn-outline-secondary btn-lg px-4 py-2 rounded-pill fs-6 fw-medium text-dark border-light-subtle">
-                        Technical Blog
-                    </a>
-                    <a href="#how-it-works" class="btn btn-link text-decoration-none text-secondary fs-6 px-2">
-                        How it works &darr;
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Verified Metrics Strip (No heavy boxes, pure typography) -->
-    <section class="border-top border-bottom border-light-subtle bg-white py-4">
-        <div class="container">
-            <div class="row g-4 text-center text-md-start">
-                <div class="col-6 col-md-3">
-                    <div class="pe-md-3 border-end-md">
-                        <div class="metric-numeral fw-bold text-dark mb-0">{{ metrics.dataset_size | default(1500) }}</div>
-                        <div class="small fw-semibold text-dark">Common Claim Records</div>
-                        <div class="extra-small text-secondary">Equal 3-class distribution across categories</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="px-md-3 border-end-md">
-                        <div class="metric-numeral fw-bold text-dark mb-0">{{ metrics.measured_test_accuracy | default('100.0%') }}</div>
-                        <div class="small fw-semibold text-dark">Held-Out Test Accuracy</div>
-                        <div class="extra-small text-secondary">Exceeds minimum {{ metrics.srs_target_accuracy }} threshold</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="px-md-3 border-end-md">
-                        <div class="metric-numeral fw-bold text-dark mb-0">{{ metrics.passing_tests | default(42) }} / 42</div>
-                        <div class="small fw-semibold text-dark">Automated Test Suite</div>
-                        <div class="extra-small text-secondary">18 SRS categories and 11 demo cases</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="ps-md-3">
-                        <div class="metric-numeral fw-bold text-dark mb-0">Dual-Branch</div>
-                        <div class="small fw-semibold text-dark">Consensus Architecture</div>
-                        <div class="extra-small text-secondary">Tabular Random Forest &amp; Vision GTM</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Competition Evaluation Demo Sandbox -->
-    <section id="demo-sandbox" class="py-5 bg-white border-bottom border-light-subtle">
-        <div class="container py-3">
-            <div class="mb-4 pb-2 border-bottom border-light-subtle">
-                <div class="text-uppercase extra-small fw-semibold tracking-wider text-primary mb-1">Role-Based Access Control</div>
-                <h2 class="fw-bold text-dark mb-1 fs-3">Explore the 4 Role Portals</h2>
-                <p class="text-secondary small mb-0">
-                    Each role below has a pre-configured demo account. Pick one to explore the full platform instantly.
-                </p>
-            </div>
-
-            <div class="row g-4">
-                {% for acc in demo_accounts %}
-                <div class="col-md-6 col-lg-3">
-                    <div class="role-selector-card p-4 rounded-3 border border-light-subtle bg-white h-100 d-flex flex-column justify-content-between shadow-xs">
-                        <div>
-                            <div class="d-flex align-items-center justify-content-between mb-2">
-                                <h3 class="fw-bold text-dark fs-6 mb-0">{{ acc.role }}</h3>
-                                {% if acc.role == 'Administrator' %}
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle extra-small">Governance</span>
-                                {% elif acc.role == 'Claim Reviewer' %}
-                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle extra-small">Adjudication</span>
-                                {% elif acc.role == 'Service Staff' %}
-                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle extra-small">Service Desk</span>
-                                {% else %}
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle extra-small">Claimant</span>
-                                {% endif %}
-                            </div>
-                            <p class="text-secondary extra-small mb-3 lh-base">
-                                {{ acc.desc }}
-                            </p>
-                            <div class="role-capabilities extra-small text-muted mb-4 pb-2 border-top border-light-subtle pt-2">
-                                {% if acc.role == 'Administrator' %}
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Chart.js System Analytics</div>
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; JSON Policy Schema Editor</div>
-                                    <div class="d-flex align-items-center gap-1">&bull; Immutable Cryptographic Audit Log</div>
-                                {% elif acc.role == 'Claim Reviewer' %}
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Filterable Triage Workbench</div>
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Dual-Model Probability Matrix</div>
-                                    <div class="d-flex align-items-center gap-1">&bull; Justified Decision Overrides</div>
-                                {% elif acc.role == 'Service Staff' %}
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Walk-in Equipment Intake</div>
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Warranty Fleet Verification</div>
-                                    <div class="d-flex align-items-center gap-1">&bull; Physical Damage Assessment</div>
-                                {% else %}
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; 5-Step Guided Intake Wizard</div>
-                                    <div class="d-flex align-items-center gap-1 mb-1">&bull; Live Side-by-Side OCR Match</div>
-                                    <div class="d-flex align-items-center gap-1">&bull; 8-Stage Tracker &amp; PDF Report</div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div>
-                            <form action="{{ url_for('auth.login') }}" method="POST">
-                                <input type="hidden" name="email" value="{{ acc.email }}">
-                                <input type="hidden" name="password" value="{{ acc.password }}">
-                                <button type="submit" class="btn btn-sm btn-dark w-100 rounded-pill py-2 fw-medium shadow-xs">
-                                    Launch {{ acc.role }} &rarr;
-                                </button>
-                                <div class="text-center extra-small text-muted mt-2">
-                                    1-Click Evaluator Access &bull; Instant Session
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </section>
-
-    <!-- How It Works: Clean Numbered Timeline -->
-    <section id="how-it-works" class="py-5 bg-light border-bottom border-light-subtle">
-        <div class="container py-3">
-            <div class="mb-5 text-center text-md-start">
-                <div class="text-uppercase extra-small fw-semibold tracking-wider text-primary mb-1">Architecture Flowchart</div>
-                <h2 class="fw-bold text-dark mb-2 fs-3">The 5-Stage Adjudication Pipeline</h2>
-                <p class="text-secondary small mb-0">
-                    Direct translation of the Page 5 system architecture diagram into an autonomous execution sequence.
-                </p>
-            </div>
-
-            <div class="timeline-clean">
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <div class="timeline-step pe-lg-3">
-                            <div class="timeline-number text-primary fw-bolder mb-2">01</div>
-                            <h3 class="fw-bold text-dark fs-6 mb-2">Intake &amp; Document Ingestion</h3>
-                            <p class="text-secondary small mb-0">
-                                Guided 5-step wizard captures equipment metadata, incident descriptions, purchase invoices, warranty certificates, and previous repair histories.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="timeline-step pe-lg-3">
-                            <div class="timeline-number text-primary fw-bolder mb-2">02</div>
-                            <h3 class="fw-bold text-dark fs-6 mb-2">OCR &amp; Cryptographic Hashing</h3>
-                            <p class="text-secondary small mb-0">
-                                Ingested files are fingerprinted with SHA-256 to stop duplicate submissions. OCR regex extracts invoice numbers, dates, and backplate serials for matching.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="timeline-step pe-lg-3">
-                            <div class="timeline-number text-primary fw-bolder mb-2">03</div>
-                            <h3 class="fw-bold text-dark fs-6 mb-2">Dual AI Parallel Evaluation</h3>
-                            <p class="text-secondary small mb-0">
-                                <strong>Branch A</strong> evaluates 14 tabular risk metrics via Random Forest. Simultaneously, <strong>Branch B</strong> converts the dossier into a 640&times;420 visual card evaluated by Google Teachable Machine.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 mt-4">
-                        <div class="timeline-step pe-lg-3">
-                            <div class="timeline-number text-primary fw-bolder mb-2">04</div>
-                            <h3 class="fw-bold text-dark fs-6 mb-2">Consensus &amp; Confidence Divergence</h3>
-                            <p class="text-secondary small mb-0">
-                                The Comparator assesses top-class agreement and calculates |&Delta;conf|. Assigns 1 of 5 formal statuses (Strong Match, Acceptable Match, Weak Match, Model Disagreement, Uncertain Result).
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 mt-4">
-                        <div class="timeline-step pe-lg-3">
-                            <div class="timeline-number text-primary fw-bolder mb-2">05</div>
-                            <h3 class="fw-bold text-dark fs-6 mb-2">Policy Gating &amp; 8-Stage Tracker</h3>
-                            <p class="text-secondary small mb-0">
-                                Category rules (grace periods, damage exclusions, authorized centers) validate eligibility. Generates the final 3-class decision, ReportLab PDF certificate, and updates the live tracker.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features: Editorial 3-Pillar Breakdown -->
-    <section id="features" class="py-5 bg-white border-bottom border-light-subtle">
-        <div class="container py-3">
-            <div class="row g-5 align-items-center mb-5 pb-4 border-bottom border-light-subtle">
-                <div class="col-lg-6">
-                    <div class="text-uppercase extra-small fw-semibold tracking-wider text-primary mb-1">Core Innovation</div>
-                    <h3 class="fw-bold text-dark mb-3 fs-4">Dual-Branch Multimodal Consensus</h3>
-                    <p class="text-secondary small mb-3 lh-base">
-                        Traditional warranty fraud models rely on single-algorithm classifiers that are prone to dataset shift. AssureX implements two independent branches that evaluate distinct representations of the same claim.
-                    </p>
-                    <ul class="list-unstyled small text-secondary d-flex flex-column gap-2 mb-0">
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Branch A:</strong> Tabular Random Forest processing numerical ratios and one-hot categorical vectors.</span>
-                        </li>
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Branch B:</strong> Google Teachable Machine vision classifier inspecting standardized 640&times;420 summary cards.</span>
-                        </li>
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Consensus Rule:</strong> Automated approval requires mutual agreement and |&Delta;conf| &le; 0.150. Disagreements automatically route to human reviewers.</span>
-                        </li>
-                    </ul>
-                </div>
-                <div class="col-lg-6">
-                    <div class="p-4 rounded-3 bg-light border border-light-subtle">
-                        <div class="small fw-bold text-dark mb-2">5 Model-Consistency Statuses</div>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-borderless extra-small mb-0">
-                                <thead>
-                                    <tr class="text-muted border-bottom border-light-subtle">
-                                        <th>Status</th>
-                                        <th>Condition</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="fw-semibold text-success">Strong Match</td>
-                                        <td>Classes Match, |&Delta;conf| &le; 0.15</td>
-                                        <td>Proceed to Rules</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-semibold text-primary">Acceptable Match</td>
-                                        <td>Classes Match, |&Delta;conf| &le; 0.30</td>
-                                        <td>Proceed to Rules</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-semibold text-warning">Weak Match</td>
-                                        <td>Classes Match, |&Delta;conf| &gt; 0.30</td>
-                                        <td>Warning Flagged</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-semibold text-danger">Model Disagreement</td>
-                                        <td>Predictions Diverge</td>
-                                        <td>Manual Triage Queue</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-semibold text-secondary">Uncertain Result</td>
-                                        <td>Top Conf &lt; 0.60</td>
-                                        <td>Manual Triage Queue</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Second Pillar: Fraud Defense & Policy Engine -->
-            <div id="architecture" class="row g-5 align-items-center">
-                <div class="col-lg-6 order-lg-2">
-                    <div class="text-uppercase extra-small fw-semibold tracking-wider text-primary mb-1">Defense-in-Depth</div>
-                    <h3 class="fw-bold text-dark mb-3 fs-4">Deterministic Policy Gating &amp; Fraud Defense</h3>
-                    <p class="text-secondary small mb-3 lh-base">
-                        AI predictions are cross-examined by deterministic business rules maintained in category-specific JSON schemas. No black-box model can override a policy exclusion or approved repair network mandate.
-                    </p>
-                    <ul class="list-unstyled small text-secondary d-flex flex-column gap-2 mb-0">
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Cryptographic Hashing:</strong> SHA-256 fingerprinting intercepts duplicate invoices and receipt re-submissions.</span>
-                        </li>
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Chronological Verification:</strong> Detects faults dated prior to retail purchase or past reporting deadlines.</span>
-                        </li>
-                        <li class="d-flex align-items-start gap-2">
-                            <span class="text-primary fw-bold">&bull;</span>
-                            <span><strong>Configurable Policies:</strong> JSON rules for Consumer Electronics, Home Appliances, and Industrial Tools.</span>
-                        </li>
-                    </ul>
-                </div>
-                <div class="col-lg-6 order-lg-1">
-                    <div class="p-4 rounded-3 bg-light border border-light-subtle">
-                        <div class="small fw-bold text-dark mb-2">8-Stage Lifecycle State Machine</div>
-                        <div class="d-flex flex-wrap gap-1 extra-small">
-                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle py-1 px-2">1. Draft</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2">2. Submitted</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-info-subtle text-info border border-info-subtle py-1 px-2">3. Under Evaluation</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle py-1 px-2">4. Info Required</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-dark-subtle text-dark border border-dark-subtle py-1 px-2">5. Manual Review</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle py-1 px-2">6. Approved</span>
-                            <span class="text-muted align-self-center">/</span>
-                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1 px-2">7. Rejected</span>
-                            <span class="text-muted align-self-center">&rarr;</span>
-                            <span class="badge bg-light text-muted border border-light-subtle py-1 px-2">8. Closed</span>
-                        </div>
-                        <div class="extra-small text-muted mt-3">
-                            Strict state transitions prevent skipping verification stages or issuing automated approvals without complete evidence dossiers.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Technical Blog Callout -->
-    <section class="py-5 bg-white">
-        <div class="container py-2">
-            <div class="p-4 p-md-5 rounded-4 bg-light border border-light-subtle d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4">
-                <div>
-                    <div class="text-uppercase extra-small fw-semibold tracking-wider text-primary mb-1">SRS Deliverable #14</div>
-                    <h3 class="fw-bold text-dark fs-4 mb-2">Technical Blog &amp; Engineering Dossier</h3>
-                    <p class="text-secondary small mb-0 max-w-700">
-                        Read the comprehensive 3,790+ word technical article addressing all 23 SRS-listed discussion topics, including dataset creation, model benchmarking, OCR extraction, and lessons learned.
-                    </p>
-                </div>
-                <div class="d-flex flex-wrap gap-2 flex-shrink-0">
-                    <a href="{{ url_for('public.view_blog') }}" class="btn btn-dark rounded-pill px-4 py-2 small fw-medium">
-                        Read Technical Blog &rarr;
-                    </a>
-                    <a href="https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111" target="_blank" class="btn btn-outline-dark rounded-pill px-3 py-2 small fw-medium d-inline-flex align-items-center gap-1 border-light-subtle">
-                        Read on Medium &nearr;
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-</div>
+{% if demo_accounts %}
+<section class="band">
+  <div class="wrap">
+    <div class="eyebrow">Evaluator accounts</div>
+    <h2 class="big">Try every role</h2>
+    <p class="muted">Demo data only. Every claim you see was evaluated by the live pipeline when the database was seeded.</p>
+    <div class="grid grid-4 mt-3">
+      {% for role, email, pw, desc in demo_accounts %}
+      <div class="card"><div class="card-b stack-sm">
+        <b>{{ role }}</b>
+        <span class="small muted">{{ desc }}</span>
+        <code class="small">{{ email }}</code>
+        <code class="small">{{ pw }}</code>
+        <a class="btn quiet sm" href="{{ url_for('auth.login', email=email) }}">Sign in as {{ role|lower }}</a>
+      </div></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

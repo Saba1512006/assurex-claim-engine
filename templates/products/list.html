@@ -1,0 +1,48 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import empty %}
+{% block title %}Products{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Products &amp; warranties</h1>
+    <p class="lede">Every registered product with its warranty status. Active, ending soon and expired warranties in one view.</p>
+  </div>
+  {% if can('product.create') %}<a class="btn" href="{{ url_for('products.register_product') }}"><i class="bi bi-plus-lg"></i>Register product</a>{% endif %}
+</div>
+
+<form class="card" method="get" role="search">
+  <div class="card-b filters">
+    <label class="field grow"><span>Search</span><input class="input sm" name="q" value="{{ request.args.get('q', '') }}" placeholder="Name, brand, serial or product ID"></label>
+    <label class="field"><span>Category</span><select class="select sm" name="category"><option value="">All</option>{% for c in categories %}<option {{ 'selected' if request.args.get('category') == c }}>{{ c }}</option>{% endfor %}</select></label>
+    <div class="field"><span>Warranty</span>
+      <div class="seg" role="radiogroup">
+        {% for s in ['', 'Active', 'Expiring soon', 'Expired'] %}
+          <label><input type="radio" name="warranty" value="{{ s }}" {{ 'checked' if request.args.get('warranty', '') == s }} data-autosubmit><span>{{ s or 'All' }}</span></label>
+        {% endfor %}
+      </div></div>
+    <div class="row"><button class="btn sm" type="submit">Apply</button><a class="btn ghost sm" href="{{ url_for('products.list_products') }}">Clear</a></div>
+  </div>
+</form>
+
+{% if products %}
+<div class="tiles mt-3">
+  {% for p in products %}{% set w = p.warranty %}
+  <a class="tile" href="{{ url_for('products.view_product', product_id=p.product_id) }}">
+    <div class="row between">
+      <span class="cat"><i class="bi {{ {'Consumer Electronics': 'bi-laptop', 'Home Appliances': 'bi-house-gear', 'Industrial Tools': 'bi-tools'}.get(p.category, 'bi-box') }}"></i></span>
+      {% if w %}<span class="badge {{ tone('warranty', w.status) }}">{{ w.status }}</span>{% else %}<span class="badge">No warranty</span>{% endif %}
+    </div>
+    <div><b>{{ p.product_name }}</b><div class="small muted">{{ p.brand }} · {{ p.model_number }}</div></div>
+    <div class="small"><span class="id">{{ p.product_id }}</span> <span class="mono muted">{{ p.serial_number }}</span></div>
+    {% if w %}
+      <div class="meter {{ tone('warranty', w.status) }}" title="{{ (w.life_used * 100)|round }}% of the warranty used"><i style="width: {{ (w.life_used * 100)|round }}%"></i></div>
+      <div class="row between small muted"><span>{{ w.duration_months }} months{% if w.is_extended %} · extended{% endif %}</span><span>{{ w.remaining_days() }} days left</span></div>
+    {% endif %}
+    {% if current_user.role != 'customer' %}<div class="tiny muted"><i class="bi bi-person"></i> {{ p.owner.full_name }}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card mt-3">{{ empty('bi-box-seam', 'No products found', 'Register a product with its receipt to track its warranty and file claims.', url_for('products.register_product') if can('product.create') else None, 'Register product') }}</div>
+{% endif %}
+{% endblock %}

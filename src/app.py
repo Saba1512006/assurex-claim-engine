@@ -1,94 +1,68 @@
-import os
+"""AssureX Claim Engine - application factory."""
 import sys
 from pathlib import Path
 
-# Ensure workspace root is in sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from flask import Flask, render_template, redirect, url_for, session
-from config.config import Config
-from database.db import init_db, db
-from src.models.entities import User
+from flask import Flask, render_template  # noqa: E402
 
-# Import Blueprints
-from src.api.auth import auth_bp, get_current_user, generate_csrf_token
-from src.api.products import product_bp
-from src.api.claims import claim_bp
-from src.api.reviewer import reviewer_bp
-from src.api.admin import admin_bp
-from src.api.reports import report_bp
-from src.api.public import public_bp, landing_page
+from config.config import Config  # noqa: E402
+from database.db import db, init_db  # noqa: E402
+from src.app_security import harden  # noqa: E402
+from src.web import register_template_helpers  # noqa: E402
 
 
-def create_app(config_class=Config):
-    """Application factory for AssureX Claim Engine."""
-    app = Flask(
-        __name__,
-        template_folder=str(Path(config_class.BASE_DIR) / "templates"),
-        static_folder=str(Path(config_class.BASE_DIR) / "static")
-    )
+def create_app(config_class=Config) -> Flask:
+    app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
     app.config.from_object(config_class)
+    Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
 
-    # Initialize Database & Models
+    harden(app)
     init_db(app)
 
-    # Register API / UI Blueprints
-    app.register_blueprint(public_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(product_bp)
-    app.register_blueprint(claim_bp)
-    app.register_blueprint(reviewer_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(report_bp)
+    from src.models.entities import AuditLog, User
+    from src.security.guards import init_rbac
+    init_rbac(app, db, User, AuditLog)
 
-    # Global Context Processors for Jinja Templates
-    @app.context_processor
-    def inject_global_vars():
-        return {
-            "current_user": get_current_user(),
-            "csrf_token": generate_csrf_token,
-            "app_config": Config,
-            "claim_classes": Config.ALL_CLAIM_CLASSES,
-            "consistency_statuses": Config.ALL_CONSISTENCY_STATUSES,
-            "claim_statuses": Config.ALL_CLAIM_STATUSES
-        }
+    from src.api.access import access_bp
+    from src.api.admin import admin_bp
+    from src.api.auth import auth_bp
+    from src.api.claims import claim_bp
+    from src.api.products import product_bp
+    from src.api.public import public_bp
+    from src.api.reviewer import reviewer_bp
+    for bp in (public_bp, auth_bp, product_bp, claim_bp, reviewer_bp, admin_bp, access_bp):
+        app.register_blueprint(bp)
 
-    @app.after_request
-    def add_no_cache_headers(response):
-        if response.mimetype == "text/html":
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
-        return response
+    register_template_helpers(app)
 
-    # Root Route (Serves the public landing page with evaluator sandbox)
-    @app.route("/")
-    def index():
-        return landing_page()
-
-    # Custom Error Handlers
     @app.errorhandler(404)
-    def not_found_error(error):
-        return render_template("components/error.html", error_code=404, message="The requested resource was not found on this server."), 404
+    def _not_found(_e):
+        return render_template("components/error.html", code=404, title="We couldn't find that page",
+                               message="The link may be old, or the record may not be visible to your account."), 404
 
-    @app.errorhandler(403)
-    def forbidden_error(error):
-        return render_template("components/error.html", error_code=403, message="Access forbidden. You do not possess the required permissions."), 403
+    @app.errorhandler(413)
+    def _too_large(_e):
+        return render_template("components/error.html", code=413, title="Upload too large",
+                               message="Files can be at most 10 MB each (16 MB for a fault video)."), 413
+
+    @app.errorhandler(429)
+    def _rate_limited(_e):
+        return render_template("components/error.html", code=429, title="Slow down a little",
+                               message="Too many attempts in a short time. Wait a minute and try again."), 429
 
     @app.errorhandler(500)
-    def internal_error(error):
-        try:
-            db.session.rollback()
-            return render_template("components/error.html", error_code=500, message="An internal application anomaly occurred. Our engineers have been alerted."), 500
-        except Exception:
-            return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;'><h2>500 Internal Application Anomaly</h2><p>Our engineers have been alerted. Please return to the <a href='/'>Home Page</a>.</p></body></html>", 500
+    def _server_error(_e):
+        db.session.rollback()
+        return render_template("components/error.html", code=500, title="Something went wrong on our side",
+                               message="Your data is safe. Please try again; if it keeps happening, contact support."), 500
 
     return app
 
 
-app = create_app()
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=Config.DEBUG)
+if __name__ == "__main__":                                        # python src/app.py  (production: wsgi.py)
+    application = create_app()
+    application.config["SESSION_COOKIE_SECURE"] = False          # local development server is plain http
+    application.run(host="127.0.0.1", port=5000, debug=Config.DEBUG)

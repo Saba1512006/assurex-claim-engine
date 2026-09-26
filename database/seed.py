@@ -1,543 +1,279 @@
+"""Create the database and demo data.
+
+    python database/seed.py            # drop + recreate everything (asks nothing - demo data only)
+    python database/seed.py --if-empty # only seed when there are no users (used by render.yaml)
+
+Every demo claim is submitted through the real pipeline (rules, Python model,
+Claim Summary Card, Teachable Machine when installed, decision table), so the
+outcomes you see are computed, not written here. Receipts are generated as
+text PDFs so the OCR step genuinely reads them. All people, products and
+documents are fictitious.
+"""
+from __future__ import annotations
+
+import argparse
+import io
 import os
-import json
+import secrets
 import sys
-from datetime import datetime, date, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
-# Add project root to sys.path
-BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
-
-from flask import Flask
-from config.config import Config
-from database.db import db, init_db
-from src.models.entities import (
-    User,
-    Product,
-    WarrantyPolicy,
-    ProductWarranty,
-    Claim,
-    ClaimDocument,
-    RepairHistory,
-    Notification,
-    ClaimStatusHistory,
-    AuditLog,
-    ModelEvaluation,
-    RuleValidationLog
-)
-
-def create_seed_app():
-    """Create a minimal Flask application context for seeding."""
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    init_db(app)
-    return app
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 
-def seed_database():
-    """Populate database with baseline administrative, policy, and sample data."""
-    app = create_seed_app()
+def ensure_secret_key() -> None:
+    """Write a random SECRET_KEY to .env on first run so `python src/app.py` works out of the box."""
+    if os.environ.get("SECRET_KEY"):
+        return
+    env = ROOT / ".env"
+    lines = env.read_text().splitlines() if env.exists() else []
+    if not any(line.startswith("SECRET_KEY=") for line in lines):
+        lines.append(f"SECRET_KEY={secrets.token_hex(32)}")
+        env.write_text("\n".join(lines) + "\n")
+        print("-> wrote a random SECRET_KEY to .env")
+    for line in lines:
+        if line.startswith("SECRET_KEY="):
+            os.environ["SECRET_KEY"] = line.split("=", 1)[1]
 
+
+ensure_secret_key()
+
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402
+from reportlab.lib.pagesizes import A5  # noqa: E402
+from reportlab.pdfgen import canvas  # noqa: E402
+from werkzeug.datastructures import FileStorage  # noqa: E402
+
+from config.config import Config  # noqa: E402
+from database.db import db  # noqa: E402
+from src.app import create_app  # noqa: E402
+from src.core.vocab import coverage_days  # noqa: E402
+from src.models.entities import (Claim, ClaimStatusHistory, Product, ProductWarranty, RepairHistory,  # noqa: E402
+                                 ServiceCenter, User, WarrantyPolicy)
+from src.rules.policy_store import get_policy  # noqa: E402
+from src.services import claim_service, documents  # noqa: E402
+
+TODAY = date.today()
+FONT = ROOT / "static" / "fonts" / "DejaVuSans.ttf"
+
+USERS = [
+    ("admin@assurex.local", "AdminPass123!", "Areeba Khan", Config.ROLE_ADMIN, None),
+    ("reviewer@assurex.local", "ReviewerPass123!", "Bilal Ahmed", Config.ROLE_REVIEWER, None),
+    ("reviewer2@assurex.local", "ReviewerPass123!", "Nadia Qureshi", Config.ROLE_REVIEWER, None),
+    ("staff@assurex.local", "StaffPass123!", "Sana Malik", Config.ROLE_STAFF, 0),
+    ("customer@assurex.local", "CustomerPass123!", "Usman Tariq", Config.ROLE_CUSTOMER, None),
+    ("hira@example.com", "CustomerPass123!", "Hira Siddiqui", Config.ROLE_CUSTOMER, None),
+    ("kamran@example.com", "CustomerPass123!", "Kamran Ali", Config.ROLE_CUSTOMER, None),
+]
+CENTERS = [("Metro Authorised Service Center", "Lahore", "+92 42 3555 0100"),
+           ("Harbor Tech Repairs", "Karachi", "+92 21 3555 0200")]
+
+
+# ------------------------------------------------------------------ synthetic evidence files
+def receipt_pdf(*, invoice, purchased, product, model, serial, retailer, amount, months) -> bytes:
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A5)
+    y = 540
+    for line in (retailer.upper(), "TAX INVOICE", "", f"Invoice No: {invoice}", f"Date: {purchased:%d/%m/%Y}",
+                 f"Product: {product}", f"Model: {model}", f"Serial No: {serial}", f"Warranty: {months} months",
+                 f"Grand Total: {amount:,.2f}", f"Retailer: {retailer}", "", "Thank you for your purchase."):
+        c.setFont("Helvetica-Bold" if y == 540 else "Helvetica", 11)
+        c.drawString(40, y, line)
+        y -= 20
+    c.save()
+    return buf.getvalue()
+
+
+def photo_png(title: str, subtitle: str, tone=(71, 85, 105)) -> bytes:
+    img = Image.new("RGB", (640, 420), (241, 245, 249))
+    g = ImageDraw.Draw(img)
+    g.rounded_rectangle([40, 40, 600, 380], radius=24, fill=(226, 232, 240), outline=tone, width=4)
+    big, small = ImageFont.truetype(str(FONT), 30), ImageFont.truetype(str(FONT), 16)
+    g.text((70, 150), title, font=big, fill=tone)
+    g.text((70, 200), subtitle, font=small, fill=(100, 116, 139))
+    g.text((70, 330), "Synthetic demo image", font=small, fill=(148, 163, 184))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def as_upload(data: bytes, name: str) -> FileStorage:
+    return FileStorage(stream=io.BytesIO(data), filename=name)
+
+
+# ------------------------------------------------------------------ builders
+def make_product(owner, *, name, category, brand, model, serial, days_ago, price, retailer, months,
+                 center=None, extended=False, invoice=None, receipt_serial=None, receipt=True):
+    purchased = TODAY - timedelta(days=days_ago)
+    p = Product(owner=owner, service_center=center, product_name=name, category=category, brand=brand,
+                model_number=model, serial_number=serial, purchase_date=purchased, purchase_price=price,
+                retailer=retailer, invoice_number=invoice)
+    db.session.add(p)
+    pol = get_policy(category)
+    row = WarrantyPolicy.query.filter_by(category=category).first() or WarrantyPolicy(
+        category=category, policy_name=pol["policy_name"], coverage_duration_months=pol["coverage_duration_months"],
+        grace_period_days=pol["grace_period_days"], claim_reporting_period_days=pol["claim_reporting_period_days"])
+    db.session.add(row)
+    db.session.add(ProductWarranty(
+        product=p, policy=row, warranty_provider=f"{brand} manufacturer warranty", start_date=purchased,
+        expiry_date=purchased + timedelta(days=coverage_days(months)), duration_months=months, is_extended=extended,
+        extended_months=12 if extended else 0, coverage_conditions=f"Covered faults: {', '.join(pol['covered_faults'])}.",
+        exclusions="; ".join(pol["exclusions"]), service_center_name=center.name if center else None))
+    db.session.flush()
+    if receipt and invoice:
+        pdf = receipt_pdf(invoice=invoice, purchased=purchased, product=name, model=model,
+                          serial=receipt_serial or serial, retailer=retailer, amount=price, months=months)
+        documents.store(as_upload(pdf, f"receipt_{invoice}.pdf"), "receipt", product=p, uploader=owner)
+    return p
+
+
+def attach(claim, kind, uploader, label=None):
+    data = photo_png({"damage_photo": "Damage photo", "serial_photo": f"S/N {claim.product.serial_number}",
+                      "warranty_card": "Warranty card", "product_photo": "Product photo"}[kind],
+                     label or f"{claim.product.brand} {claim.product.product_name}")
+    documents.store(as_upload(data, f"{kind}.png"), kind, claim=claim, uploader=uploader)
+
+
+def make_claim(product, actor, *, fault, damage, days_ago_fault, description, conf=None, docs=("warranty_card",
+               "damage_photo", "serial_photo"), submit=True, replacement=None, submitted_days_ago=0):
+    claim = Claim(user_id=product.user_id, created_by_id=actor.id, product=product, warranty=product.warranty,
+                  service_center_id=product.service_center_id, fault_category=fault, damage_type=damage,
+                  fault_occurrence_date=TODAY - timedelta(days=days_ago_fault), fault_description=description,
+                  diagnostic_confidence=0.5 if conf is None else conf,
+                  diagnosis_source="Not assessed" if conf is None else "Service-center technician",
+                  previous_replacement_details=replacement)
+    db.session.add(claim)
+    db.session.flush()
+    db.session.add(ClaimStatusHistory(claim=claim, new_status="Draft", changed_by_user_id=actor.id,
+                                      reason_comment="Claim created"))
+    for kind in docs:
+        attach(claim, kind, actor)
+    db.session.flush()
+    if submit:
+        claim.claim_submission_date = TODAY - timedelta(days=submitted_days_ago)
+        claim_service.submit(claim, actor)
+    db.session.flush()
+    return claim
+
+
+def seed(reset: bool = True) -> None:
+    app = create_app()
     with app.app_context():
-        print("-> Initializing database tables...")
+        if not reset and User.query.first():
+            print("-> database already has users; nothing to do (--if-empty)")
+            return
+        db.drop_all()
         db.create_all()
+        up = Path(app.config["UPLOAD_DIR"])
+        for sub in ("docs", "cards"):
+            for f in (up / sub).glob("*"):
+                f.unlink()
 
-        # -------------------------------------------------------------
-        # 1. Seed Core Role Users
-        # -------------------------------------------------------------
-        users_data = [
-            {
-                "email": "admin@assurex.local",
-                "password": "AdminPass123!",
-                "full_name": "System Administrator",
-                "role": Config.ROLE_ADMIN,
-                "phone": "+92 300 5550100",
-                "address": "AssureX HQ, Suite 100, Tech District"
-            },
-            {
-                "email": "reviewer@assurex.local",
-                "password": "ReviewerPass123!",
-                "full_name": "Sarah Jenkins",
-                "role": Config.ROLE_REVIEWER,
-                "phone": "+92 321 5550101",
-                "address": "Claims Adjudication Dept, Floor 4"
-            },
-            {
-                "email": "staff@assurex.local",
-                "password": "StaffPass123!",
-                "full_name": "Marcus Vance",
-                "role": Config.ROLE_STAFF,
-                "phone": "+92 333 5550102",
-                "address": "Metro Authorized Service Center #12"
-            },
-            {
-                "email": "customer@assurex.local",
-                "password": "CustomerPass123!",
-                "full_name": "David Miller",
-                "role": Config.ROLE_CUSTOMER,
-                "phone": "+92 345 5550103",
-                "address": "742 Evergreen Terrace, Springfield"
-            }
-        ]
+        centers = [ServiceCenter(name=n, city=c, phone=ph) for n, c, ph in CENTERS]
+        db.session.add_all(centers)
+        db.session.flush()
+        users = {}
+        for email, pw, name, role, center in USERS:
+            u = User(email=email, full_name=name, role=role, phone_number="+92 300 5550" + str(len(users)).zfill(3),
+                     service_center_id=centers[center].id if center is not None else None)
+            u.set_password(pw)
+            db.session.add(u)
+            users[email] = u
+        db.session.flush()
+        usman, hira, kamran = users["customer@assurex.local"], users["hira@example.com"], users["kamran@example.com"]
+        staff, reviewer = users["staff@assurex.local"], users["reviewer@assurex.local"]
+        metro = centers[0]
 
-        seeded_users = {}
-        for u in users_data:
-            existing = User.query.filter_by(email=u["email"]).first()
-            if not existing:
-                user = User(
-                    email=u["email"],
-                    full_name=u["full_name"],
-                    role=u["role"],
-                    phone_number=u["phone"],
-                    address=u["address"]
-                )
-                user.set_password(u["password"])
-                db.session.add(user)
-                db.session.flush()
-                seeded_users[u["role"]] = user
-                print(f"   [+] Seeded user: {u['email']} ({u['role']})")
-            else:
-                seeded_users[u["role"]] = existing
-                print(f"   [*] User already exists: {u['email']}")
-
-        # -------------------------------------------------------------
-        # 2. Seed Baseline Category Warranty Policies
-        # -------------------------------------------------------------
-        policies_data = [
-            {
-                "category": "Consumer Electronics",
-                "policy_name": "Standard Electronics Protection Policy",
-                "duration": 12,
-                "grace": 7,
-                "reporting": 30,
-                "auth_required": True,
-                "rules": {
-                    "covered_faults": [
-                        "Screen flickering", "Motherboard failure", "Battery failure to charge",
-                        "Speaker malfunction", "Unresponsive touch panel", "Bluetooth/Wi-Fi failure"
-                    ],
-                    "exclusions": [
-                        "Liquid damage", "Screen shattering from drops", "Third-party unauthorized disassembly",
-                        "Cosmetic dents and scratches", "Power surge damage", "Rooted/modified firmware"
-                    ],
-                    "mandatory_documents": [
-                        "Purchase Invoice", "Warranty Card", "Serial Number Photo", "Fault Evidence Photo"
-                    ],
-                    "hard_fail_rules": [
-                        "Claim submitted after warranty expiry and grace period",
-                        "Liquid/water ingress detected",
-                        "Disassembly by non-authorized technician"
-                    ],
-                    "warning_rules": [
-                        "Claim filed within 3 days of grace period expiration",
-                        "Multiple repairs logged within 6 months"
-                    ],
-                    "manual_review_rules": [
-                        "Model prediction disagreement",
-                        "Confidence score below threshold",
-                        "Serial number OCR confidence mismatch"
-                    ]
-                }
-            },
-            {
-                "category": "Home Appliances",
-                "policy_name": "Major Home Appliance Comprehensive Coverage",
-                "duration": 24,
-                "grace": 14,
-                "reporting": 45,
-                "auth_required": True,
-                "rules": {
-                    "covered_faults": [
-                        "Compressor failure", "Motor burnout", "Thermostat failure",
-                        "Drum spin malfunction", "Electronic PCB failure", "Water pump leakage"
-                    ],
-                    "exclusions": [
-                        "Commercial utilization of domestic appliance", "Pest infestation damage",
-                        "Rust and environmental corrosion", "Improper electrical supply rating",
-                        "Third-party modifications"
-                    ],
-                    "mandatory_documents": [
-                        "Original Tax Invoice", "Installation Certificate", "Model Serial Plate Photo"
-                    ],
-                    "hard_fail_rules": [
-                        "Product operated beyond domestic home environment limits",
-                        "Corrosion due to hazardous chemical exposure",
-                        "Missing purchase date verification"
-                    ],
-                    "warning_rules": [
-                        "High frequency repair history",
-                        "Installation certificate unverified"
-                    ],
-                    "manual_review_rules": [
-                        "Previous compressor replacement under dispute",
-                        "Duplicate claim serial detection"
-                    ]
-                }
-            },
-            {
-                "category": "Industrial & Automotive Tools",
-                "policy_name": "Heavy Duty Industrial Equipment Warranty",
-                "duration": 36,
-                "grace": 10,
-                "reporting": 30,
-                "auth_required": True,
-                "rules": {
-                    "covered_faults": [
-                        "Armature burning", "Hydraulic pressure seal failure", "Gearbox seizure",
-                        "Chuck bearing breakdown", "Trigger switch failure"
-                    ],
-                    "exclusions": [
-                        "Abnormal overload beyond specified torque limits", "Normal consumable wear (brushes, chuck teeth)",
-                        "Unlubricated operation", "Use of non-spec hydraulic oil"
-                    ],
-                    "mandatory_documents": [
-                        "Commercial Tax Invoice", "Authorized Service Logbook", "Damage Site Photo"
-                    ],
-                    "hard_fail_rules": [
-                        "Operating without oil/lubrication",
-                        "Serial number plate altered, removed, or defaced"
-                    ],
-                    "warning_rules": [
-                        "Service interval exceeded recommended hours"
-                    ],
-                    "manual_review_rules": [
-                        "Discrepancy in hours of operation vs claim date"
-                    ]
-                }
-            }
-        ]
-
-        seeded_policies = {}
-        for pol in policies_data:
-            existing_pol = WarrantyPolicy.query.filter_by(category=pol["category"]).first()
-            if not existing_pol:
-                p_obj = WarrantyPolicy(
-                    category=pol["category"],
-                    policy_name=pol["policy_name"],
-                    coverage_duration_months=pol["duration"],
-                    grace_period_days=pol["grace"],
-                    claim_reporting_period_days=pol["reporting"],
-                    authorized_service_center_required=pol["auth_required"],
-                    policy_rules_json=json.dumps(pol["rules"], indent=2)
-                )
-                db.session.add(p_obj)
-                db.session.flush()
-                seeded_policies[pol["category"]] = p_obj
-                print(f"   [+] Seeded policy: {pol['policy_name']} ({pol['category']})")
-            else:
-                seeded_policies[pol["category"]] = existing_pol
-                print(f"   [*] Policy already exists: {pol['policy_name']}")
-
-        # -------------------------------------------------------------
-        # 3. Seed Sample Products & Active Warranties for Customer
-        # -------------------------------------------------------------
-        customer_user = seeded_users.get(Config.ROLE_CUSTOMER)
-        if customer_user:
-            today = date.today()
-            sample_products = [
-                {
-                    "name": "ApexBook Pro 16 Laptop",
-                    "category": "Consumer Electronics",
-                    "brand": "ApexTech",
-                    "model": "ABP-16-M3",
-                    "serial": "SN-APX-8829104",
-                    "purchase_date": today - timedelta(days=120),
-                    "price": 1899.99,
-                    "retailer": "TechMegaStore Downtown",
-                    "invoice": "INV-2026-08122",
-                    "duration_months": 12,
-                    "provider": "ApexTech Official Care"
-                },
-                {
-                    "name": "FrostGuard Smart Refrigerator 450L",
-                    "category": "Home Appliances",
-                    "brand": "FrostGuard",
-                    "model": "FG-450-INV",
-                    "serial": "SN-FG-5519283",
-                    "purchase_date": today - timedelta(days=340),
-                    "price": 1249.00,
-                    "retailer": "HomeComfort Appliances",
-                    "invoice": "INV-2025-99211",
-                    "duration_months": 24,
-                    "provider": "FrostGuard Home Warranty"
-                },
-                {
-                    "name": "TitanDrill Industrial 20V Cordless",
-                    "category": "Industrial & Automotive Tools",
-                    "brand": "TitanPower",
-                    "model": "TD-20V-HD",
-                    "serial": "SN-TP-1102938",
-                    "purchase_date": today - timedelta(days=200),
-                    "price": 389.50,
-                    "retailer": "Industrial Supply Direct",
-                    "invoice": "INV-2025-44019",
-                    "duration_months": 36,
-                    "provider": "Titan Heavy Duty Warranty"
-                }
-            ]
-
-            for sp in sample_products:
-                existing_prd = Product.query.filter_by(serial_number=sp["serial"]).first()
-                if not existing_prd:
-                    prd = Product(
-                        user_id=customer_user.id,
-                        product_name=sp["name"],
-                        category=sp["category"],
-                        brand=sp["brand"],
-                        model_number=sp["model"],
-                        serial_number=sp["serial"],
-                        purchase_date=sp["purchase_date"],
-                        purchase_price=sp["price"],
-                        retailer=sp["retailer"],
-                        invoice_number=sp["invoice"]
-                    )
-                    db.session.add(prd)
-                    db.session.flush()
-
-                    # Attach warranty
-                    pol = seeded_policies.get(sp["category"])
-                    w_start = sp["purchase_date"]
-                    w_expiry = w_start + timedelta(days=sp["duration_months"] * 30)
-
-                    warr = ProductWarranty(
-                        product_id=prd.id,
-                        policy_id=pol.id if pol else 1,
-                        warranty_provider=sp["provider"],
-                        start_date=w_start,
-                        expiry_date=w_expiry,
-                        service_center_name="Metro Authorized Care Center"
-                    )
-                    db.session.add(warr)
-
-                    # Add sample repair record for the laptop
-                    if "Laptop" in sp["name"]:
-                        rep = RepairHistory(
-                            product_id=prd.id,
-                            repair_date=today - timedelta(days=60),
-                            repair_center="Metro Authorized Care Center",
-                            replaced_parts="Cooling Fan Assembly",
-                            outcome="Repaired",
-                            repair_cost=45.00,
-                            is_authorized_center=True,
-                            notes="Standard authorized thermal fan cleaning and replacement under warranty."
-                        )
-                        db.session.add(rep)
-
-                    print(f"   [+] Seeded product & warranty: {sp['name']} ({sp['serial']})")
-
-        # -------------------------------------------------------------
-        # 4. Seed Initial Notification
-        # -------------------------------------------------------------
-        if customer_user:
-            notif = Notification(
-                user_id=customer_user.id,
-                notification_type=Config.NOTIF_TYPE_WARRANTY_EXPIRY,
-                title="Welcome to AssureX Claim Engine",
-                message="Your registered products and warranty records are active and protected."
-            )
-            db.session.add(notif)
-
-        # -------------------------------------------------------------
-        # 5. Seed System Audit Entry
-        # -------------------------------------------------------------
-        admin_user = seeded_users.get(Config.ROLE_ADMIN)
-        audit = AuditLog(
-            user_id=admin_user.id if admin_user else None,
-            user_role=Config.ROLE_ADMIN,
-            action="SYSTEM_INIT_SEED",
-            entity_type="DATABASE",
-            entity_id="ALL_TABLES",
-            ip_address="127.0.0.1",
-            details_json=json.dumps({"status": "SUCCESS", "message": "Baseline system seeded successfully."})
-        )
-        db.session.add(audit)
-
-        # -------------------------------------------------------------
-        # 6. Seed Baseline Demonstration Claims for Workbenches
-        # -------------------------------------------------------------
-        existing_claim_count = Claim.query.count()
-        if existing_claim_count == 0 and customer_user:
-            demo_claims_data = [
-                {
-                    "claim_id": "CLM-DEMO-001",
-                    "product_name": "ApexBook Studio 14 Display",
-                    "serial_number": "SN-DEMO-APX-001",
-                    "brand": "ApexTech",
-                    "model": "ABS-14-DISP",
-                    "price": 899.00,
-                    "category": "Consumer Electronics",
-                    "fault_desc": "Intermittent screen display flickering and GPU thermal throttling under medium load.",
-                    "fault_cat": "Screen flickering",
-                    "damage_type": "Internal Component Failure",
-                    "status": Config.STATUS_MANUAL_REVIEW,
-                    "risk": "Medium",
-                    "final_decision": "Manual Review Required",
-                    "reason": "Borderline dual-model confidence score (0.71) requires expert human verification.",
-                    "py_conf": (0.71, 0.19, 0.10),
-                    "gtm_conf": (0.65, 0.22, 0.13),
-                    "match": True,
-                    "diff": 0.06,
-                    "status_text": "Consistent",
-                    "passed_rules": ["Warranty active at occurrence date", "Category fault eligible", "Authorized retailer purchase verified"],
-                    "failed_rules": [],
-                    "warnings": ["Notice: Prior authorized fan service recorded on unit"],
-                    "rule_status": "PASSED"
-                },
-                {
-                    "claim_id": "CLM-DEMO-002",
-                    "product_name": "FrostGuard Beverage Cooler 90L",
-                    "serial_number": "SN-DEMO-FG-002",
-                    "brand": "FrostGuard",
-                    "model": "FG-90-COOL",
-                    "price": 549.00,
-                    "category": "Home Appliances",
-                    "fault_desc": "Refrigerator compressor failed to maintain cooling temperature.",
-                    "fault_cat": "Compressor failure",
-                    "damage_type": "Mechanical Breakdown",
-                    "status": Config.STATUS_APPROVED,
-                    "risk": "Low",
-                    "final_decision": "Likely Valid",
-                    "reason": "All automated policy rules passed; high dual-model confidence consensus (0.94).",
-                    "py_conf": (0.94, 0.04, 0.02),
-                    "gtm_conf": (0.92, 0.05, 0.03),
-                    "match": True,
-                    "diff": 0.02,
-                    "status_text": "Consistent",
-                    "passed_rules": ["Domestic home use verified", "Compressor fault covered", "Within 24 month duration"],
-                    "failed_rules": [],
-                    "warnings": [],
-                    "rule_status": "PASSED"
-                },
-                {
-                    "claim_id": "CLM-DEMO-003",
-                    "product_name": "TitanImpact Pneumatic Wrench 24V",
-                    "serial_number": "SN-DEMO-TP-003",
-                    "brand": "TitanPower",
-                    "model": "TI-24V-WR",
-                    "price": 420.00,
-                    "category": "Industrial & Automotive Tools",
-                    "fault_desc": "Armature burned out following continuous commercial hydraulic torque overload.",
-                    "fault_cat": "Armature burning",
-                    "damage_type": "Overload Misuse",
-                    "status": Config.STATUS_REJECTED,
-                    "risk": "High",
-                    "final_decision": "Likely Invalid",
-                    "reason": "Hard policy exclusion violated: abnormal commercial overload beyond torque threshold.",
-                    "py_conf": (0.12, 0.82, 0.06),
-                    "gtm_conf": (0.15, 0.79, 0.06),
-                    "match": True,
-                    "diff": 0.03,
-                    "status_text": "Consistent",
-                    "passed_rules": ["Serial number authentic"],
-                    "failed_rules": ["Hard Fail: Abnormal continuous torque overloading detected", "Hard Fail: Commercial duty cycle on standard tool"],
-                    "warnings": [],
-                    "rule_status": "FAILED"
-                }
-            ]
-
-            for dcd in demo_claims_data:
-                # Find or create dedicated demo product
-                p_item = Product.query.filter_by(serial_number=dcd["serial_number"]).first()
-                if not p_item:
-                    p_item = Product(
-                        user_id=customer_user.id,
-                        product_name=dcd["product_name"],
-                        category=dcd["category"],
-                        brand=dcd["brand"],
-                        model_number=dcd["model"],
-                        serial_number=dcd["serial_number"],
-                        purchase_date=date.today() - timedelta(days=180),
-                        purchase_price=dcd["price"],
-                        retailer="Authorized Direct Store",
-                        invoice_number=f"INV-{dcd['serial_number']}"
-                    )
-                    db.session.add(p_item)
-                    db.session.flush()
-
-                    pol = seeded_policies.get(dcd["category"])
-                    warr = ProductWarranty(
-                        product_id=p_item.id,
-                        policy_id=pol.id if pol else 1,
-                        warranty_provider="AssureX Shield Comprehensive",
-                        start_date=date.today() - timedelta(days=180),
-                        expiry_date=date.today() + timedelta(days=185),
-                        service_center_name="Metro Authorized Care Center"
-                    )
-                    db.session.add(warr)
-                    db.session.flush()
-                else:
-                    warr = p_item.warranty
-
-                demo_claim = Claim(
-                    claim_id=dcd["claim_id"],
-                    user_id=customer_user.id,
-                    product_id=p_item.id,
-                    warranty_id=warr.id,
-                    fault_occurrence_date=date.today() - timedelta(days=7),
-                    fault_description=dcd["fault_desc"],
-                    fault_category=dcd["fault_cat"],
-                    damage_type=dcd["damage_type"],
-                    claim_submission_date=date.today() - timedelta(days=2),
-                    status=dcd["status"],
-                    risk_level=dcd["risk"],
-                    final_decision=dcd["final_decision"],
-                    decision_reason=dcd["reason"]
-                )
-                db.session.add(demo_claim)
-                db.session.flush()
-
-                # Status History
-                hist_sub = ClaimStatusHistory(
-                    claim_id=demo_claim.id,
-                    previous_status=Config.STATUS_DRAFT,
-                    new_status=Config.STATUS_SUBMITTED,
-                    changed_by_user_id=customer_user.id,
-                    reason_comment="Claim intake wizard completed by customer."
-                )
-                hist_eval = ClaimStatusHistory(
-                    claim_id=demo_claim.id,
-                    previous_status=Config.STATUS_SUBMITTED,
-                    new_status=dcd["status"],
-                    changed_by_user_id=None,
-                    reason_comment=f"Automated evaluation: {dcd['reason']}"
-                )
-                db.session.add_all([hist_sub, hist_eval])
-
-                # Model Evaluation
-                me = ModelEvaluation(
-                    claim_id=demo_claim.id,
-                    python_model_version=Config.PYTHON_MODEL_VERSION,
-                    python_predicted_class="Valid Claim" if dcd["py_conf"][0] > 0.5 else "Invalid Claim",
-                    python_conf_valid=dcd["py_conf"][0],
-                    python_conf_invalid=dcd["py_conf"][1],
-                    python_conf_manual=dcd["py_conf"][2],
-                    gtm_model_version=Config.GTM_MODEL_VERSION,
-                    gtm_predicted_class="Valid Claim" if dcd["gtm_conf"][0] > 0.5 else "Invalid Claim",
-                    gtm_conf_valid=dcd["gtm_conf"][0],
-                    gtm_conf_invalid=dcd["gtm_conf"][1],
-                    gtm_conf_manual=dcd["gtm_conf"][2],
-                    is_class_match=dcd["match"],
-                    top_confidence_difference=dcd["diff"],
-                    model_consistency_status=dcd["status_text"]
-                )
-                db.session.add(me)
-
-                # Rule Validation Log
-                rv = RuleValidationLog(
-                    claim_id=demo_claim.id,
-                    policy_id=p_item.warranty.policy.policy_id if p_item.warranty and p_item.warranty.policy else "POL-DEFAULT",
-                    rules_passed_json=json.dumps(dcd["passed_rules"]),
-                    rules_failed_json=json.dumps(dcd["failed_rules"]),
-                    warnings_json=json.dumps(dcd["warnings"]),
-                    contradictions_json=json.dumps([]),
-                    duplicate_flags_json=json.dumps([]),
-                    overall_rule_status=dcd["rule_status"]
-                )
-                db.session.add(rv)
-                print(f"   [+] Seeded demo claim: {demo_claim.claim_id} ({demo_claim.status})")
-
+        # 1 valid: covered manufacturing defect, complete evidence, technician-confirmed
+        laptop = make_product(usman, name="ApexBook Pro 16", category="Consumer Electronics", brand="ApexTech",
+                              model="ABP-16", serial="SN-APX-4471823", days_ago=210, price=1899.0,
+                              retailer="City Electronics Mall", months=24, center=metro, invoice="INV-2025-48213")
+        make_claim(laptop, staff, fault="Motherboard failure", damage="Manufacturing Defect", days_ago_fault=4, conf=0.86,
+                   description="Laptop shuts down within minutes of starting; the technician traced it to the motherboard.")
+        # 2 invalid: excluded damage confirmed by diagnosis
+        fridge = make_product(usman, name="FrostGuard 450L", category="Home Appliances", brand="FrostGuard",
+                              model="FG-450", serial="SN-FRO-2209381", days_ago=400, price=1250.0,
+                              retailer="National Appliance Depot", months=24, center=metro, invoice="INV-2025-11872")
+        make_claim(fridge, staff, fault="PCB failure", damage="Water Ingress", days_ago_fault=6, conf=0.81,
+                   description="Control board corroded after water from a burst pipe entered the rear panel.")
+        # 3 manual review: cause unknown and diagnosis inconclusive
+        saw = make_product(usman, name="VoltEdge Saw 18V", category="Industrial Tools", brand="VoltEdge",
+                           model="VE-18S", serial="SN-VOL-7781204", days_ago=300, price=420.0,
+                           retailer="Metro Hardware Centre", months=24, invoice="INV-2025-50931")
+        make_claim(saw, usman, fault="Trigger switch failure", damage="Unknown / Not Sure", days_ago_fault=5, conf=0.3,
+                   description="Trigger stopped responding intermittently; no obvious cause, the saw was stored indoors.")
+        # 4 expired warranty
+        phone = make_product(usman, name="NovaPhone 12", category="Consumer Electronics", brand="NovaSound",
+                             model="NP-12", serial="SN-NOV-5520913", days_ago=560, price=699.0,
+                             retailer="MegaMart Online", months=12, invoice="INV-2024-77410")
+        make_claim(phone, usman, fault="Battery not charging", damage="Manufacturing Defect", days_ago_fault=3,
+                   description="Battery no longer charges past 10 percent with the original charger.")
+        # 5 missing mandatory document (no receipt anywhere)
+        washer = make_product(hira, name="CleanCycle 8kg", category="Home Appliances", brand="CleanCycle",
+                              model="CC-8FL", serial="SN-CLE-6612045", days_ago=180, price=780.0,
+                              retailer="Brand Flagship Store", months=24, invoice=None, receipt=False)
+        make_claim(washer, hira, fault="Drum spin malfunction", damage="Manufacturing Defect", days_ago_fault=2,
+                   docs=("damage_photo",), description="Drum does not spin on any programme; motor hums but nothing turns.")
+        # 6 duplicate: the laptop's receipt and invoice reused for a second registration
+        dup = make_product(kamran, name="ApexBook Pro 16", category="Consumer Electronics", brand="ApexTech",
+                           model="ABP-16", serial="SN-APX-4471823", days_ago=210, price=1899.0,
+                           retailer="City Electronics Mall", months=24, invoice="INV-2025-48213")
+        make_claim(dup, kamran, fault="Motherboard failure", damage="Manufacturing Defect", days_ago_fault=3,
+                   description="Laptop shuts down within minutes of starting; the technician traced it to the motherboard.")
+        # 7 contradictory: fault dated before purchase
+        tv = make_product(hira, name="VividTab 11", category="Consumer Electronics", brand="VividDisplay",
+                          model="VT-11", serial="SN-VIV-3390117", days_ago=90, price=540.0,
+                          retailer="City Electronics Mall", months=12, invoice="INV-2026-20455")
+        make_claim(tv, hira, fault="Touch panel unresponsive", damage="Manufacturing Defect", days_ago_fault=120,
+                   description="Touch input stops working in the lower third of the screen.")
+        # 8 serial mismatch: receipt shows a different serial than the registered unit
+        grinder = make_product(kamran, name="IronForge Grinder 9", category="Industrial Tools", brand="IronForge",
+                               model="IF-G9", serial="SN-IRO-1184420", days_ago=250, price=310.0,
+                               retailer="Industrial Supply Direct", months=24, invoice="INV-2025-63310",
+                               receipt_serial="SN-IRO-9901772")
+        make_claim(grinder, kamran, fault="Armature burnout", damage="Mechanical Stress", days_ago_fault=6,
+                   description="Burning smell then the grinder stopped; armature windings look scorched.")
+        # 9 unauthorised repair recorded by staff
+        ac = make_product(usman, name="AeroBreeze 1.5T", category="Home Appliances", brand="AeroBreeze",
+                          model="AB-15I", serial="SN-AER-4410297", days_ago=330, price=980.0,
+                          retailer="National Appliance Depot", months=24, center=metro, invoice="INV-2025-33018")
+        db.session.add(RepairHistory(product=ac, recorded_by_id=staff.id, repair_date=TODAY - timedelta(days=60),
+                                     repair_center="Street Fix Workshop", replaced_parts="Capacitor",
+                                     outcome="Repaired", repair_cost=35.0, is_authorized_center=False,
+                                     notes="Customer had the unit opened at a local shop."))
+        make_claim(ac, staff, fault="Compressor failure", damage="Manufacturing Defect", days_ago_fault=5, conf=0.7,
+                   description="Compressor starts and trips after a few seconds; no cooling.")
+        # 10 tricky boundary date: warranty ended 4 days ago, inside the 7-day grace period
+        pods = make_product(hira, name="NovaPods Max", category="Consumer Electronics", brand="NovaSound",
+                            model="NPM-2", serial="SN-NOV-8830154", days_ago=coverage_days(12) + 4, price=329.0,
+                            retailer="MegaMart Online", months=12, invoice="INV-2025-90126")
+        make_claim(pods, hira, fault="Speaker malfunction", damage="Manufacturing Defect", days_ago_fault=6, conf=0.75,
+                   description="Left speaker crackles at any volume; started a few days before the warranty end date.")
+        # 11 model-disagreement candidate: borderline evidence (outcome depends on the installed image model)
+        drill = make_product(kamran, name="TorqueMax HD Drill", category="Industrial Tools", brand="TorqueMax",
+                             model="TM-HD2", serial="SN-TOR-5528730", days_ago=640, price=560.0,
+                             retailer="Industrial Supply Direct", months=24, invoice="INV-2024-41876")
+        make_claim(drill, kamran, fault="Gearbox seizure", damage="Normal Wear and Tear", days_ago_fault=20, conf=0.55,
+                   docs=("damage_photo", "serial_photo"),
+                   description="Gearbox grinds and locks under load after heavy daily use on site.")
+        # extras: a draft and a reviewed claim
+        make_claim(make_product(usman, name="KitchenPro 30L", category="Home Appliances", brand="KitchenPro",
+                                model="KP-30C", serial="SN-KIT-2201984", days_ago=120, price=210.0,
+                                retailer="MegaMart Online", months=24, invoice="INV-2026-10822"),
+                   usman, fault="Thermostat failure", damage="Manufacturing Defect", days_ago_fault=1, submit=False,
+                   docs=("damage_photo",), description="Oven does not hold temperature; food burns at low settings.")
+        manual = Claim.query.filter_by(product=saw).first()
+        claim_service.assign(manual, reviewer, reviewer)
+        claim_service.decide(manual, reviewer, "request_info",
+                             "Please upload a diagnostic report from an authorised center confirming the cause.", None)
         db.session.commit()
-        print("-> Seeding completed successfully.")
+        counts = {s: Claim.query.filter_by(status=s).count() for s in Config.ALL_CLAIM_STATUSES}
+        print("-> seeded", User.query.count(), "users,", Product.query.count(), "products,", Claim.query.count(), "claims")
+        print("   status mix:", {k: v for k, v in counts.items() if v})
+
 
 if __name__ == "__main__":
-    seed_database()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--if-empty", action="store_true", help="seed only when the database has no users")
+    seed(reset=not ap.parse_args().if_empty)

@@ -1,40 +1,67 @@
 {
-  "total_records": 1500,
-  "classes": {
+  "total": 1500,
+  "by_class": {
+    "Manual Review": 500,
     "Valid Claim": 500,
-    "Invalid Claim": 500,
-    "Manual Review": 500
+    "Invalid Claim": 500
   },
-  "categories": {
-    "Home Appliances": 499,
-    "Consumer Electronics": 511,
-    "Industrial & Automotive Tools": 490
+  "by_scenario": {
+    "covered_defect": 487,
+    "expired": 223,
+    "missing_documents": 144,
+    "ambiguous_cause": 127,
+    "unauthorized_repair": 98,
+    "grace_boundary": 80,
+    "excluded_damage": 76,
+    "serial_mismatch": 60,
+    "contradiction": 51,
+    "repeat_repairs": 35,
+    "possible_duplicate": 31,
+    "covered_defect+noise": 23,
+    "late_reporting": 23,
+    "expired+noise": 14,
+    "excluded_damage+noise": 5,
+    "missing_documents+noise": 5,
+    "unauthorized_repair+noise": 4,
+    "serial_mismatch+noise": 3,
+    "ambiguous_cause+noise": 3,
+    "grace_boundary+noise": 3,
+    "contradiction+noise": 2,
+    "serial_unverifiable+noise": 1,
+    "late_reporting+noise": 1,
+    "repeat_repairs+noise": 1
+  },
+  "by_category": {
+    "Industrial Tools": 522,
+    "Home Appliances": 514,
+    "Consumer Electronics": 464
   },
   "splits": {
     "train": {
-      "total": 1050,
+      "rows": 1050,
       "by_class": {
-        "Valid Claim": 350,
         "Invalid Claim": 350,
-        "Manual Review": 350
+        "Manual Review": 350,
+        "Valid Claim": 350
       }
     },
-    "validation": {
-      "total": 225,
+    "val": {
+      "rows": 225,
       "by_class": {
         "Valid Claim": 75,
-        "Invalid Claim": 75,
-        "Manual Review": 75
+        "Manual Review": 75,
+        "Invalid Claim": 75
       }
     },
     "test": {
-      "total": 225,
+      "rows": 225,
       "by_class": {
+        "Manual Review": 75,
         "Valid Claim": 75,
-        "Invalid Claim": 75,
-        "Manual Review": 75
+        "Invalid Claim": 75
       }
     }
   },
-  "created_at": "2026-09-23T13:23:07.543603"
+  "label_noise_rate": 0.04,
+  "seed": 42
 }

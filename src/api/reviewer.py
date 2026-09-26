@@ -1,228 +1,139 @@
-import json
-from datetime import datetime
-from flask import Blueprint, request, session, redirect, url_for, flash, jsonify, render_template
+"""Manual-review workflow (SRS xxxvi, xxxvii): queue, take, decide/override, assign, re-evaluate."""
+from __future__ import annotations
+
+from datetime import date
+
+from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+
 from config.config import Config
 from database.db import db
-from src.models.entities import Claim, ClaimStatusHistory, ReviewerAction, Notification, AuditLog
-from src.api.auth import login_required, role_required, get_current_user
+from src.core.features import FeatureError
+from src.core.vocab import CATEGORIES, CONSISTENCY_STATUSES
+from src.models.entities import Claim, Product, ReviewerAction, User
+from src.security import rbac
+from src.security.guards import authorize_object, check, require, scoped_claims
+from src.services import claim_service
 
 reviewer_bp = Blueprint("reviewer", __name__, url_prefix="/reviewer")
+RISK_ORDER = {"High": 0, "Medium": 1, "Low": 2, None: 3}
+TABS = ("queue", "mine", "waiting", "decided")
 
 
-@reviewer_bp.route("/queue", methods=["GET"])
-@login_required
-@role_required(Config.ROLE_REVIEWER, Config.ROLE_ADMIN)
+def _claim(claim_id: str, permission: str, **ctx) -> Claim:
+    return authorize_object(permission, Claim.query.filter_by(claim_id=claim_id).first_or_404(), **ctx)
+
+
+@reviewer_bp.get("/queue")
+@require("review.queue")
 def queue():
-    """Dedicated manual review triage queue with multi-criteria filtering."""
-    status_filter = request.args.get("status", Config.STATUS_MANUAL_REVIEW)
-    risk_filter = request.args.get("risk", "ALL")
-    category_filter = request.args.get("category", "ALL")
-
-    query = Claim.query
-
-    if status_filter != "ALL":
-        query = query.filter(Claim.status == status_filter)
-
-    if risk_filter != "ALL":
-        query = query.filter(Claim.risk_level == risk_filter)
-
-    if category_filter != "ALL":
-        query = query.join(Claim.product).filter(Claim.product.has(category=category_filter))
-
-    claims = query.order_by(Claim.created_at.desc()).all()
-
-    return render_template(
-        "reviewer/queue.html",
-        claims=claims,
-        current_status=status_filter,
-        current_risk=risk_filter,
-        current_category=category_filter,
-        all_statuses=Config.ALL_CLAIM_STATUSES
-    )
-
-
-@reviewer_bp.route("/claim/<string:claim_id>", methods=["GET"])
-@login_required
-@role_required(Config.ROLE_REVIEWER, Config.ROLE_ADMIN)
-def inspect_claim(claim_id):
-    """Detailed inspection workspace with side-by-side evidence, AI summary, comparison, and override controls."""
-    claim = Claim.query.filter_by(claim_id=claim_id).first_or_404()
-    from src.core.decision_engine import get_decision_engine
-    engine = get_decision_engine()
-    ai_summary = engine.generate_claim_summary(claim)
-    decision_explanation = engine.generate_decision_explanation(claim)
-    return render_template(
-        "reviewer/claim_inspect.html",
-        claim=claim,
-        ai_summary=ai_summary,
-        decision_explanation=decision_explanation
-    )
-
-
-@reviewer_bp.route("/claim/<string:claim_id>/adjudicate", methods=["POST"])
-@login_required
-@role_required(Config.ROLE_REVIEWER, Config.ROLE_ADMIN)
-def adjudicate(claim_id):
-    """
-    Reviewer decision adjudication and override handler.
-    Preserves original AI results and logs override justification.
-    """
-    user = get_current_user()
-    claim = Claim.query.filter_by(claim_id=claim_id).first_or_404()
-
-    action = request.form.get("action")  # 'APPROVE', 'REJECT', 'REQUEST_INFO'
-    comments = request.form.get("comments", "").strip()
-    override_reason = request.form.get("override_reason", "").strip()
-
-    if not comments:
-        flash("Reviewer comments are mandatory for audit compliance.", "warning")
-        return redirect(url_for("reviewer.inspect_claim", claim_id=claim_id))
-
-    old_status = claim.status
-    automated_rec = claim.final_decision or "Manual Review Required"
-    is_override = False
-
-    if action == "APPROVE":
-        new_status = Config.STATUS_APPROVED
-        new_decision = "Approved"
-        if automated_rec != "Likely Valid":
-            is_override = True
-    elif action == "REJECT":
-        new_status = Config.STATUS_REJECTED
-        new_decision = "Rejected"
-        if automated_rec != "Likely Invalid":
-            is_override = True
-    elif action == "REQUEST_INFO":
-        new_status = Config.STATUS_ADDITIONAL_INFO
-        new_decision = "Additional Information Required"
-    elif action == "CLOSE":
-        new_status = Config.STATUS_CLOSED
-        new_decision = "Closed"
+    tab = request.args.get("tab") if request.args.get("tab") in TABS else "queue"
+    base = scoped_claims(Claim)
+    uid = g.user.id
+    if tab == "queue":
+        q = base.filter(Claim.status.in_([Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION]),
+                        Claim.assigned_reviewer_id.is_(None))
+    elif tab == "mine":
+        q = base.filter(Claim.assigned_reviewer_id == uid,
+                        Claim.status.in_([Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION]))
+        if g.user.role == Config.ROLE_ADMIN:           # admins see every assigned open claim
+            q = base.filter(Claim.assigned_reviewer_id.isnot(None),
+                            Claim.status.in_([Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION]))
+    elif tab == "waiting":
+        q = base.filter(Claim.status == Config.STATUS_ADDITIONAL_INFO)
     else:
-        flash("Invalid reviewer adjudication action.", "danger")
-        return redirect(url_for("reviewer.inspect_claim", claim_id=claim_id))
+        decided_ids = db.session.query(ReviewerAction.claim_id)
+        if g.user.role != Config.ROLE_ADMIN:
+            decided_ids = decided_ids.filter(ReviewerAction.reviewer_id == uid)
+        q = base.filter(Claim.id.in_(decided_ids))
+    if request.args.get("category") in CATEGORIES:
+        q = q.join(Product, Claim.product_id == Product.id).filter(Product.category == request.args["category"])
+    if request.args.get("risk") in ("Low", "Medium", "High"):
+        q = q.filter(Claim.risk_level == request.args["risk"])
+    claims = q.all()
+    if request.args.get("consistency") in CONSISTENCY_STATUSES:
+        claims = [c for c in claims if c.model_evaluation and
+                  c.model_evaluation.model_consistency_status == request.args["consistency"]]
+    claims.sort(key=lambda c: (RISK_ORDER.get(c.risk_level, 3), c.claim_submission_date or date.today()))
+    counts = {
+        "queue": base.filter(Claim.status.in_([Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION]),
+                             Claim.assigned_reviewer_id.is_(None)).count(),
+        "mine": base.filter(Claim.assigned_reviewer_id == uid,
+                            Claim.status.in_([Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION])).count(),
+        "waiting": base.filter(Claim.status == Config.STATUS_ADDITIONAL_INFO).count(),
+    }
+    reviewers = User.query.filter_by(role=Config.ROLE_REVIEWER, is_active=True).order_by(User.full_name).all()
+    return render_template("reviewer/queue.html", claims=claims, tab=tab, counts=counts, categories=CATEGORIES,
+                           consistency_statuses=CONSISTENCY_STATUSES, reviewers=reviewers, today=date.today())
 
-    # Update Claim
-    claim.status = new_status
-    claim.reviewer_notes = comments
-    claim.assigned_reviewer_id = user.id
 
-    # Record ClaimStatusHistory
-    status_log = ClaimStatusHistory(
-        claim_id=claim.id,
-        previous_status=old_status,
-        new_status=new_status,
-        changed_by_user_id=user.id,
-        reason_comment=f"Reviewer Action: {new_decision}. Notes: {comments}"
-    )
-    db.session.add(status_log)
+@reviewer_bp.post("/claims/<string:claim_id>/take")
+@require("review.decide")
+def take(claim_id):
+    claim = _claim(claim_id, "review.decide")
+    if claim.assigned_reviewer_id not in (None, g.user.id):
+        flash("Another reviewer already has this claim.", "warning")
+    else:
+        claim_service.assign(claim, g.user, g.user)
+        db.session.commit()
+        flash(f"{claim.claim_id} is assigned to you.", "success")
+    return redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="decision"))
 
-    # Record ReviewerAction with override audit trail
-    action_log = ReviewerAction(
-        claim_id=claim.id,
-        reviewer_id=user.id,
-        previous_recommendation=automated_rec,
-        reviewer_decision=new_decision,
-        is_override=is_override,
-        override_reason=(override_reason or comments) if is_override else None,
-        comments=comments
-    )
-    db.session.add(action_log)
 
-    # Notify Claimant across all SRS 1.6.xxxix event types:
-    # (status changes, requests for additional info, approval, rejection, review completion)
-    product_name = claim.product.product_name if claim.product else "Asset"
-    product_id_val = claim.product.product_id if claim.product else None
-
-    # 1. Primary Action Notification (Approval / Rejection / Additional Info / Closure)
-    if action == "APPROVE":
-        primary_notif = Notification(
-            user_id=claim.user_id,
-            notification_type=Config.NOTIF_TYPE_APPROVAL,
-            title=f"Claim Approved: {claim.claim_id}",
-            message=f"Official Approval: Your warranty claim {claim.claim_id} for '{product_name}' has been approved by authorized reviewer {user.full_name}. Adjudication notes: {comments}",
-            related_claim_id=claim.claim_id,
-            related_product_id=product_id_val
-        )
-        db.session.add(primary_notif)
-    elif action == "REJECT":
-        primary_notif = Notification(
-            user_id=claim.user_id,
-            notification_type=Config.NOTIF_TYPE_REJECTION,
-            title=f"Claim Rejected: {claim.claim_id}",
-            message=f"Adjudication Notice: Claim {claim.claim_id} for '{product_name}' has been rejected by authorized reviewer {user.full_name}. Rationale: {comments}",
-            related_claim_id=claim.claim_id,
-            related_product_id=product_id_val
-        )
-        db.session.add(primary_notif)
-    elif action == "REQUEST_INFO":
-        primary_notif = Notification(
-            user_id=claim.user_id,
-            notification_type=Config.NOTIF_TYPE_ADDITIONAL_INFO,
-            title=f"Action Required: Information Requested for Claim {claim.claim_id}",
-            message=f"Reviewer {user.full_name} has requested additional evidence for '{product_name}': {comments}. Please upload requested documents via the claim dossier.",
-            related_claim_id=claim.claim_id,
-            related_product_id=product_id_val
-        )
-        db.session.add(primary_notif)
-
-    # 2. General Lifecycle Status Change Notification
-    status_notif = Notification(
-        user_id=claim.user_id,
-        notification_type=Config.NOTIF_TYPE_STATUS_CHANGE,
-        title=f"Claim {claim.claim_id} Status: {new_status}",
-        message=f"Claim status for '{product_name}' transitioned from '{old_status}' to '{new_status}'. Reviewer note: {comments}",
-        related_claim_id=claim.claim_id,
-        related_product_id=product_id_val
-    )
-    db.session.add(status_notif)
-
-    # 3. Review Completion Notification
-    if action in ["APPROVE", "REJECT", "CLOSE"]:
-        review_comp_notif = Notification(
-            user_id=claim.user_id,
-            notification_type=Config.NOTIF_TYPE_REVIEW_COMPLETE,
-            title=f"Adjudication Review Completed: {claim.claim_id}",
-            message=f"The formal warranty review process for claim {claim.claim_id} has concluded with adjudication outcome: '{new_decision}'.",
-            related_claim_id=claim.claim_id,
-            related_product_id=product_id_val
-        )
-        db.session.add(review_comp_notif)
-
-    # System Audit
-    audit = AuditLog(
-        user_id=user.id,
-        user_role=user.role,
-        action="REVIEWER_ADJUDICATION",
-        entity_type="Claim",
-        entity_id=claim.claim_id,
-        ip_address=request.remote_addr,
-        details_json=json.dumps({
-            "action": action,
-            "new_status": new_status,
-            "is_override": is_override,
-            "override_reason": override_reason
-        })
-    )
-    db.session.add(audit)
-
-    if new_status in [Config.STATUS_APPROVED, Config.STATUS_REJECTED]:
-        final_audit = AuditLog(
-            user_id=user.id,
-            user_role=user.role,
-            action="FINAL_DECISION",
-            entity_type="Claim",
-            entity_id=claim.claim_id,
-            ip_address=request.remote_addr,
-            details_json=json.dumps({
-                "outcome": new_status,
-                "decision": new_decision,
-                "adjudicated_by": user.full_name
-            })
-        )
-        db.session.add(final_audit)
-
+@reviewer_bp.post("/claims/<string:claim_id>/decide")
+@require("review.decide")
+def decide(claim_id):
+    action = request.form.get("action", "")
+    comments = request.form.get("comments", "").strip()
+    reason = request.form.get("override_reason", "").strip() or None
+    back = redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="decision"))
+    if action not in claim_service.REVIEW_ACTIONS:
+        flash("Choose a decision.", "warning")
+        return back
+    claim = _claim(claim_id, "review.decide")          # scope + SoD (404 / 403)
+    target = claim_service.REVIEW_ACTIONS[action]
+    permission = "review.override" if claim_service.is_override(claim, target) else "review.decide"
+    decision = check(permission, claim, target_status=target, reason=reason)
+    if not decision:
+        flash(rbac.MESSAGES.get(decision.code, "This decision isn't allowed."), "danger")
+        return back
+    if len(comments) < 5:
+        flash("Add a comment for the customer and the audit trail (at least 5 characters).", "warning")
+        return back
+    claim_service.decide(claim, g.user, action, comments, reason)
     db.session.commit()
+    flash(f"{claim.claim_id} is now {claim.status}.", "success")
+    return back
 
-    flash(f"Claim {claim.claim_id} adjudicated successfully as '{new_status}'!", "success")
-    return redirect(url_for("reviewer.queue"))
+
+@reviewer_bp.post("/claims/<string:claim_id>/assign")
+@require("review.assign")
+def assign(claim_id):
+    claim = _claim(claim_id, "claim.read")
+    code = request.form.get("reviewer", "")
+    reviewer = User.query.filter_by(user_id=code, role=Config.ROLE_REVIEWER, is_active=True).first() if code else None
+    if code and reviewer is None:
+        flash("Choose an active claim reviewer.", "warning")
+    elif reviewer and reviewer.id in {claim.user_id, claim.created_by_id}:
+        flash(rbac.MESSAGES["SOD_OWN_CLAIM"], "warning")
+    else:
+        claim_service.assign(claim, reviewer, g.user)
+        db.session.commit()
+        flash(f"{claim.claim_id} assigned to {reviewer.full_name}." if reviewer else "Assignment cleared.", "success")
+    return redirect(request.referrer or url_for("claims.view_claim", claim_id=claim_id))
+
+
+@reviewer_bp.post("/claims/<string:claim_id>/reevaluate")
+@require("review.decide")
+def reevaluate(claim_id):
+    """Re-run both models and all rules (e.g. after new evidence). Earlier evaluations are kept."""
+    claim = _claim(claim_id, "review.decide")
+    try:
+        outcome = claim_service.reevaluate(claim, g.user)
+    except FeatureError as exc:
+        db.session.rollback()
+        flash(str(exc), "danger")
+    else:
+        db.session.commit()
+        flash(f"Re-evaluated: {outcome.decision['decision']} (rule {outcome.decision['rule_id']}). "
+              "The status is unchanged until you decide.", "info")
+    return redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="models"))

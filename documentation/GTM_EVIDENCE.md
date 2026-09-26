@@ -1,76 +1,56 @@
-# Google Teachable Machine Evidence Dossier (AssureX Claim Engine)
+# Google Teachable Machine — evidence (SRS deliverable 5)
 
-## Executive Summary
-This document provides complete technical evidence for the **Google Teachable Machine Image-Classification Model**, fulfilling the submission requirements of SRS Section 1.2 (Step 8 & 9) and Section 1.10 (Deliverable 5).
+> **Status: training pending.** Teachable Machine runs in the browser at teachablemachine.withgoogle.com,
+> so the model cannot be produced by a script in this repository. Everything around it is ready: the
+> training cards, the runtime, the installer, the evaluation and the comparison report. The sections
+> marked *to record* are filled in by the team after training. The earlier `gtm_classifier.joblib` /
+> `weights.bin` / `metadata.json` files were a scikit-learn stand-in, not a Teachable Machine export,
+> and have been removed.
 
-The model was trained on standardized visual Claim Summary Cards, evaluated on held-out unseen test cards, and achieved **100.00% accuracy on unseen test claims**, well exceeding the SRS mandatory threshold of $\ge 85.00\%$.
+## Claim Summary Cards
 
----
+| Item | Value |
+|---|---|
+| Renderer | `src/core/card_v2.py` (same code for training cards and live claims) |
+| Size | 600 × 600 px (square, so Teachable Machine's centre crop keeps every element) |
+| Fonts | DejaVu Sans shipped in `static/fonts/` (identical rendering on Windows / Linux / servers) |
+| Content | Claim facts only: category pips, warranty life bar with expiry marker, reporting delay bar with 30-day marker, diagnostic confidence bar, five evidence tiles (filled = present, hatched = missing), four integrity signals, previous-repair squares, damage-cause pips, fault and dates |
+| Never on a card | Python prediction, any confidence score, final decision, class label |
+| Training images | 2 variations per training claim (tint, date format, ±1.5° rotation, blur, JPEG quality) → **2,100** images: 700 per class in `data/summary_cards/train/{valid,invalid,manual_review}/` |
+| Validation / test | one canonical card per claim (`<claim_id>_v0.jpg`) in `data/summary_cards/{val,test}/` — **never uploaded for training** |
+| Mapping | `data/claim_id_to_card_mapping.csv` (claim ID, split, class, variation, filename, path) |
 
-## 1. Project Architecture & Setup
-- **Platform Compatibility**: Google Teachable Machine (Standard Image Model Export)
-- **Model Topology**: MobileNetV2-style spatial visual feature extractor + dense multi-class classification head
-- **Target Classes (Exactly 3)**:
-  1. `Valid Claim`
-  2. `Invalid Claim`
-  3. `Manual Review`
-- **Model Artifact Location**: `model/teachable_machine/`
-  - `model.json` (Topology, feature dimensions, manifest)
-  - `metadata.json` (GTM package metadata, training configs, timestamps)
-  - `labels.txt` (Class order)
-  - `weights.bin` (Binary weights)
-  - `gtm_classifier.joblib` (Runtime inference engine)
+Samples: Admin › Models shows one training card per class; any card can be opened from a claim page.
 
----
+## Training procedure
 
-## 2. Dataset Composition & Augmentation
-In strict compliance with SRS Page 9, at least two visual variations of every training claim summary card were generated:
-- **Training Set (Minimum 2,100 Images)**:
-  - `data/summary_cards/train/valid/`: **700 images** (350 records $\times$ 2 visual variations)
-  - `data/summary_cards/train/invalid/`: **700 images** (350 records $\times$ 2 visual variations)
-  - `data/summary_cards/train/manual_review/`: **700 images** (350 records $\times$ 2 visual variations)
-  - **Total Training Cards**: **2,100 augmented images**
-- **Unseen Held-Out Test Set (225 Images)**:
-  - `data/summary_cards/test/`: **225 images** (75 per class)
-- **Unseen Held-Out Validation Set (225 Images)**:
-  - `data/summary_cards/val/`: **225 images** (75 per class)
+1. Admin › Models › *Download training cards* (zip with three class folders), or use the folders above.
+2. teachablemachine.withgoogle.com → *Image Project* → *Standard image model*.
+3. Rename the classes exactly **Valid Claim**, **Invalid Claim**, **Manual Review**; upload 700 images each.
+4. *Advanced*: start with epochs 50, batch size 16, learning rate 0.001. Train.
+5. *Export Model* → *Tensorflow Lite* → *Floating point* → download; unzip.
+6. Admin › Models › upload `model_unquant.tflite` and `labels.txt` (checked: TFLite header, exactly the three
+   labels, the model loads and runs; the previous model is archived under `model/teachable_machine/versions/`).
+7. *Run evaluation* (or `python notebooks/evaluate_gtm.py`) and `python reports/generate_comparison_report.py`.
 
----
+## Runtime
 
-## 3. Strict Neutrality Guarantee
-As mandated by SRS Page 7 & 14:
-- The Claim Summary Cards contain **strictly raw claim attributes** (Product Age, Warranty Remaining, Fault Category, Repair History, Document Availability, Serial Status).
-- **NO model predictions, confidence scores, or final claim results appear on any summary card.**
+`src/core/gtm_classifier_v2.py` — TensorFlow Lite interpreter (`ai-edge-litert`), preprocessing identical to
+the Teachable Machine export sample (ImageOps.fit to the model input, scaled to [-1, 1]; quantized exports
+are supported). The model version is `gtm-<SHA-256 prefix of the .tflite file>` and is stored with every
+prediction. If the file is missing or broken the prediction is marked *unavailable* and the claim goes to
+manual review — there is no fallback model.
 
----
+## To record after training
 
-## 4. Visual Variations & Data Augmentation Details
-- **Variation 1 (Modern Slate Theme)**:
-  - Dark slate background (`#18202F`), dark card container (`#212C3F`), electric cyan accents (`#38BDF8`), ISO date format (`YYYY-MM-DD`).
-- **Variation 2 (Classic Enterprise Theme)**:
-  - Off-white slate background (`#F1F5F9`), pure white card container (`#FFFFFF`), royal blue accents (`#2563EB`), standard date format (`DD/MM/YYYY`).
-- Both variations preserve 100% identical underlying claim information and class labels.
-
----
-
-## 5. Performance on Unseen Test Summary Cards
-
-| Class | Precision | Recall | F1-Score | Support |
-|---|:---:|:---:|:---:|:---:|
-| **Valid Claim** | 1.0000 | 1.0000 | 1.0000 | 75 |
-| **Invalid Claim** | 1.0000 | 1.0000 | 1.0000 | 75 |
-| **Manual Review** | 1.0000 | 1.0000 | 1.0000 | 75 |
-| **Overall Accuracy** | — | — | **1.0000 (100.0%)** | **225** |
-
-### Confusion Matrix (Test Split)
-```text
-                  Predicted Valid    Predicted Invalid    Predicted Review
-Actual Valid            75                  0                   0
-Actual Invalid           0                 75                   0
-Actual Review            0                  0                  75
-```
-
----
-
-## 6. Sample Predictions Log
-Sample predictions on unseen test cards are recorded in `model/teachable_machine/sample_gtm_predictions.json`, verifying that the vision model produces independent confidence probabilities for all 3 classes: `Valid Claim`, `Invalid Claim`, and `Manual Review`.
+| Item | Value |
+|---|---|
+| Project link / screenshots of the three classes | *to record* |
+| Training configuration (epochs, batch, learning rate) | *to record* |
+| Images per class | 700 / 700 / 700 |
+| Validation accuracy · test accuracy · macro F1 | *from `model/teachable_machine/evaluation.json`* |
+| Confusion matrix | *from `evaluation.json`* |
+| Incorrectly classified samples | `reports/gtm_misclassified_test.csv` (written by the evaluation) |
+| Retraining details | *to record* |
+| Model version | shown on Admin › Models |
+| Test screenshots | *to record* |

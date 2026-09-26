@@ -1,0 +1,117 @@
+{% extends "components/base.html" %}
+{% from "components/macros.html" import csrf, empty %}
+{% block title %}Access control{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Security</div>
+    <h1>Access control</h1>
+    <p class="lede">Who can sign in, what each role may do, and which records it can reach. Role changes sign the person out everywhere so new limits apply immediately.</p>
+  </div>
+</div>
+
+<section class="stats" aria-label="People per role">
+  {% for r, spec in policy.roles.items() %}
+    <a class="stat" href="{{ url_for('access.index', role=r) }}"><div class="v">{{ counts.get(r, 0) }}</div><div class="l"><span class="role role--{{ r }}">{{ spec.label }}</span></div></a>
+  {% endfor %}
+</section>
+
+<div class="split mt-3">
+  <div class="stack">
+    <section class="card" aria-labelledby="people">
+      <div class="card-h">
+        <h2 id="people">People</h2>
+        <form class="row" method="get" role="search">
+          <label class="sr" for="q">Search people</label><input class="input sm" id="q" name="q" value="{{ filters.get('q', '') }}" placeholder="Name or email" style="width:200px">
+          <label class="sr" for="f-role">Role</label><select class="select sm" id="f-role" name="role" style="width:auto"><option value="">All roles</option>{% for r, spec in policy.roles.items() %}<option value="{{ r }}" {{ 'selected' if filters.get('role') == r }}>{{ spec.label }}</option>{% endfor %}</select>
+          <label class="sr" for="f-status">Status</label><select class="select sm" id="f-status" name="status" style="width:auto"><option value="">Any status</option><option value="active" {{ 'selected' if filters.get('status') == 'active' }}>Active</option><option value="disabled" {{ 'selected' if filters.get('status') == 'disabled' }}>Disabled</option></select>
+          <button class="btn quiet sm" type="submit">Filter</button>
+        </form>
+      </div>
+      {% if users %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Person</th><th>Role</th><th>Status</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+        {% for u in users %}{% set is_self = u.id == current_user.id %}
+          <tr class="{{ 'is-self' if is_self }}">
+            <td><div class="t-main">{{ u.full_name }}{% if is_self %} (you){% endif %}</div><div class="t-sub">{{ u.email }} <span class="id">{{ u.user_id }}</span></div>
+              {% if u.service_center %}<div class="t-sub"><i class="bi bi-geo-alt"></i> {{ u.service_center.name }}</div>{% endif %}</td>
+            <td>
+              {% if is_self %}<span class="role role--{{ u.role }}" title="You can't change your own role">{{ role_label(u.role) }}</span>
+              {% else %}
+                <form method="post" action="{{ url_for('access.change_role', user_code=u.user_id) }}" data-confirm="Change {{ u.full_name }}'s role? They will be signed out everywhere.">{{ csrf() }}
+                  <label class="sr" for="role-{{ u.id }}">Role for {{ u.full_name }}</label>
+                  <select class="select sm" id="role-{{ u.id }}" name="role" data-autosubmit data-confirm-change style="width:auto">
+                    {% for r, spec in policy.roles.items() %}<option value="{{ r }}" {{ 'selected' if u.role == r }}>{{ spec.label }}</option>{% endfor %}
+                  </select>
+                  <noscript><button class="btn quiet sm" type="submit">Save</button></noscript>
+                </form>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              {% if u.is_locked %}<span class="badge bad">Locked</span>
+              {% elif u.is_active %}<span class="badge good">Active</span>
+              {% else %}<span class="badge">Disabled</span>{% endif %}
+              {% if u.must_change_password %}<div class="tiny muted">awaiting first sign-in</div>{% endif %}
+            </td>
+            <td class="right">
+              <div class="row" style="justify-content:flex-end">
+                <form method="post" action="{{ url_for('access.force_sign_out', user_code=u.user_id) }}">{{ csrf() }}<button class="btn quiet sm" type="submit" title="End all sessions and clear any lockout">Sign out</button></form>
+                <form method="post" action="{{ url_for('access.toggle_status', user_code=u.user_id) }}" data-confirm="{{ 'Disable' if u.is_active else 'Enable' }} {{ u.full_name }}?">{{ csrf() }}
+                  <button class="btn {{ 'danger' if u.is_active else 'quiet' }} sm" type="submit" {{ 'disabled' if is_self }}>{{ 'Disable' if u.is_active else 'Enable' }}</button></form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}{{ empty('bi-people', 'No one matches these filters', 'Clear them to see everyone.') }}{% endif %}
+    </section>
+
+    <section class="card" aria-labelledby="matrix">
+      <div class="card-h"><h2 id="matrix">What each role can do</h2><span class="hint">Scope = which records a permission reaches. Edit <code>config/rbac.json</code> to change it.</span></div>
+      <div class="table-wrap"><table class="table compact matrix small">
+        <thead><tr><th>Permission</th>{% for r, spec in policy.roles.items() %}<th>{{ spec.label }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for p in perms %}<tr><td class="mono">{{ p }}</td>
+          {% for r, spec in policy.roles.items() %}{% set s = spec.permissions.get(p) %}
+            <td>{% if s %}<span class="scope scope--{{ s }}">{{ s|replace('_', ' ') }}</span>{% else %}<span class="none" aria-label="no access">—</span>{% endif %}</td>
+          {% endfor %}</tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="card" aria-labelledby="invite">
+      <div class="card-h"><h2 id="invite">Invite someone</h2></div>
+      <form class="card-b stack-sm" method="post" action="{{ url_for('access.invite') }}" data-invite-form>{{ csrf() }}
+        <label class="field"><span>Full name</span><input class="input" name="full_name" required autocomplete="off"></label>
+        <label class="field"><span>Work email</span><input class="input" type="email" name="email" required autocomplete="off"></label>
+        <label class="field"><span>Role</span><select class="select" name="role" data-invite-role required>{% for r, spec in policy.roles.items() %}<option value="{{ r }}">{{ spec.label }}</option>{% endfor %}</select></label>
+        <label class="field" data-center-field hidden><span>Service center</span><select class="select" name="service_center_id">{% for c in centers %}<option value="{{ c.id }}">{{ c.name }} — {{ c.city }}</option>{% endfor %}</select></label>
+        <p class="tiny muted mb-0">They get a one-time password and must set their own at first sign-in. Public sign-up only creates customer accounts.</p>
+        <button class="btn" type="submit">Send invite</button>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="denied">
+      <div class="card-h"><h2 id="denied">Recent blocked attempts</h2></div>
+      <ul class="list">
+        {% for d in denials %}
+          <li><span class="ico bad"><i class="bi bi-shield-x"></i></span><div class="grow">
+            <div class="small"><b>{{ role_label(d.user_role) if d.user_role else 'Signed-out visitor' }}</b> tried {{ {'Claim': 'a claim', 'ClaimDocument': 'a document', 'Product': 'a product', 'ENDPOINT': 'a restricted page'}.get(d.entity_type, 'a record') }} <span class="id">{{ d.entity_id }}</span></div>
+            <div class="sub">{{ d.details.get('code', '') }} · {{ d.timestamp|ago }}</div></div></li>
+        {% else %}<li class="small muted">No blocked attempts yet.</li>{% endfor %}
+      </ul>
+    </section>
+
+    <section class="card" id="centers">
+      <div class="card-h"><h2>Service centers</h2></div>
+      <ul class="list">{% for c in centers %}<li><div class="grow"><div class="ttl small">{{ c.name }}</div><div class="sub">{{ c.city }}{% if c.phone %} · {{ c.phone }}{% endif %} · <span class="id">{{ c.center_id }}</span></div></div></li>{% endfor %}</ul>
+      <form class="card-f stack-sm" method="post" action="{{ url_for('access.add_center') }}">{{ csrf() }}
+        <div class="row"><input class="input sm" name="name" placeholder="Center name" required style="flex:2"><input class="input sm" name="city" placeholder="City" required style="flex:1"></div>
+        <div class="row"><input class="input sm" name="phone" placeholder="Phone (optional)" style="flex:1"><button class="btn quiet sm" type="submit">Add</button></div>
+      </form>
+    </section>
+  </aside>
+</div>
+{% endblock %}

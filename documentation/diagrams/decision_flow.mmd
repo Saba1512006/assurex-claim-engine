@@ -1,0 +1,17 @@
+flowchart TD
+  F["Facts: rule counts, contradictions, duplicates,<br/>missing mandatory docs, consistency, both classes"] --> D01
+  D01{"D01 any hard-fail rule?"} -- yes --> LI1["Likely Invalid"]
+  D01 -- no --> D02{"D02 contradiction or duplicate?"}
+  D02 -- yes --> MR2["Manual Review Required"]
+  D02 -- no --> D03{"D03 mandatory document missing?"}
+  D03 -- yes --> MR3["Manual Review Required"]
+  D03 -- no --> D04{"D04 disagreement, uncertain,<br/>weak match or model unavailable?"}
+  D04 -- yes --> MR4["Manual Review Required"]
+  D04 -- no --> D05{"D05 manual-review rule fired?"}
+  D05 -- yes --> MR5["Manual Review Required"]
+  D05 -- no --> D06{"D06 both models Invalid?"}
+  D06 -- yes --> LI6["Likely Invalid"]
+  D06 -- no --> D07{"D07 both models Valid?"}
+  D07 -- yes --> LV["Likely Valid"]
+  D07 -- no --> D99["D99 Manual Review Required"]
+  C["Consistency: min confidence 0.60 → Uncertain;<br/>classes differ → Disagreement;<br/>|Δ| ≤ 0.10 Strong · ≤ 0.25 Acceptable · else Weak"] -.-> D04

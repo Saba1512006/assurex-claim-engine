@@ -1,0 +1,23 @@
+flowchart TB
+  C(["Customer / service-center staff"]) -- "product, receipt, claim details, evidence" --> P1["1.0 Register product &amp; warranty"]
+  P1 --> D1[("D1 Products &amp; warranties")]
+  C -- "claim form + files" --> P2["2.0 Collect claim &amp; documents"]
+  P2 -- "files" --> D2[("D2 Document store")]
+  P2 -- "OCR values to confirm" --> C
+  P2 --> P3["3.0 Validate &amp; pre-process"]
+  D1 --> P3
+  D2 --> P3
+  P3 -- "feature record" --> P4["4.0 Python classification"]
+  P3 -- "feature record" --> P5["5.0 Render card &amp; Teachable Machine"]
+  P3 -- "facts" --> P6["6.0 Warranty rules, contradictions, duplicates"]
+  P4 --> P7["7.0 Compare models &amp; decide"]
+  P5 --> P7
+  P6 --> P7
+  P7 --> D3[("D3 Claims, evaluations, rule logs")]
+  P7 -- "status + notification" --> C
+  D3 --> P8["8.0 Manual review"]
+  R(["Claim reviewer"]) -- "decision, comment, override reason" --> P8
+  P8 --> D3
+  D3 --> P9["9.0 Dashboards, analytics, exports"]
+  A(["Administrator"]) -- "policies, thresholds, users, models" --> P9
+  P9 --> D4[("D4 Audit log")]

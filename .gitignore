@@ -19,3 +19,9 @@ data/uploads/*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local database (built by `python database/seed.py`) and generated artefacts
+database/*.db
+reports/model_comparison_val.csv
+reports/gtm_misclassified_*.csv
+model/teachable_machine/versions/
