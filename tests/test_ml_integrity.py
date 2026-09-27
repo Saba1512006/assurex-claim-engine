@@ -168,3 +168,18 @@ def test_teachable_machine_keeps_its_accuracy_on_freshly_rendered_cards(splits):
     recorded = json.loads((GTM_DIR / "evaluation.json").read_text())["test"]["gtm_accuracy"]
     assert accuracy >= 0.85, f"Teachable Machine test accuracy fell to {accuracy:.1%} (SRS target 85%)"
     assert abs(accuracy - recorded) < 0.005, f"cards no longer match training: {accuracy:.1%} vs recorded {recorded:.1%}"
+
+
+def test_exported_encoder_preprocessing_and_processed_data_match_the_model(splits):
+    """The standalone label encoder / preprocessing / processed CSVs must describe the saved model exactly."""
+    bundle = joblib.load(ROOT / "model" / "python_model" / "claim_classifier_v2.joblib")
+    encoder = joblib.load(ROOT / "model" / "python_model" / "label_encoder.joblib")
+    prep = joblib.load(ROOT / "model" / "python_model" / "preprocessing_pipeline.joblib")
+    assert list(encoder.classes_) == list(bundle["pipeline"].classes_)
+    for name, df in splits.items():
+        processed = pd.read_csv(ROOT / "data" / "processed" / f"{name}_features.csv")
+        assert list(processed["claim_id"]) == list(df["claim_id"])
+        features = processed.drop(columns=["claim_id", "claim_class", "label_id"]).to_numpy()
+        assert abs(prep.transform(df[bundle["features"]]) - features).max() < 1e-6
+    labels = pd.read_csv(ROOT / "data" / "labels.csv")
+    assert len(labels) == 1500 and labels.groupby("claim_id")["split"].nunique().max() == 1

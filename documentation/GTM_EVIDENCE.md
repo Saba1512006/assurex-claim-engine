@@ -58,9 +58,31 @@ way to test a card design before spending a browser training run.
 | **Invalid Claim** | 5 | 68 | 2 |
 | **Manual Review** | 4 | 1 | 70 |
 
-Most errors predict *Valid Claim* for claims that are Invalid or need review (9 of 14); the decision table
-catches these because the rule engine and the Python model must also agree before a claim is marked
-*Likely Valid*. The 14 misclassified test cards are listed in `reports/gtm_misclassified_test.csv`.
+Most errors predict *Valid Claim* for claims labelled Invalid or Manual Review (9 of 14). 12 of the 14
+errors are claims whose label was deliberately flipped, where the model's answer is the policy's answer (see
+*Training observations*); in the application no claim is marked *Likely Valid* unless the rule engine and
+the Python model agree as well.
+
+## Training observations
+
+* **Run 1 (v2 cards).** Training finished normally (epochs 50, batch 16, learning rate 0.001), but on our
+  225 test cards the model reached only 54.2% and agreed with the Python model on 55.1% of claims: a card
+  that looks clear to a person is not necessarily clear to frozen ImageNet features at 224 × 224 pixels.
+* **Diagnosis.** An offline replica of the trainer (`notebooks/tm_replica_check.py`) reproduced the failure
+  (58–66%), so the problem was the input representation, not the training run or its settings.
+* **Run 2 (v3 cards).** Same settings. Validation 97.3%, test 93.8%; the preview in Teachable Machine gave
+  *Invalid Claim 99%* for an unseen card with a date conflict, late reporting and an excluded cause
+  (`screenshots/24_gtm_v3_preview_test.png`).
+* **Where it still errs.** 12 of its 14 test errors are claims whose label was deliberately flipped to
+  simulate reviewer disagreement (the test split has 12 such claims): on every one of them the image model
+  gave the answer the warranty policy gives. Its only 2 real errors are a grace-period claim called
+  *Invalid* (should be reviewed) and a late-reporting claim called *Manual Review* (should be invalid).
+  Measured against the policy instead of the noisy labels it agrees on 223 of 225 test claims (99.1%).
+  The misclassified cards are listed with their scenario in `reports/gtm_misclassified_test.csv`.
+* **Browser behaviour.** With 2,100 images Chrome showed "Page unresponsive" during "Preparing training
+  data"; choosing *Wait* and keeping the tab in front let training finish (about 20–25 minutes).
+* **Deployment.** TensorFlow 2.20 no longer ships `tf.lite.Interpreter`; the app uses `ai-edge-litert`
+  (Windows and Linux). Models are loaded from bytes so a new export can replace a running one on Windows.
 
 ## Runtime
 

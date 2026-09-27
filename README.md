@@ -43,9 +43,20 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (197 tests).
+Run the tests: `python -m pytest -q` (199 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`
 from `wsgi.py`). Set `SECRET_KEY` in the environment — the app refuses to start without one.
+
+### Testing the deployed application
+
+1. Open https://assurexai.pythonanywhere.com and sign in with an account below (the landing page lists them).
+2. **Customer**: *Claims* shows the 11 demonstration claims with their decisions; open one to see both
+   models' predictions, the Claim Summary Card, rules, contradictions and duplicates; *New claim* files a
+   new one (a receipt PDF from any demo claim's *Evidence* list can be reused).
+3. **Reviewer**: *Review queue* → take a claim → request information, approve, reject or override with a reason.
+4. **Administrator**: *Overview*, *Analytics* (both models' accuracy and confusion matrices), *Models*,
+   *Policies* (edit a rule or threshold — the next evaluation uses it), *Access*, *Audit*, CSV/Excel exports.
+5. `/healthz` reports whether both models are loaded.
 
 ### Evaluator accounts (demo data only)
 
@@ -81,7 +92,7 @@ Public sign-up creates **customer** accounts only. Other roles are invited by an
 | Manual-review queue | Reviewer or admin › *Review queue* |
 | Administrator dashboard | Admin › *Overview* (filters by category, status and date) and *Analytics* |
 | Track a claim | Claim page › *Track*, or the 8-stage bar at the top of the claim page |
-| Export a claim report | Claim page › *Report (PDF)*; bulk CSV from Admin › *Overview* / *Claims* |
+| Export a claim report | Claim page › *Report (PDF)*; bulk **CSV or Excel (.xlsx)** from Admin › *Overview*, *Analytics*, *Audit* and claim *Search* |
 
 ### The 11 SRS demonstration cases
 
@@ -152,6 +163,7 @@ Runtime: `ai-edge-litert` (in requirements). `tflite-runtime` or full `tensorflo
 ```bash
 python dataset_generator/generator_v2.py     # 1,500 claims, 500 per class, stratified 1050/225/225
 python notebooks/train_python_v2.py          # 3 algorithms, 5-fold CV, select on validation, calibrate, model card
+python notebooks/export_model_artifacts.py   # label encoder, preprocessing pipeline, processed CSVs, labels, scenarios
 python dataset_generator/build_cards_v2.py   # 2 variations per training claim + 1 canonical card per val/test claim
 python reports/generate_comparison_report.py # SRS model-comparison report (reports/model_comparison_report.*)
 python reports/build_project_report.py       # documentation/PROJECT_REPORT.md -> reports/AssureX_Project_Report.pdf
@@ -213,7 +225,8 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
 * Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
 * Installation & troubleshooting: [`documentation/INSTALLATION.md`](documentation/INSTALLATION.md)
-* Test cases: [`documentation/TEST_CASES.md`](documentation/TEST_CASES.md)
+* Test cases: [`documentation/TEST_CASES.md`](documentation/TEST_CASES.md) · results: [`reports/test_results.txt`](reports/test_results.txt)
+* Team contribution record: [`documentation/TEAM_CONTRIBUTIONS.md`](documentation/TEAM_CONTRIBUTIONS.md)
 * AI tool declaration: [`AI_USAGE.md`](AI_USAGE.md)
 
 ## License

@@ -8,6 +8,7 @@
     <p class="lede">Append-only record of sign-ins, registrations, uploads, OCR corrections, predictions, submissions, status changes, reviewer actions, configuration changes and blocked access attempts.</p>
   </div>
   <a class="btn quiet" href="{{ url_for('admin.export', kind='audit') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>
+  <a class="btn quiet" href="{{ url_for('admin.export', kind='audit', format='xlsx') }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
 </div>
 <form class="card" method="get"><div class="card-b filters">
   <label class="field"><span>Action</span><select class="select sm" name="action" data-autosubmit><option value="">All actions</option>{% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}</select></label>

@@ -247,7 +247,7 @@ for 92.0% of claims.
 
 ## Testing results
 
-197 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
+199 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
 period, the reporting deadline ±1 day, the exclusion threshold), contradiction and duplicate detection,
 OCR patterns, upload validation, both model runtimes, all five consistency statuses, the eleven
 demonstration cases from the competition brief, full HTTP journeys from registration to approval, and the

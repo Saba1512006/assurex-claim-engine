@@ -64,5 +64,15 @@ Earlier days are in the Git history; team members should add their own entries b
   to 77.8% and failed the test, as intended.
 - The policy editor warns when a limit drawn on the card is changed (the image model then needs retraining).
 
+**Requirement audit against SRS §1.10**
+- Added the standalone label encoder, preprocessing pipeline, feature schema, processed train/val/test CSVs,
+  labels file, scenario definitions and all 225 sample test predictions (extracted from the saved model;
+  a test proves they match it).
+- Excel (.xlsx) export next to CSV for claims, analytics, audit and search, with the same formula guard.
+- Test results file (`reports/test_results.txt`), team contribution record template, demo-video script,
+  deployed-app testing guide in the README; a seeded demonstration claim where the two real models
+  disagree.
+- Teachable Machine error analysis: 12 of its 14 test errors are deliberately flipped labels.
+
 **Open items**
 - Republish the blog; redeploy and re-seed the live site; complete the team rows in `AI_USAGE.md`.

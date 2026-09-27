@@ -10,6 +10,7 @@
   </div>
   <div class="row">
     <a class="btn quiet" href="{{ url_for('admin.export', kind='analytics', **filters) }}"><i class="bi bi-filetype-csv"></i>Analytics CSV</a>
+    <a class="btn quiet" href="{{ url_for('admin.export', kind='analytics', format='xlsx', **filters) }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
     <a class="btn quiet" href="{{ url_with(format='json') }}"><i class="bi bi-braces"></i>JSON</a>
   </div>
 </div>

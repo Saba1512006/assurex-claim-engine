@@ -29,9 +29,18 @@ vocabulary are rejected with a message. **Derived fields**: product age, days to
 warranty, reporting delay, missing-document count, conflict / mismatch / duplicate flags —
 `src/core/features.py` builds them with exactly the training column names.
 
-**Encoder / pre-processing files.** The `ColumnTransformer` (scaler + one-hot encoder with its category
-lists = the "label encoder") is saved *inside* the single pipeline artefact
-`model/python_model/claim_classifier_v2.joblib`, so pre-processing and model can never drift apart.
+**Encoder / pre-processing files.** The application loads one artefact,
+`model/python_model/claim_classifier_v2.joblib`, which contains the pre-processing and the model together so
+they can never drift apart. `python notebooks/export_model_artifacts.py` extracts the pieces from that saved
+model (nothing is refitted) and a test checks they match it exactly:
+
+| File | Content |
+|---|---|
+| `model/python_model/preprocessing_pipeline.joblib` | `ColumnTransformer`: numeric and binary passthrough, one-hot for category and damage type with the fixed vocabulary |
+| `model/python_model/label_encoder.joblib` | `LabelEncoder` for Invalid Claim / Manual Review / Valid Claim (ids 0 / 1 / 2) |
+| `model/python_model/feature_schema.json` | Input columns and types, vocabularies, missing-value and encoding rules, the 30 encoded output columns |
+| `data/processed/{train,val,test}_features.csv` | Model-ready matrices: claim ID, 30 encoded features, class and label id |
+| `data/labels.csv`, `data/claim_scenarios.json` | Label, split, scenario and card files per claim; scenario definitions and counts |
 
 ## Leakage audit
 
@@ -105,4 +114,4 @@ the outcome.
 * Version string stored with every prediction: `v2.0.0+<first 12 hex of the file's SHA-256>`.
 * scikit-learn 1.9.1 (pinned in `requirements.txt` so the pickle loads identically everywhere).
 * 30 sample test predictions with all three probabilities: `model_card_v2.json → test.sample_predictions`;
-  all 225 in `reports/model_comparison_report.csv`.
+  all 225 in `model/python_model/sample_test_predictions.csv` and `reports/model_comparison_report.csv`.

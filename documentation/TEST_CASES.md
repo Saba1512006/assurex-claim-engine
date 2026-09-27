@@ -1,6 +1,6 @@
 # Test cases (SRS deliverable 8)
 
-Run everything: `python -m pytest -q` → **197 passed** (about 25 s). Every test is automated; the table
+Run everything: `python -m pytest -q` → **199 passed** (about 25 s). Every test is automated; the table
 maps each SRS test category to the functions that cover it (`file :: function`).
 
 | SRS category | What is checked | Tests |
@@ -15,6 +15,7 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 | **Python model** | Accuracy ≥ 85% and not suspiciously perfect; no single-feature leakage; three calibrated probabilities; unknown category rejected; failure handled | `test_ml_integrity :: test_model_meets_srs_accuracy_and_is_not_suspiciously_perfect, test_unknown_category_is_rejected_not_silently_zeroed`, `test_pipeline :: test_python_model_scores_all_three_classes, test_unknown_category_is_rejected_by_model, test_python_model_failure_is_handled` |
 | **Teachable Machine** | Missing model → *Uncertain Result* + manual review (no fallback); label-file parsing incl. folder names; installer rejects non-TFLite files; card is 600×600 and prediction-free | `test_pipeline :: test_without_teachable_machine_claim_goes_to_manual_review, test_teachable_machine_label_file_parsing, test_card_stored_and_contains_no_prediction`, `test_workflow :: test_gtm_upload_rejects_non_tflite, test_gtm_upload_replaces_and_archives_running_model` |
 | **Accuracy guards** | The installed Teachable Machine model is re-scored on test cards rendered with the current card code and policies (≥ 85% and equal to the recorded 93.8%); the saved Python model is re-scored on the test split (≥ 85% and equal to the recorded 89.3%); editing a policy limit shown on the card warns that the image model needs retraining | `test_ml_integrity :: test_teachable_machine_keeps_its_accuracy_on_freshly_rendered_cards, test_installed_teachable_machine_model_matches_its_evaluation, test_saved_python_model_still_scores_its_recorded_accuracy`, `test_workflow :: test_changing_a_card_limit_warns_that_teachable_machine_needs_retraining` |
+| **Model artefacts & exports** | Exported label encoder, preprocessing pipeline and processed CSVs reproduce the saved model exactly; Excel export is a valid workbook and neutralises formulas | `test_ml_integrity :: test_exported_encoder_preprocessing_and_processed_data_match_the_model`, `test_workflow :: test_excel_export_is_a_real_workbook_and_neutralises_formulas` |
 | **Model comparison** | All five consistency statuses; disagreement; low confidence; hard fail beats agreeing models | `test_ml_integrity :: test_consistency_matrix`, `test_pipeline :: test_model_disagreement_goes_to_manual_review, test_low_confidence_image_model_is_uncertain, test_hard_fail_wins_over_agreeing_models` |
 | **Rule engine** | Every rule fires and passes; per-category exclusions; severities from config; policy files complete (SRS deliverable 7) | `test_rules :: *` |
 | **Contradiction detection** | Claim before purchase, fault before purchase, fault after claim, repair before purchase, model/invoice/purchase-date mismatch | `test_detectors :: test_date_contradictions, test_model_invoice_and_purchase_date_mismatch, test_consistent_claim_has_no_contradictions` |
@@ -37,7 +38,7 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 - [x] Rules, thresholds and routing are configuration, editable in the admin UI and validated on save.
 - [x] A missing or broken model can never crash a request or silently decide a claim.
 - [x] Every prediction is stored with both model versions, the card hash and the decision trace.
-- [x] 197 tests pass on a clean checkout (`python -m pytest -q`).
+- [x] 199 tests pass on a clean checkout (`python -m pytest -q`).
 
 ## Manual checks performed
 

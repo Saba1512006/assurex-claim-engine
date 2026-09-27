@@ -113,7 +113,7 @@ Out of scope (SRS §1.4): live manufacturer databases, payment systems, enterpri
 | xlii | Search & filter by claim, product, category, serial, warranty status, claim status, risk, confidence, reviewer, dates | `/claims/search` |
 | xliii | Analytics (outcomes, faults, rejection reasons, categories, expirations, repairs, model performance, manual-review frequency) | `/admin/analytics` |
 | xliv | Downloadable claim report | `/claims/<id>/report.pdf` (`src/services/report_generator.py`) |
-| xlv | CSV/Excel export | `/admin/export/<kind>` |
+| xlv | CSV/Excel export | `/admin/export/<kind>` (CSV with BOM, or `?format=xlsx` workbook); formula-injection guard in both |
 | xlvi | Secure database storage | SQLAlchemy models, SQLite/any SQL |
 | xlvii | Audit trail | `AuditLog`, `src/services/audit.py`, Admin › Audit |
 | xlviii | Model version tracking; updates don't alter recorded results | Hash-based versions on every `ModelEvaluation` row; rows never updated |
@@ -305,7 +305,7 @@ noisy labels — i.e. the combination is sound once the second model is in place
 
 ## 31. Testing strategy
 
-197 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
+199 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
 integration (full HTTP journeys through the real app, DB and file store), boundary, negative, security,
 database, model and demonstration cases; surprise-modification scenarios are tests too. Catalogue:
 `documentation/TEST_CASES.md`. Additionally every page is rendered for every role, and browser screenshots

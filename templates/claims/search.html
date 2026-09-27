@@ -8,7 +8,8 @@
     <p class="lede">Search and filter every claim you can see — by ID, product, serial, category, warranty, status, risk, confidence, reviewer and date.</p>
   </div>
   <div class="row">
-    {% if can('export.data') %}<a class="btn quiet" href="{{ url_with(export='csv') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>{% endif %}
+    {% if can('export.data') %}<a class="btn quiet" href="{{ url_with(export='csv') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>
+    <a class="btn quiet" href="{{ url_with(export='xlsx') }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>{% endif %}
     {% if can('claim.create') %}<a class="btn" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg"></i>New claim</a>{% endif %}
   </div>
 </div>

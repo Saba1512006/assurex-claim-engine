@@ -143,13 +143,16 @@ def _search_query(args):
 @require("claim.read")
 def search():
     claims = _search_query(request.args)
-    if request.args.get("export") == "csv":
+    fmt = request.args.get("export")
+    if fmt in ("csv", "xlsx"):
         if not check("export.data"):
             abort(403)
-        audit("DATA_EXPORTED", "Claim", None, rows=len(claims), filters=request.args.to_dict())
+        audit("DATA_EXPORTED", "Claim", None, rows=len(claims), format=fmt, filters=request.args.to_dict())
         db.session.commit()
-        return Response(export_service.claims_csv(claims), mimetype="text/csv",
-                        headers={"Content-Disposition": "attachment; filename=assurex_claims.csv"})
+        mimetype = ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if fmt == "xlsx"
+                    else "text/csv; charset=utf-8")
+        return Response(export_service.claims_csv(claims, fmt), mimetype=mimetype,
+                        headers={"Content-Disposition": f"attachment; filename=assurex_claims.{fmt}"})
     reviewers = User.query.filter_by(role=Config.ROLE_REVIEWER, is_active=True).order_by(User.full_name).all()
     return render_template("claims/search.html", claims=claims, categories=CATEGORIES, reviewers=reviewers,
                            statuses=Config.ALL_CLAIM_STATUSES, args=request.args)

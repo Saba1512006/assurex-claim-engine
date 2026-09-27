@@ -333,3 +333,17 @@ def test_changing_a_card_limit_warns_that_teachable_machine_needs_retraining(app
     r = client.post("/admin/policies", data=form, follow_redirects=True)
     assert b"retrain the model" in r.data
     policy_store.reload()
+
+
+def test_excel_export_is_a_real_workbook_and_neutralises_formulas(app, client):
+    from openpyxl import load_workbook
+    from src.services import export_service
+    wb = load_workbook(io.BytesIO(export_service.to_xlsx(["Name", "Amount"], [["=HYPERLINK(\"x\")", 12.5], ["ok", 3]])))
+    ws = wb.active
+    assert [c.value for c in ws[1]] == ["Name", "Amount"]
+    assert ws["A2"].value == "'=HYPERLINK(\"x\")" and ws["A2"].data_type == "s" and ws["B2"].value == 12.5
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    r = client.get("/admin/export/claims?format=xlsx")
+    assert r.status_code == 200 and r.mimetype.endswith("spreadsheetml.sheet") and r.data[:2] == b"PK"
+    assert "assurex_claims_" in r.headers["Content-Disposition"] and r.headers["Content-Disposition"].endswith(".xlsx")

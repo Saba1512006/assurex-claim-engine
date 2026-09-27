@@ -299,22 +299,25 @@ def audit_log():
 @require("export.data")
 def export(kind):
     f = _filters()
+    fmt = "xlsx" if request.args.get("format") == "xlsx" else "csv"
     claims_q = analytics_service.apply_filters(scoped_claims(Claim), **f)
     products = scoped_products(Product, Claim).order_by(Product.id).all()
     if kind == "claims":
-        body = export_service.claims_csv(claims_q.order_by(Claim.id).all())
+        body = export_service.claims_csv(claims_q.order_by(Claim.id).all(), fmt)
     elif kind == "products":
-        body = export_service.products_csv(products)
+        body = export_service.products_csv(products, fmt)
     elif kind == "warranties":
-        body = export_service.warranties_csv(products)
+        body = export_service.warranties_csv(products, fmt)
     elif kind == "analytics":
-        body = export_service.analytics_csv(analytics_service.full(claims_q, scoped_products(Product, Claim)))
+        body = export_service.analytics_csv(analytics_service.full(claims_q, scoped_products(Product, Claim)), fmt)
     elif kind == "audit" and check("audit.read"):
-        body = export_service.audit_csv(AuditLog.query.order_by(AuditLog.id).all())
+        body = export_service.audit_csv(AuditLog.query.order_by(AuditLog.id).all(), fmt)
     else:
         abort(404)
-    audit("DATA_EXPORTED", "Export", kind, filters={k: str(v) for k, v in f.items() if v})
+    audit("DATA_EXPORTED", "Export", kind, format=fmt, filters={k: str(v) for k, v in f.items() if v})
     db.session.commit()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
-    return Response(body, mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f"attachment; filename=assurex_{kind}_{stamp}.csv"})
+    mimetype = ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" if fmt == "xlsx"
+                else "text/csv; charset=utf-8")
+    return Response(body, mimetype=mimetype,
+                    headers={"Content-Disposition": f"attachment; filename=assurex_{kind}_{stamp}.{fmt}"})

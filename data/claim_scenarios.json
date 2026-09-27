@@ -1,0 +1,84 @@
+{
+  "precedence": "rules are applied in this order; the first that matches decides the label",
+  "label_noise": "65 claims (4.3%) carry a deliberately flipped label (scenario suffix '+noise') to simulate reviewer disagreement",
+  "scenarios": [
+    {
+      "scenario": "expired",
+      "class": "Invalid Claim",
+      "definition": "Claim filed after the warranty and its grace period ended.",
+      "claims": 237
+    },
+    {
+      "scenario": "unauthorized_repair",
+      "class": "Invalid Claim",
+      "definition": "The product was previously repaired by an unauthorised center.",
+      "claims": 102
+    },
+    {
+      "scenario": "excluded_damage",
+      "class": "Invalid Claim",
+      "definition": "Damage cause is excluded by the category policy and the technician's diagnosis confirms it (confidence at or above the policy threshold).",
+      "claims": 81
+    },
+    {
+      "scenario": "serial_mismatch",
+      "class": "Invalid Claim",
+      "definition": "Serial number differs from the receipt and the serial photo.",
+      "claims": 63
+    },
+    {
+      "scenario": "contradiction",
+      "class": "Manual Review",
+      "definition": "Dates contradict each other (fault reported before purchase).",
+      "claims": 53
+    },
+    {
+      "scenario": "late_reporting",
+      "class": "Invalid Claim",
+      "definition": "Fault reported later than the category's reporting period.",
+      "claims": 24
+    },
+    {
+      "scenario": "grace_boundary",
+      "class": "Manual Review",
+      "definition": "Warranty ended but the claim is inside the grace period.",
+      "claims": 83
+    },
+    {
+      "scenario": "possible_duplicate",
+      "class": "Manual Review",
+      "definition": "The invoice was already used on another claim.",
+      "claims": 31
+    },
+    {
+      "scenario": "missing_documents",
+      "class": "Manual Review",
+      "definition": "Receipt missing, or two or more supporting documents missing.",
+      "claims": 149
+    },
+    {
+      "scenario": "serial_unverifiable",
+      "class": "Manual Review",
+      "definition": "Serial mismatch that cannot be verified (evidence incomplete).",
+      "claims": 1
+    },
+    {
+      "scenario": "ambiguous_cause",
+      "class": "Manual Review",
+      "definition": "Excluded cause without a confirming diagnosis, or unknown cause with low diagnostic confidence.",
+      "claims": 130
+    },
+    {
+      "scenario": "repeat_repairs",
+      "class": "Manual Review",
+      "definition": "Previous repairs at or above the policy's repeat-repair threshold.",
+      "claims": 36
+    },
+    {
+      "scenario": "covered_defect",
+      "class": "Valid Claim",
+      "definition": "Covered fault, inside the warranty, complete evidence, consistent data.",
+      "claims": 510
+    }
+  ]
+}

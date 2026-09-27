@@ -1,0 +1,206 @@
+AssureX Claim Engine — automated test results
+Command : python -m pytest -q -rA
+Date    : 2026-09-27 (UTC)
+Python  : 3.11.15 · scikit-learn 1.9.1 · Linux
+Result  : 199 passed in 28.35s
+
+Per test (file :: test):
+  PASSED tests/test_demonstration_cases.py::test_all_eleven_cases_present
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[01_valid_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[02_invalid_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[03_manual_review_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[04_expired_warranty_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[05_missing_document_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[06_duplicate_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[07_contradictory_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[08_serial_mismatch_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[09_unauthorized_repair_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[10_boundary_date_claim]
+  PASSED tests/test_demonstration_cases.py::test_demonstration_case[11_model_disagreement_claim]
+  PASSED tests/test_detectors.py::test_consistent_claim_has_no_contradictions
+  PASSED tests/test_detectors.py::test_date_contradictions
+  PASSED tests/test_detectors.py::test_serial_checked_against_every_source
+  PASSED tests/test_detectors.py::test_model_invoice_and_purchase_date_mismatch
+  PASSED tests/test_detectors.py::test_placeholder_serials_are_ignored
+  PASSED tests/test_detectors.py::test_duplicate_document_hash_across_products
+  PASSED tests/test_detectors.py::test_invoice_reuse_and_open_claim_on_same_serial
+  PASSED tests/test_detectors.py::test_closed_claim_on_same_unit_is_history_not_duplicate
+  PASSED tests/test_detectors.py::test_missing_documents_follow_policy
+  PASSED tests/test_detectors.py::test_product_level_receipt_counts_for_claims
+  PASSED tests/test_detectors.py::test_repair_serial_feeds_contradictions
+  PASSED tests/test_documents.py::test_invalid_files_are_refused[\x89PNG\r\n\x1a\n0000000000-tiny.png-damage_photo-empty or damaged]
+  PASSED tests/test_documents.py::test_invalid_files_are_refused[GIF89a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-photo.png-damage_photo-only PDF, JPG]
+  PASSED tests/test_documents.py::test_invalid_files_are_refused[%PDF-1.400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-photo.png-damage_photo-does not match]
+  PASSED tests/test_documents.py::test_invalid_files_are_refused[MZ00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000-virus.pdf-receipt-only PDF, JPG]
+  PASSED tests/test_documents.py::test_oversized_file_is_refused
+  PASSED tests/test_documents.py::test_video_only_for_fault_video
+  PASSED tests/test_documents.py::test_stored_file_is_hashed_and_named_safely
+  PASSED tests/test_documents.py::test_pdf_receipt_is_read_by_ocr
+  PASSED tests/test_documents.py::test_text_pdf_without_invoice_details_is_not_accepted_as_receipt
+  PASSED tests/test_documents.py::test_image_receipt_accepted_when_ocr_engine_missing
+  PASSED tests/test_documents.py::test_entity_patterns[Invoice # 88213-invoice_number-88213]
+  PASSED tests/test_documents.py::test_entity_patterns[Tax Invoice No: INV-2026-00017-invoice_number-INV-2026-00017]
+  PASSED tests/test_documents.py::test_entity_patterns[Date of purchase: 03 Apr 2026-purchase_date-2026-04-03]
+  PASSED tests/test_documents.py::test_entity_patterns[Date: 2026-04-03-purchase_date-2026-04-03]
+  PASSED tests/test_documents.py::test_entity_patterns[Serial number: X99-221-serial_number-X99-221]
+  PASSED tests/test_documents.py::test_entity_patterns[Total Amount: Rs 12,500.50-purchase_amount-12500.5]
+  PASSED tests/test_documents.py::test_entity_patterns[Warranty: 2 years-warranty_duration_months-24]
+  PASSED tests/test_documents.py::test_entity_patterns[Retailer: Metro Hardware Centre-retailer-Metro Hardware Centre]
+  PASSED tests/test_documents.py::test_words_are_not_mistaken_for_identifiers
+  PASSED tests/test_ml_integrity.py::test_split_sizes_and_balance
+  PASSED tests/test_ml_integrity.py::test_no_claim_in_two_splits
+  PASSED tests/test_ml_integrity.py::test_card_mapping_respects_splits
+  PASSED tests/test_ml_integrity.py::test_claim_id_does_not_encode_class
+  PASSED tests/test_ml_integrity.py::test_ui_options_exist_in_training_vocabulary
+  PASSED tests/test_ml_integrity.py::test_training_categories_are_canonical
+  PASSED tests/test_ml_integrity.py::test_unknown_category_is_rejected_not_silently_zeroed
+  PASSED tests/test_ml_integrity.py::test_model_meets_srs_accuracy_and_is_not_suspiciously_perfect
+  PASSED tests/test_ml_integrity.py::test_saved_python_model_still_scores_its_recorded_accuracy
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.92-Valid Claim-0.88-Strong Match]
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.92-Valid Claim-0.72-Acceptable Match]
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.95-Valid Claim-0.62-Weak Match]
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.9-Invalid Claim-0.85-Model Disagreement]
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.55-Valid Claim-0.9-Uncertain Result]
+  PASSED tests/test_ml_integrity.py::test_consistency_matrix[Valid Claim-0.6-Valid Claim-0.6-Strong Match]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override0-Likely Valid]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override1-Likely Invalid]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override2-Likely Invalid]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override3-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override4-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override5-Likely Invalid]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override6-Likely Valid]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override7-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override8-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override9-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override10-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override11-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_decision_table[override12-Manual Review Required]
+  PASSED tests/test_ml_integrity.py::test_policy_file_is_valid
+  PASSED tests/test_ml_integrity.py::test_all_configured_date_formats_parse[2026-09-26]
+  PASSED tests/test_ml_integrity.py::test_all_configured_date_formats_parse[26/09/2026]
+  PASSED tests/test_ml_integrity.py::test_all_configured_date_formats_parse[26-09-2026]
+  PASSED tests/test_ml_integrity.py::test_all_configured_date_formats_parse[26 Sep 2026]
+  PASSED tests/test_ml_integrity.py::test_all_configured_date_formats_parse[Sep 26, 2026]
+  PASSED tests/test_ml_integrity.py::test_installed_teachable_machine_model_matches_its_evaluation
+  PASSED tests/test_ml_integrity.py::test_teachable_machine_keeps_its_accuracy_on_freshly_rendered_cards
+  PASSED tests/test_ml_integrity.py::test_exported_encoder_preprocessing_and_processed_data_match_the_model
+  PASSED tests/test_pipeline.py::test_python_model_scores_all_three_classes
+  PASSED tests/test_pipeline.py::test_without_teachable_machine_claim_goes_to_manual_review
+  PASSED tests/test_pipeline.py::test_both_models_agree_valid_is_approved
+  PASSED tests/test_pipeline.py::test_model_disagreement_goes_to_manual_review
+  PASSED tests/test_pipeline.py::test_hard_fail_wins_over_agreeing_models
+  PASSED tests/test_pipeline.py::test_low_confidence_image_model_is_uncertain
+  PASSED tests/test_pipeline.py::test_consistency_boundaries[Valid Claim-0.9-Valid Claim-0.8-Strong Match]
+  PASSED tests/test_pipeline.py::test_consistency_boundaries[Valid Claim-0.9-Valid Claim-0.79-Acceptable Match]
+  PASSED tests/test_pipeline.py::test_consistency_boundaries[Valid Claim-0.9-Valid Claim-0.65-Acceptable Match]
+  PASSED tests/test_pipeline.py::test_consistency_boundaries[Valid Claim-0.91-Valid Claim-0.65-Weak Match]
+  PASSED tests/test_pipeline.py::test_consistency_boundaries[Invalid Claim-0.59-Invalid Claim-0.99-Uncertain Result]
+  PASSED tests/test_pipeline.py::test_card_stored_and_contains_no_prediction
+  PASSED tests/test_pipeline.py::test_reevaluation_keeps_earlier_results
+  PASSED tests/test_pipeline.py::test_python_model_failure_is_handled
+  PASSED tests/test_pipeline.py::test_unknown_category_is_rejected_by_model
+  PASSED tests/test_pipeline.py::test_teachable_machine_label_file_parsing
+  PASSED tests/test_pipeline.py::test_evaluation_is_fast_enough
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u0-claim.create-True]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u1-admin.dashboard-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u2-review.decide-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u3-user.manage-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u4-repair.record-True]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u5-review.decide-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u6-policy.manage-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u7-review.queue-True]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u8-claim.create-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u9-export.data-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u10-policy.manage-True]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u11-review.decide-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u12-claim.read-False]
+  PASSED tests/test_rbac_policy.py::test_permission_matrix[u13-claim.read-False]
+  PASSED tests/test_rbac_policy.py::test_unauthenticated_denied
+  PASSED tests/test_rbac_policy.py::test_customer_sees_only_own_claim_and_gets_404_semantics
+  PASSED tests/test_rbac_policy.py::test_customer_document_idor_blocked
+  PASSED tests/test_rbac_policy.py::test_staff_limited_to_own_service_center
+  PASSED tests/test_rbac_policy.py::test_reviewer_scope_assigned_or_unassigned_queue
+  PASSED tests/test_rbac_policy.py::test_reviewer_cannot_decide_own_claim
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Manual Review-Approved-True]
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Manual Review-Closed-False]
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Approved-Rejected-False]
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Approved-Closed-True]
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Closed-Approved-False]
+  PASSED tests/test_rbac_policy.py::test_review_state_machine[Draft-Approved-False]
+  PASSED tests/test_rbac_policy.py::test_override_requires_reason
+  PASSED tests/test_rbac_policy.py::test_submitted_claim_locked_for_customer_edits
+  PASSED tests/test_rbac_policy.py::test_admin_self_protection_and_last_admin
+  PASSED tests/test_rbac_policy.py::test_only_customer_can_self_register
+  PASSED tests/test_rbac_policy.py::test_list_filter_matches_object_scope
+  PASSED tests/test_rbac_policy.py::test_every_message_code_has_text
+  PASSED tests/test_rbac_routes.py::test_no_unguarded_endpoints
+  PASSED tests/test_rbac_routes.py::test_public_registration_cannot_create_admin
+  PASSED tests/test_rbac_routes.py::test_login_does_not_reveal_which_emails_exist
+  PASSED tests/test_rbac_routes.py::test_lockout_after_five_failures
+  PASSED tests/test_rbac_routes.py::test_role_change_kills_existing_session
+  PASSED tests/test_rbac_routes.py::test_disabled_user_is_signed_out
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[customer-/admin/dashboard-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[customer-/reviewer/queue-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[service_center_staff-/admin/policies-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[claim_reviewer-/admin/export/claims-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[claim_reviewer-/claims/new-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[administrator-/claims/new-403]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[administrator-/admin/dashboard-200]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[claim_reviewer-/reviewer/queue-200]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[customer-/claims/new-200]
+  PASSED tests/test_rbac_routes.py::test_role_endpoint_matrix[service_center_staff-/claims/-200]
+  PASSED tests/test_rbac_routes.py::test_idor_on_other_customers_records_returns_404
+  PASSED tests/test_rbac_routes.py::test_staff_only_see_their_service_center
+  PASSED tests/test_rbac_routes.py::test_reviewer_cannot_decide_claim_they_filed
+  PASSED tests/test_rbac_routes.py::test_denied_access_is_audited
+  PASSED tests/test_rbac_routes.py::test_admin_cannot_demote_themselves_or_last_admin
+  PASSED tests/test_rules.py::test_clean_claim_passes_every_rule
+  PASSED tests/test_rules.py::test_warranty_boundaries[0-expected0]
+  PASSED tests/test_rules.py::test_warranty_boundaries[-1-expected1]
+  PASSED tests/test_rules.py::test_warranty_boundaries[-7-expected2]
+  PASSED tests/test_rules.py::test_warranty_boundaries[-8-expected3]
+  PASSED tests/test_rules.py::test_reporting_window_boundaries[23-expected0]
+  PASSED tests/test_rules.py::test_reporting_window_boundaries[24-expected1]
+  PASSED tests/test_rules.py::test_reporting_window_boundaries[30-expected2]
+  PASSED tests/test_rules.py::test_reporting_window_boundaries[31-expected3]
+  PASSED tests/test_rules.py::test_late_reporting_not_judged_when_dates_conflict
+  PASSED tests/test_rules.py::test_exclusion_needs_diagnosis_to_hard_fail[0.55-EXCLUDED_DAMAGE]
+  PASSED tests/test_rules.py::test_exclusion_needs_diagnosis_to_hard_fail[0.54-EXCLUDED_DAMAGE_UNCONFIRMED]
+  PASSED tests/test_rules.py::test_exclusions_are_per_category
+  PASSED tests/test_rules.py::test_serial_mismatch_severity_depends_on_evidence[1-1-SERIAL_MISMATCH]
+  PASSED tests/test_rules.py::test_serial_mismatch_severity_depends_on_evidence[1-0-SERIAL_UNVERIFIED]
+  PASSED tests/test_rules.py::test_serial_mismatch_severity_depends_on_evidence[0-1-SERIAL_UNVERIFIED]
+  PASSED tests/test_rules.py::test_evidence_rules
+  PASSED tests/test_rules.py::test_other_manual_review_rules
+  PASSED tests/test_rules.py::test_all_three_policies_are_valid_and_complete
+  PASSED tests/test_rules.py::test_policy_validation_rejects_bad_files
+  PASSED tests/test_rules.py::test_surprise_add_warranty_exclusion
+  PASSED tests/test_rules.py::test_surprise_change_rule_severity
+  PASSED tests/test_rules.py::test_surprise_change_confidence_threshold
+  PASSED tests/test_rules.py::test_decision_policy_save_rejects_invalid
+  PASSED tests/test_rules.py::test_surprise_modify_decision_logic
+  PASSED tests/test_rules.py::test_surprise_support_another_date_format
+  PASSED tests/test_rules.py::test_unknown_fact_in_decision_table_fails_loudly
+  PASSED tests/test_workflow.py::test_customer_registers_product_with_receipt
+  PASSED tests/test_workflow.py::test_product_form_validation
+  PASSED tests/test_workflow.py::test_scan_receipt_endpoint
+  PASSED tests/test_workflow.py::test_full_claim_journey_with_agreeing_models
+  PASSED tests/test_workflow.py::test_ocr_values_confirmed_by_user_are_saved_and_audited
+  PASSED tests/test_workflow.py::test_draft_edit_then_submit
+  PASSED tests/test_workflow.py::test_wizard_rejects_bad_input
+  PASSED tests/test_workflow.py::test_reviewer_override_requires_reason_and_keeps_ai_result
+  PASSED tests/test_workflow.py::test_request_info_loop
+  PASSED tests/test_workflow.py::test_reviewer_queue_and_take
+  PASSED tests/test_workflow.py::test_admin_tools
+  PASSED tests/test_workflow.py::test_admin_invites_staff_who_must_change_password
+  PASSED tests/test_workflow.py::test_policy_editor_validates_and_audits
+  PASSED tests/test_workflow.py::test_gtm_upload_rejects_non_tflite
+  PASSED tests/test_workflow.py::test_security_headers_and_csp
+  PASSED tests/test_workflow.py::test_csrf_is_enforced
+  PASSED tests/test_workflow.py::test_open_redirect_blocked
+  PASSED tests/test_workflow.py::test_logout_is_post_only_and_clears_session
+  PASSED tests/test_workflow.py::test_public_pages
+  PASSED tests/test_workflow.py::test_database_constraints
+  PASSED tests/test_workflow.py::test_gtm_upload_replaces_and_archives_running_model
+  PASSED tests/test_workflow.py::test_changing_a_card_limit_warns_that_teachable_machine_needs_retraining
+  PASSED tests/test_workflow.py::test_excel_export_is_a_real_workbook_and_neutralises_formulas

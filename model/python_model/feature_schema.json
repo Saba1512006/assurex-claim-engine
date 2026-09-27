@@ -1,0 +1,87 @@
+{
+  "model_file": "claim_classifier_v2.joblib",
+  "model_version": "v2.0.0",
+  "sklearn_version": "1.9.1",
+  "inputs": {
+    "numeric": [
+      "purchase_price",
+      "warranty_duration_months",
+      "product_age_days",
+      "days_to_expiry",
+      "reporting_delay_days",
+      "diagnostic_confidence",
+      "previous_repairs_count",
+      "missing_document_count"
+    ],
+    "binary": [
+      "is_extended_warranty",
+      "has_receipt",
+      "has_warranty_card",
+      "has_damage_photo",
+      "has_serial_photo",
+      "has_repair_report",
+      "serial_number_match",
+      "unauthorized_repair_flag",
+      "duplicate_invoice_flag",
+      "claim_date_conflict_flag"
+    ],
+    "categorical": [
+      "product_category",
+      "damage_type"
+    ]
+  },
+  "vocabularies": {
+    "product_category": [
+      "Consumer Electronics",
+      "Home Appliances",
+      "Industrial Tools"
+    ],
+    "damage_type": [
+      "Manufacturing Defect",
+      "Normal Wear and Tear",
+      "Electrical Surge",
+      "Mechanical Stress",
+      "Accidental Drop",
+      "Water Ingress",
+      "Unknown / Not Sure"
+    ]
+  },
+  "missing_values": "documents absent -> 0, no repairs -> 0, no diagnosis -> 0.5 (src/core/features.py); unknown category or damage type is rejected, never encoded as zeros",
+  "encoding": "one-hot with the fixed vocabularies above (handle_unknown='error')",
+  "scaling": "none for tree models (the selected HistGradientBoosting); StandardScaler only for the logistic-regression candidate",
+  "output_columns": [
+    "purchase_price",
+    "warranty_duration_months",
+    "product_age_days",
+    "days_to_expiry",
+    "reporting_delay_days",
+    "diagnostic_confidence",
+    "previous_repairs_count",
+    "missing_document_count",
+    "is_extended_warranty",
+    "has_receipt",
+    "has_warranty_card",
+    "has_damage_photo",
+    "has_serial_photo",
+    "has_repair_report",
+    "serial_number_match",
+    "unauthorized_repair_flag",
+    "duplicate_invoice_flag",
+    "claim_date_conflict_flag",
+    "product_category_Consumer Electronics",
+    "product_category_Home Appliances",
+    "product_category_Industrial Tools",
+    "damage_type_Manufacturing Defect",
+    "damage_type_Normal Wear and Tear",
+    "damage_type_Electrical Surge",
+    "damage_type_Mechanical Stress",
+    "damage_type_Accidental Drop",
+    "damage_type_Water Ingress",
+    "damage_type_Unknown / Not Sure"
+  ],
+  "classes": [
+    "Invalid Claim",
+    "Manual Review",
+    "Valid Claim"
+  ]
+}
