@@ -43,7 +43,7 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (225 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
+Run the tests: `python -m pytest -q` (226 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
 Browser suite (13 journeys with accessibility checks):
 `pip install -r requirements-dev.txt && python -m playwright install chromium && python -m pytest -m e2e tests/e2e`.
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`

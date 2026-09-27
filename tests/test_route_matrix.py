@@ -11,6 +11,9 @@ from tests.conftest import login, make_center, make_user
 
 ROLES = ["customer", "service_center_staff", "claim_reviewer", "administrator"]
 SKIP = {"static", "auth.logout"}                      # logout would end the session mid-matrix
+# Slow for a role that may use them (a 106 MB zip, a full model evaluation); only the denial is checked here,
+# the allowed path has its own test.
+HEAVY = {"admin.training_cards", "admin.evaluate_gtm"}
 
 
 def _fill(pattern: str, values: dict) -> str:
@@ -45,8 +48,10 @@ def test_every_guarded_route_answers_each_role_as_rbac_json_says(app, people):
         client = app.test_client()
         login(client, f"{role}@x.io")
         for endpoint, method, url, perm in cases:
-            r = client.open(url, method=method, data={} if method == "POST" else None)
             allowed = perm is None or rbac.has_permission(people[role], perm)
+            if allowed and endpoint in HEAVY:
+                continue
+            r = client.open(url, method=method, data={} if method == "POST" else None)
             if allowed and r.status_code == 403:
                 wrong.append((role, method, url, perm, "denied but rbac.json allows it"))
             if not allowed and r.status_code != 403:

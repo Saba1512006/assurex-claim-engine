@@ -8,7 +8,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import (Blueprint, Response, abort, after_this_request, flash, jsonify, redirect, render_template, request,
+from flask import (Blueprint, Response, abort, flash, jsonify, redirect, render_template, request,
                    send_file, url_for)
 from sqlalchemy import or_
 
@@ -344,20 +344,17 @@ def training_cards():
     src = ROOT / "data" / "summary_cards" / "train"
     if not src.exists():
         abort(404)
-    tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    # An anonymous temporary file: the operating system deletes it as soon as it is closed, and the server closes
+    # it after sending. (A named file removed in a cleanup hook fails on Windows, where open files can't be deleted.)
+    tmp = tempfile.TemporaryFile(suffix=".zip")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as zf:
         for folder, label in (("valid", "Valid Claim"), ("invalid", "Invalid Claim"), ("manual_review", "Manual Review")):
             for img in sorted((src / folder).glob("*.jpg")):
                 zf.write(img, f"{label}/{img.name}")
-    tmp.close()
-
-    @after_this_request
-    def _cleanup(resp):
-        Path(tmp.name).unlink(missing_ok=True)
-        return resp
+    tmp.seek(0)
     audit("TRAINING_CARDS_DOWNLOADED", "Model", "summary_cards/train")
     db.session.commit()
-    return send_file(tmp.name, mimetype="application/zip", as_attachment=True,
+    return send_file(tmp, mimetype="application/zip", as_attachment=True,
                      download_name="assurex_teachable_machine_training_cards.zip")
 
 

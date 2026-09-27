@@ -406,3 +406,21 @@ def test_text_responses_are_gzipped_only_when_accepted(app, client):
     assert css.headers["Content-Encoding"] == "gzip" and css.headers.get("ETag", "W/").startswith("W/")
     card = client.get("/cards/test/CLM-00850_v0.jpg", headers={"Accept-Encoding": "gzip"})
     assert "Content-Encoding" not in card.headers                         # images are already compressed
+
+
+def test_training_cards_zip_is_valid_and_its_temp_file_is_closed_after_sending(app, client, monkeypatch):
+    """The zip lives in an anonymous temporary file that the OS deletes when it is closed (works on Windows too,
+    where a named file can't be deleted while the response still holds it open)."""
+    import io
+    import tempfile
+    import zipfile
+    made = []
+    real = tempfile.TemporaryFile
+    monkeypatch.setattr(tempfile, "TemporaryFile", lambda *a, **k: made.append(real(*a, **k)) or made[-1])
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    r = client.get("/admin/models/training-cards.zip")
+    names = zipfile.ZipFile(io.BytesIO(r.get_data())).namelist()
+    assert r.status_code == 200 and {n.split("/")[0] for n in names} == {"Valid Claim", "Invalid Claim", "Manual Review"}
+    r.close()
+    assert len(made) == 1 and made[0].closed

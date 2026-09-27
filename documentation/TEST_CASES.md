@@ -1,6 +1,6 @@
 # Test cases (SRS deliverable 8)
 
-Run everything: `python -m pytest -q` → **225 passed** (about 75 s); the browser suite `python -m pytest -m e2e tests/e2e` → **13 passed** (about 70 s). Every test is automated; the table
+Run everything: `python -m pytest -q` → **226 passed** (about 80 s); the browser suite `python -m pytest -m e2e tests/e2e` → **13 passed** (about 70 s). Every test is automated; the table
 maps each SRS test category to the functions that cover it (`file :: function`).
 
 | SRS category | What is checked | Tests |
@@ -43,7 +43,7 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 - [x] Rules, thresholds and routing are configuration, editable in the admin UI and validated on save.
 - [x] A missing or broken model can never crash a request or silently decide a claim.
 - [x] Every prediction is stored with both model versions, the card hash and the decision trace.
-- [x] 225 tests pass on a clean checkout (`python -m pytest -q`), and the 13 browser journeys pass (`python -m pytest -m e2e tests/e2e`).
+- [x] 226 tests pass on a clean checkout (`python -m pytest -q`), and the 13 browser journeys pass (`python -m pytest -m e2e tests/e2e`).
 
 ## Manual checks performed
 

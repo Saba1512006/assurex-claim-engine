@@ -2,7 +2,7 @@ AssureX Claim Engine — automated test results
 Command : python -m pytest -q -rA
 Date    : 2026-09-27 (UTC)
 Python  : 3.11.15 · scikit-learn 1.9.1 · Linux
-Result  : 225 passed, 13 deselected in 78.47s (0:01:18)
+Result  : 226 passed, 13 deselected in 50.04s
 Browser : python -m pytest -m e2e tests/e2e -rA
 Result  : 13 passed in 69.56s (0:01:09)
 
@@ -73,6 +73,7 @@ Per test (file :: test):
   PASSED tests/test_frontend_contracts.py::test_overrides_export_lists_reviewer_decisions_next_to_the_models
   PASSED tests/test_frontend_contracts.py::test_icon_subset_contains_every_icon_the_app_uses
   PASSED tests/test_frontend_contracts.py::test_text_responses_are_gzipped_only_when_accepted
+  PASSED tests/test_frontend_contracts.py::test_training_cards_zip_is_valid_and_its_temp_file_is_closed_after_sending
   PASSED tests/test_ml_integrity.py::test_split_sizes_and_balance
   PASSED tests/test_ml_integrity.py::test_no_claim_in_two_splits
   PASSED tests/test_ml_integrity.py::test_card_mapping_respects_splits
