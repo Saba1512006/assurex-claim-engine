@@ -11,7 +11,7 @@
 {% block page_css %}<link rel="stylesheet" href="{{ asset('css/pages/landing.css') }}">{% endblock %}
 {% block main %}
 {% set test_n = mc.dataset.splits.get('test') if mc.dataset else none %}
-<section class="bench grid-bg hero" aria-labelledby="hero-h">
+<section class="bench hero" aria-labelledby="hero-h">
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <span class="itag">Warranty claim adjudication</span>
@@ -28,7 +28,7 @@
         {{ metric(test_n, '', 'Test claims neither model saw in training') }}
       </div>
     </div>
-    <div class="hero-visual">{{ instrument(bench, cases) }}</div>
+    <div class="hero-visual">{% include "public/_engines.html" %}{{ instrument(bench, cases) }}</div>
   </div>
 </section>
 
