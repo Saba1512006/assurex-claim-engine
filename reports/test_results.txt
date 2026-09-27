@@ -2,7 +2,9 @@ AssureX Claim Engine — automated test results
 Command : python -m pytest -q -rA
 Date    : 2026-09-27 (UTC)
 Python  : 3.11.15 · scikit-learn 1.9.1 · Linux
-Result  : 199 passed in 28.35s
+Result  : 225 passed, 13 deselected in 78.47s (0:01:18)
+Browser : python -m pytest -m e2e tests/e2e -rA
+Result  : 13 passed in 69.56s (0:01:09)
 
 Per test (file :: test):
   PASSED tests/test_demonstration_cases.py::test_all_eleven_cases_present
@@ -47,6 +49,30 @@ Per test (file :: test):
   PASSED tests/test_documents.py::test_entity_patterns[Warranty: 2 years-warranty_duration_months-24]
   PASSED tests/test_documents.py::test_entity_patterns[Retailer: Metro Hardware Centre-retailer-Metro Hardware Centre]
   PASSED tests/test_documents.py::test_words_are_not_mistaken_for_identifiers
+  PASSED tests/test_frontend_contracts.py::test_verdict_payload_is_stored_complete_and_consistent
+  PASSED tests/test_frontend_contracts.py::test_evaluation_api_returns_the_stored_payload_in_the_envelope
+  PASSED tests/test_frontend_contracts.py::test_evaluation_api_errors_use_the_envelope
+  PASSED tests/test_frontend_contracts.py::test_customer_b_gets_404_on_everything_of_customer_a
+  PASSED tests/test_frontend_contracts.py::test_fresh_verdict_animates_once_and_reload_is_static
+  PASSED tests/test_frontend_contracts.py::test_templates_have_no_unsafe_patterns
+  PASSED tests/test_frontend_contracts.py::test_demo_evaluate_runs_the_real_pipeline_and_writes_nothing
+  PASSED tests/test_frontend_contracts.py::test_demo_evaluate_rejects_unknown_cases_with_field_errors
+  PASSED tests/test_frontend_contracts.py::test_demo_evaluate_is_rate_limited
+  PASSED tests/test_frontend_contracts.py::test_macro_attributes_render_as_attributes_not_escaped_text
+  PASSED tests/test_frontend_contracts.py::test_wizard_autosave_creates_one_draft_and_submit_reuses_it
+  PASSED tests/test_frontend_contracts.py::test_wizard_autosave_validates_and_never_touches_someone_elses_draft
+  PASSED tests/test_frontend_contracts.py::test_readiness_check_uses_the_envelope
+  PASSED tests/test_frontend_contracts.py::test_workbench_opens_for_reviewers_only_and_decisions_return_to_it
+  PASSED tests/test_frontend_contracts.py::test_what_if_simulation_is_read_only_and_reproduces_current_decisions
+  PASSED tests/test_frontend_contracts.py::test_what_if_apply_saves_a_new_version_and_audits
+  PASSED tests/test_frontend_contracts.py::test_batch_runs_in_chunks_writes_no_claims_and_exports
+  PASSED tests/test_frontend_contracts.py::test_batch_rejects_bad_files_with_row_errors
+  PASSED tests/test_frontend_contracts.py::test_batch_upload_is_rate_limited
+  PASSED tests/test_frontend_contracts.py::test_policy_save_shows_up_in_version_history
+  PASSED tests/test_frontend_contracts.py::test_customer_view_setting_hides_model_details_from_customers_only
+  PASSED tests/test_frontend_contracts.py::test_overrides_export_lists_reviewer_decisions_next_to_the_models
+  PASSED tests/test_frontend_contracts.py::test_icon_subset_contains_every_icon_the_app_uses
+  PASSED tests/test_frontend_contracts.py::test_text_responses_are_gzipped_only_when_accepted
   PASSED tests/test_ml_integrity.py::test_split_sizes_and_balance
   PASSED tests/test_ml_integrity.py::test_no_claim_in_two_splits
   PASSED tests/test_ml_integrity.py::test_card_mapping_respects_splits
@@ -154,6 +180,8 @@ Per test (file :: test):
   PASSED tests/test_rbac_routes.py::test_reviewer_cannot_decide_claim_they_filed
   PASSED tests/test_rbac_routes.py::test_denied_access_is_audited
   PASSED tests/test_rbac_routes.py::test_admin_cannot_demote_themselves_or_last_admin
+  PASSED tests/test_route_matrix.py::test_every_guarded_route_answers_each_role_as_rbac_json_says
+  PASSED tests/test_route_matrix.py::test_signed_out_visitors_are_sent_to_sign_in
   PASSED tests/test_rules.py::test_clean_claim_passes_every_rule
   PASSED tests/test_rules.py::test_warranty_boundaries[0-expected0]
   PASSED tests/test_rules.py::test_warranty_boundaries[-1-expected1]
@@ -204,3 +232,18 @@ Per test (file :: test):
   PASSED tests/test_workflow.py::test_gtm_upload_replaces_and_archives_running_model
   PASSED tests/test_workflow.py::test_changing_a_card_limit_warns_that_teachable_machine_needs_retraining
   PASSED tests/test_workflow.py::test_excel_export_is_a_real_workbook_and_neutralises_formulas
+
+Browser journeys:
+  PASSED tests/e2e/test_journeys.py::test_landing_bench_runs_the_real_pipeline
+  PASSED tests/e2e/test_journeys.py::test_persona_sign_in_and_customer_dashboard
+  PASSED tests/e2e/test_journeys.py::test_product_registration_reads_the_receipt
+  PASSED tests/e2e/test_journeys.py::test_claim_wizard_autosaves_reads_the_receipt_and_shows_the_verdict
+  PASSED tests/e2e/test_journeys.py::test_reviewer_workbench_keyboard_flow_and_double_submit_guard
+  PASSED tests/e2e/test_journeys.py::test_admin_what_if_and_batch
+  PASSED tests/e2e/test_journeys.py::test_role_change_signs_the_person_out_everywhere
+  PASSED tests/e2e/test_journeys.py::test_reduced_motion_turns_animation_off
+  PASSED tests/e2e/test_journeys.py::test_pages_have_no_serious_accessibility_violations[None-paths0]
+  PASSED tests/e2e/test_journeys.py::test_pages_have_no_serious_accessibility_violations[customer-paths1]
+  PASSED tests/e2e/test_journeys.py::test_pages_have_no_serious_accessibility_violations[reviewer-paths2]
+  PASSED tests/e2e/test_journeys.py::test_pages_have_no_serious_accessibility_violations[admin-paths3]
+  PASSED tests/e2e/test_journeys.py::test_phone_width_has_no_horizontal_scroll

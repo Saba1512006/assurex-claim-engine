@@ -126,7 +126,7 @@ Out of scope (SRS §1.4): live manufacturer databases, payment systems, enterpri
 |---|---|
 | Performance ≤ 5 s | Full evaluation (rules + Python + card + image model + decision) ~150–300 ms on a laptop; stored per claim (`latency_ms`) and tested |
 | Scalability (10,000 claims, several centers, concurrent users) | Indexed columns (claim_id, status, reviewer, serial, hashes); scoped SQL queries; stateless workers; any SQL database via `DATABASE_URL` |
-| Usability | Four-step wizard with live checklist, plain-language explanations, responsive layout (390 px phones and up), light/dark themes, keyboard focus styles |
+| Usability and accessibility | Four-step wizard with a live readiness checklist and server-saved drafts, plain-language explanations, responsive layout from 390 px, keyboard shortcuts for reviewers, visible focus, reduced-motion support. axe-core finds no serious or critical WCAG 2 A/AA issue on 21 pages; Lighthouse scores 100 for accessibility, best practices and SEO and 99 for performance on the public pages |
 | Accuracy ≥ 85% | Python model 89.3%, Teachable Machine 93.8% on the 225 unseen test claims |
 | Availability ≥ 99% | Stateless app behind gunicorn; `/healthz` for uptime monitors; no runtime dependency on external APIs or CDNs |
 
@@ -134,8 +134,10 @@ Out of scope (SRS §1.4): live manufacturer databases, payment systems, enterpri
 
 ![Architecture](diagrams/architecture.png)
 
-Three layers: the **web layer** (Jinja templates, a design-system stylesheet and one JavaScript file; the
-Content-Security-Policy forbids inline and third-party scripts), the **application layer** (Flask
+Three layers: the **web layer** (Jinja templates on one component library, design tokens in
+`static/css/tokens.css`, self-hosted IBM Plex fonts, a shell script plus small page scripts and the Alpine.js
+CSP build; the Content-Security-Policy allows only same-origin scripts and one nonce'd bootstrap line, and
+every JSON endpoint answers with one `{success, data, error}` envelope), the **application layer** (Flask
 blueprints guarded by the RBAC engine; services for the claim lifecycle, documents, alerts, analytics,
 exports and reports) and the **evaluation layer** (feature builder, rule engine, detectors, both model
 runtimes, card renderer, consistency and decision table). Persistence is SQLAlchemy over SQLite by default
@@ -159,7 +161,12 @@ plus a file store for documents and cards.
 | `src/rules/validator.py` | Form validation and preparation checklist |
 | `src/security/rbac.py`, `guards.py` | Permission → scope → constraint engine; request hooks, decorators, scoped queries, login hardening |
 | `src/services/*` | Claim lifecycle, documents, notifications, audit, alerts, analytics, exports, PDF report, summaries |
-| `src/api/*` | Public, auth, products, claims, reviewer, admin, access-control blueprints |
+| `src/api/*` | Public, auth, products, claims, reviewer (queue and workbench), admin, access-control blueprints |
+| `src/api/api.py`, `errors.py` | JSON endpoints (stored verdict, live bench, draft autosave, what-if, batch) and the error vocabulary |
+| `src/core/explain_models.py` | Per-claim explanations: Python feature contributions (replace each input with its training median/mode) and Teachable Machine tile occlusion |
+| `src/services/verdict.py` | Verdict screen data from the stored payload: agreement-meter geometry, reviewer overrides, customer visibility |
+| `src/services/whatif.py`, `batch.py` | Threshold simulator over the labelled test claims and live claims; chunked batch evaluation of uploaded CSVs |
+| `src/services/model_card_service.py` | Public model card: metrics, calibration (reliability bins, ECE), per-category accuracy, label-noise analysis |
 
 ## 12. Database design
 
@@ -299,17 +306,27 @@ latter three statuses and disagreement all route to manual review. On the test c
 on 92.9%. If the Teachable Machine export is missing, the report states that its columns are unavailable
 rather than estimating them.
 
+Every stored verdict also carries its explanation: the three inputs that moved the Python model most
+(each replaced by its typical training value) and the Claim Summary Card tiles that changed the image model's
+answer most when blanked out. Administrators can replay all 225 test claims under different agreement
+thresholds in the what-if simulator before changing them; applying a change saves a new decision-policy
+version with its simulated effect in the audit trail.
+
 Design check with a simulated agreeing image model (not a reported metric): the rules + decision table map
 93.3% of test claims to their labelled class, and 10 of the 15 remaining differences are the deliberately
 noisy labels — i.e. the combination is sound once the second model is in place.
 
 ## 31. Testing strategy
 
-199 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
+225 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
 integration (full HTTP journeys through the real app, DB and file store), boundary, negative, security,
-database, model and demonstration cases; surprise-modification scenarios are tests too. Catalogue:
-`documentation/TEST_CASES.md`. Additionally every page is rendered for every role, and browser screenshots
-are taken at desktop and mobile widths.
+database, model and demonstration cases; surprise-modification scenarios are tests too. A generated route ×
+role matrix calls every guarded route (68 route/method pairs) as each role and signed out and compares the
+answer with `config/rbac.json`. Accuracy guards re-render the test cards with the current code and fail if
+the image model's accuracy could drop. A separate browser suite (`python -m pytest -m e2e tests/e2e`, 13
+tests) runs the main journeys on a live seeded server with the real models, checks accessibility with axe,
+keyboard use, reduced motion, phone width and session revocation, and fails on any console error. Catalogue:
+`documentation/TEST_CASES.md`; screenshots in `docs/screenshots/`.
 
 ## 32. Security considerations
 
@@ -339,7 +356,7 @@ restrict database backups, and define a retention period for closed claims and u
 
 ## 35. Future enhancements
 
-Retrain on real claims with periodic recalibration and drift monitoring; active learning from reviewer
-overrides; image-based damage detection on customer photos; semantic duplicate detection; email/SMS
+Retrain on real claims with periodic recalibration and drift monitoring; feed the reviewer-decision export
+(Admin › Overview) back into training; image-based damage detection on customer photos; semantic duplicate detection; email/SMS
 notifications; multi-tenant manufacturer support; REST API for service-center systems; database migrations
 with Alembic.

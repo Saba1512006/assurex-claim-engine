@@ -1,6 +1,6 @@
 # Test cases (SRS deliverable 8)
 
-Run everything: `python -m pytest -q` → **199 passed** (about 25 s). Every test is automated; the table
+Run everything: `python -m pytest -q` → **225 passed** (about 75 s); the browser suite `python -m pytest -m e2e tests/e2e` → **13 passed** (about 70 s). Every test is automated; the table
 maps each SRS test category to the functions that cover it (`file :: function`).
 
 | SRS category | What is checked | Tests |
@@ -26,7 +26,12 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 | **Model disagreement** | Different classes → *Model Disagreement* → D04 | `test_pipeline :: test_model_disagreement_goes_to_manual_review`, `test_demonstration_cases :: 11_model_disagreement_claim` |
 | **Demonstration cases** | The 11 SRS cases from `sample_claims/` | `test_demonstration_cases :: *` |
 | **Surprise modifications** | New exclusion, rule severity change, confidence threshold, extra date format, decision-logic (routing) change | `test_rules :: test_surprise_*` |
-| **Performance** | Both predictions + rules within 5 s (SRS NFR-1) | `test_pipeline :: test_evaluation_is_fast_enough` |
+| **Performance** | Both predictions + rules within 5 s (SRS NFR-1); text responses gzipped | `test_pipeline :: test_evaluation_is_fast_enough`, `test_frontend_contracts :: test_text_responses_are_gzipped_only_when_accepted` |
+| **Access matrix** | Every guarded route (68 route/method pairs) called as each role and signed out; the answer must match `config/rbac.json` (403 with the JSON envelope under `/api/`, sign-in redirect or 401 when signed out) | `test_route_matrix :: *` |
+| **Frontend contracts** | Stored verdict payload complete and consistent (fixed class order, scores sum to 1, decision re-derivable); JSON envelope and error codes; cross-customer 404 on every claim URL; verdict animates once; no `\|safe` on data, inline styles or un-nonce'd scripts in any template; icon subset complete | `test_frontend_contracts :: *` |
+| **Live bench, what-if, batch** | Demo endpoint runs the real pipeline, writes nothing, 400 on unknown cases, 429 on the 11th call; what-if is read-only, reproduces all 225 stored decisions at current thresholds, apply saves a new audited version; batch validates rows, runs a chunk per call, writes no claims, exports CSV, 429 on the 4th upload | `test_frontend_contracts :: test_demo_*, test_what_if_*, test_batch_*` |
+| **Wizard autosave and workbench** | Draft created once and reused on submit; another customer's draft is never reused; workbench only for reviewers, next-claim order, decisions return to the workbench through the open-redirect guard | `test_frontend_contracts :: test_wizard_autosave_*, test_workbench_*` |
+| **Browser journeys (e2e)** | Landing bench, persona sign-in, receipt prefill, wizard with OCR split view, reviewer keyboard flow and double-submit guard, what-if and batch, session revoked on role change, reduced motion, 390 px without sideways scroll, axe WCAG 2 A/AA on 21 pages; any console error fails the test | `tests/e2e/test_journeys.py :: *` |
 
 ## Hidden-test readiness checklist
 
@@ -38,11 +43,12 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 - [x] Rules, thresholds and routing are configuration, editable in the admin UI and validated on save.
 - [x] A missing or broken model can never crash a request or silently decide a claim.
 - [x] Every prediction is stored with both model versions, the card hash and the decision trace.
-- [x] 199 tests pass on a clean checkout (`python -m pytest -q`).
+- [x] 225 tests pass on a clean checkout (`python -m pytest -q`), and the 13 browser journeys pass (`python -m pytest -m e2e tests/e2e`).
 
 ## Manual checks performed
 
 * Every page rendered for all four roles (customer, staff, reviewer, administrator) with the seeded data:
   no server errors; out-of-scope records return 404 and forbidden pages 403.
-* Browser screenshots at 1366 px and 390 px (mobile) — see `screenshots/`.
+* Browser screenshots at 1440, 1024 and 390 px; the e2e suite writes the current ones to `docs/screenshots/`.
+* Lighthouse (landing, sign-in, model card, blog): performance 99, accessibility 100, best practices 100, SEO 100.
 * `python database/seed.py` submits the 11 demonstration claims through the live pipeline.

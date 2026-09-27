@@ -43,20 +43,28 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (199 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
+Run the tests: `python -m pytest -q` (225 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
+Browser suite (13 journeys with accessibility checks):
+`pip install -r requirements-dev.txt && python -m playwright install chromium && python -m pytest -m e2e tests/e2e`.
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`
 from `wsgi.py`). Set `SECRET_KEY` in the environment — the app refuses to start without one.
 
 ### Testing the deployed application
 
-1. Open https://assurexai.pythonanywhere.com and sign in with an account below (the landing page lists them).
-2. **Customer**: *Claims* shows the 11 demonstration claims with their decisions; open one to see both
-   models' predictions, the Claim Summary Card, rules, contradictions and duplicates; *New claim* files a
-   new one (a receipt PDF from any demo claim's *Evidence* list can be reused).
-3. **Reviewer**: *Review queue* → take a claim → request information, approve, reject or override with a reason.
-4. **Administrator**: *Overview*, *Analytics* (both models' accuracy and confusion matrices), *Models*,
-   *Policies* (edit a rule or threshold — the next evaluation uses it), *Access*, *Audit*, CSV/Excel exports.
-5. `/healthz` reports whether both models are loaded.
+1. Open https://assurexai.pythonanywhere.com. **Try a real claim** on the landing page runs three sample
+   claims through both models and the rules live, without signing in. **Model card** shows how both models
+   were measured.
+2. **Sign in**: one click on an evaluator account on the sign-in page.
+3. **Customer**: the dashboard lists what needs attention, product warranty plates and all claims; open a
+   claim for the verdict (agreement gauge, both models, why, what the image model saw); *File a claim* runs
+   the four-step wizard (a receipt PDF from any demo claim's evidence can be reused).
+4. **Reviewer**: *Review queue › Start reviewing* opens the workbench. Keys: A approve, R reject,
+   I request information, / comment, N next claim, ? help.
+5. **Administrator**: *Overview* (KPIs and charts, each with a table view), *What-if simulator* (move the
+   agreement thresholds and see the effect on 225 labelled claims before saving), *Batch evaluation* (upload
+   the offered test-split CSV), *Policies* (change preview and version history), *Analytics*, *Models*,
+   *Access*, *Audit*, CSV/Excel exports including every reviewer decision next to the models.
+6. `/healthz` reports whether both models are loaded.
 
 ### Evaluator accounts (demo data only)
 
@@ -83,14 +91,17 @@ Public sign-up creates **customer** accounts only. Other roles are invited by an
 | Upload documents | Wizard step 3, or the claim page › *Evidence* while the claim is a draft, in review, or waiting for information |
 | Verify extracted information | Wizard step 3 shows the values read from the receipt in editable fields; on the claim page each document has *Extracted details*. Corrections are audited. |
 | Submit | Wizard *Submit claim* (or *Save as draft* then *Submit claim* on the claim page) |
-| Python prediction & confidence | Claim page › *Model predictions & comparison*, left column: predicted class and probability for all three classes. Probabilities are calibrated: 0.80 means right ~80% of the time. |
-| Claim Summary Card | Same panel, the card image (also *Evaluation history* › *card* for older runs) |
-| Teachable Machine prediction | Same panel, right column (or “Model unavailable” until the export is installed) |
-| Compare both models | Middle column: \|Δ top confidence\| and the consistency status; thresholds shown below |
-| Warranty-rule results | *Warranty rules* card: triggered rules first, passed rules underneath |
-| Contradictions / duplicates | Bottom of the rules card; duplicates also flag the claim in lists |
-| Manual-review queue | Reviewer or admin › *Review queue* |
+| Python prediction & confidence | Claim page › verdict, left column: predicted class and probability for all three classes (calibrated: 0.80 means right about 80% of the time), plus the inputs that moved it most |
+| Claim Summary Card | Claim page › *What the image model saw*, with the tiles that drove its answer outlined |
+| Teachable Machine prediction | Claim page › verdict, right column (or “Model unavailable” until the export is installed) |
+| Compare both models | The agreement gauge between the two columns: both needles, the gap Δ, the minimum-confidence mark and the consistency status |
+| Warranty-rule results | Claim page › *Why this decision*: failed and review rules first, passed rules underneath |
+| Contradictions / duplicates | Same list; duplicates also flag the claim in lists |
+| Manual-review queue | Reviewer or admin › *Review queue*, then the workbench (`/reviewer/claim/<id>`) |
 | Administrator dashboard | Admin › *Overview* (filters by category, status and date) and *Analytics* |
+| Try other thresholds safely | Admin › *What-if simulator* |
+| Evaluate many records at once | Admin › *Batch evaluation* (CSV in the training-split format) |
+| Choose what customers see | Admin › *Policies* › *What customers see* (model probabilities on or off) |
 | Track a claim | Claim page › *Track*, or the 8-stage bar at the top of the claim page |
 | Export a claim report | Claim page › *Report (PDF)*; bulk **CSV or Excel (.xlsx)** from Admin › *Overview*, *Analytics*, *Audit* and claim *Search* |
 
@@ -103,6 +114,26 @@ boundary date (inside the grace period) and a model disagreement (*KitchenPro Ov
 says Valid, the Python model Invalid, so the claim goes to a reviewer). The same cases
 exist as feature records in [`sample_claims/`](sample_claims/README.md) and are pinned by
 `tests/test_demonstration_cases.py`.
+
+---
+
+## Interface
+
+One component library (“Inspection Bench”: IBM Plex, steel and teal, verdict colours used only for
+decisions) across all 25 pages. Every screen is built for the person using it: the customer sees what needs
+doing next, the reviewer gets a three-column workbench with keyboard shortcuts, the administrator can try a
+threshold before changing it.
+
+| | |
+|---|---|
+| ![Landing page with the live bench](docs/screenshots/landing.png) | ![Verdict screen](docs/screenshots/verdict.png) |
+| ![Claim wizard reading a receipt](docs/screenshots/wizard-ocr.png) | ![Reviewer workbench](docs/screenshots/workbench.png) |
+| ![Customer dashboard](docs/screenshots/customer-dashboard.png) | ![What-if simulator](docs/screenshots/what-if.png) |
+
+Quality, measured: axe-core finds no serious or critical WCAG 2 A/AA issue on 21 pages; Lighthouse gives
+99 performance and 100 accessibility, best practices and SEO on the landing, sign-in, model card and blog
+pages; no page scrolls sideways at 390 px; motion is off under *reduce motion*. No script, font or style
+is loaded from a third-party host.
 
 ---
 
@@ -201,7 +232,8 @@ src/rules/         policy store, rule engine, contradiction + duplicate detector
 src/security/      RBAC policy engine and Flask guards
 src/services/      claim lifecycle, documents, OCR glue, alerts, analytics, exports, PDF report, explanations
 src/api/           Flask blueprints        templates/, static/   UI
-database/          seed.py                 tests/                pytest suites
+database/          seed.py                 tests/                pytest suites (tests/e2e: browser journeys)
+scripts/           subset_icons.py (icon-font subset)      docs/screenshots/  images produced by the e2e suite
 reports/           comparison report, project report builder
 documentation/     project report, blog, evidence, installation, test cases, diagrams
 ```

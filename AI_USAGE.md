@@ -33,6 +33,18 @@ decision table running inside this application. No external AI API is called at 
 | What it did **not** do | Train the Teachable Machine model (requires the browser tool); decide any claim at runtime; invent metrics (every number in the docs is read from files the scripts produce) |
 | Testing performed by the tool | 192 automated tests (`python -m pytest -q`), a page-by-page render check of every screen for all four roles, browser screenshots, and an end-to-end seed that submits the 11 demonstration claims through the live pipeline |
 
+## 2b. Claude Code (Anthropic) — frontend rebuild
+
+| Field | Declaration |
+|---|---|
+| Tool | Claude Code (Anthropic), an AI coding assistant |
+| Date | 27 September 2026 |
+| Purpose | Rebuild the web interface from the team's written brief, add the explainability, simulation and batch features it asked for, and test them |
+| Prompt / type of assistance | The team's *AssureX Frontend Master Prompt* (PDF, 10 parts, prepared by Muhammad Azhar Nawaz), plus the instruction to implement all of it together with three model-explanation additions. Code generation, refactoring, test writing, running the test suites, browser screenshots, accessibility and Lighthouse audits |
+| Files / modules affected | `templates/` (every page), `static/css/`, `static/js/`, `src/api/api.py`, `src/api/errors.py`, `src/services/` (`verdict`, `whatif`, `batch`, `model_card_service`, `receipt_scan`, `paging`), `src/core/explain_models.py`, `src/core/pipeline.py` (stored verdict payload and stage timings), `src/app_security.py`, `tests/` (contract, route-matrix and `tests/e2e/` browser tests), `scripts/subset_icons.py`, `README.md`, `documentation/PROJECT_REPORT.md` |
+| What it did **not** do | Change the Claim Summary Card design or either model (tests re-render the test cards and fail if Teachable Machine accuracy could drop; the batch evaluator reproduces 89.3% and 93.8% on the test split); decide any claim at runtime |
+| Testing performed by the tool | 225 automated tests including a route × role matrix over every guarded route; 13 browser journeys on a live seeded server with axe-core accessibility checks on 21 pages; Lighthouse on the public pages; screenshots at 1440, 1024 and 390 px |
+
 ### Required team entries (SRS: modifications, testing and verifier name)
 
 The SRS requires the **team** to review, modify, test and understand AI output, and to name the member
@@ -48,6 +60,7 @@ written on the team's behalf:
 | Rule engine & policies (`src/rules/`, `policies/`) | | | |
 | Security & access control (`src/security/`, `config/rbac.json`) | | | |
 | Web interface (`templates/`, `static/`) | | | |
+| Frontend rebuild features (verdict, workbench, what-if, batch, model card) | | | |
 | Documentation & report | | | |
 
 ## 3. Other tools
@@ -55,7 +68,8 @@ written on the team's behalf:
 | Tool | Use |
 |---|---|
 | scikit-learn, pandas, NumPy, Pillow, ReportLab, pdfplumber, Tesseract (pytesseract) | Libraries used by the application (not AI assistants) |
-| Chart.js, Bootstrap Icons | Front-end libraries, served from `static/vendor/` |
+| Chart.js, Bootstrap Icons, Alpine.js (CSP build), IBM Plex fonts | Front-end libraries and fonts, self-hosted in `static/vendor/` |
+| Playwright, axe-core (axe-playwright-python), Lighthouse | Browser testing, accessibility and performance audits (development only) |
 | Mermaid | Rendering the report diagrams from `documentation/diagrams/*.mmd` |
 
 Images: the demo "damage" and "serial" photos created by `database/seed.py` are synthetic drawings made
