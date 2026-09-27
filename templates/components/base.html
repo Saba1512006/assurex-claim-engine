@@ -16,10 +16,11 @@
   {% block page_css %}{% endblock %}
   <script nonce="{{ csp_nonce() }}">try{if(!sessionStorage.getItem("ax-seen"))document.documentElement.classList.add("first-view")}catch(e){}</script>
 </head>
-<body data-page="{{ request.endpoint or '' }}">
+<body data-page="{{ request.endpoint or '' }}" class="{% block body_class %}{% endblock %}">
   <a class="skip" href="#main">Skip to content</a>
   <div class="preloader" data-preloader aria-hidden="true"><span class="plate">AssureX</span></div>
   {% include "components/navbar.html" %}
+  <div class="nav-sentinel" data-nav-sentinel aria-hidden="true"></div>
   <div class="toasts" data-toasts>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}

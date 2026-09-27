@@ -309,3 +309,11 @@
     });
   });
 })();
+
+/* Landing: the navbar is transparent over the bench until the page scrolls 24px (observer, not a scroll listener). */
+(() => {
+  const bar = document.querySelector(".nav-overlay .topbar");
+  const sentinel = document.querySelector("[data-nav-sentinel]");
+  if (!bar || !sentinel || !("IntersectionObserver" in window)) { if (bar) bar.classList.add("scrolled"); return; }
+  new IntersectionObserver(([e]) => bar.classList.toggle("scrolled", !e.isIntersecting)).observe(sentinel);
+})();

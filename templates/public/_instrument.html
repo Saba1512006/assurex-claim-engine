@@ -1,0 +1,69 @@
+{# The landing instrument: a real sample claim already decided by the pipeline (cached per model version),
+   drawn on the bench. instrument.js swaps samples from #bench-data and replays the reveal; "Run the checks again"
+   calls the live endpoint. The first paint is server-rendered, so nothing jumps and it works without JavaScript. #}
+{% from "components/ui.html" import icon %}
+{# icons: check x eye minus #}
+{% macro instrument(bench, cases) -%}
+{% set views, geo = bench.views, bench.meter %}
+{% set v = views['valid'] %}
+{% set stamp_icons = {'valid': 'check', 'invalid': 'x', 'review': 'eye', 'none': 'minus'} %}
+<section class="instrument hero-instrument" aria-labelledby="im-h" data-instrument data-url="{{ url_for('api.demo_evaluate') }}">
+  <div class="im-head">
+    <h2 id="im-h" class="im-title"><span class="live-dot" aria-hidden="true"></span>Live check</h2>
+    <span class="mono im-total" data-im-total title="Time from the claim record to the decision">{{ '%.2f'|format(v.total_ms / 1000) }} s</span>
+  </div>
+
+  <div class="segmented" role="radiogroup" aria-label="Sample claim">
+    {% for key, c in cases.items() %}
+      <label title="{{ c[2] }}"><input type="radio" name="im-case" value="{{ key }}" {{ 'checked' if loop.first }}><span>{{ c[1] }}</span></label>
+    {% endfor %}
+  </div>
+  <p class="im-desc" data-im-desc>{{ v.desc }}</p>
+
+  <div class="im-body">
+    <div class="im-models">
+      {% for key, label, m in [('python', 'Python model', v.python), ('gtm', 'Teachable Machine', v.gtm)] %}
+        <div class="im-model {{ key }}" data-im-model="{{ key }}">
+          <div class="im-model-h"><span class="k">{{ label }}</span><span class="num-lg" data-im-top>{{ '%.2f'|format(m.top) if m.available else '—' }}</span></div>
+          <div class="im-bar" aria-hidden="true"><i data-im-bar style="--p: {{ '%.3f'|format(m.top or 0) }}"></i></div>
+          <span class="im-class" data-im-class>{{ m.predicted if m.available else 'Unavailable' }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    <svg class="im-meter" viewBox="-24 -12 368 196" role="img" aria-label="{{ v.meter.label }}" data-im-meter>
+      <path class="im-track" d="{{ geo.track }}"/>
+      <path class="im-arc tone-{{ v.consistency.tone }}" d="{{ v.meter.arc or '' }}" data-im-arc/>
+      {% for t in geo.ticks %}
+        <line class="im-tick {{ 'min' if t.min }}" x1="{{ t.x1 }}" y1="{{ t.y1 }}" x2="{{ t.x2 }}" y2="{{ t.y2 }}"/>
+        <text class="im-tick-l" x="{{ t.lx }}" y="{{ t.ly }}" text-anchor="middle" dominant-baseline="middle">{{ t.label }}</text>
+      {% endfor %}
+      {% for cls in ['py', 'gtm'] %}
+        {% set n = v.meter.needles|selectattr('cls', 'equalto', cls)|first %}
+        <g class="needle {{ cls }}" data-im-needle="{{ cls }}" style="--a: {{ n.angle if n else -90 }}deg" {% if not n %}hidden{% endif %}>
+          <line x1="{{ geo.cx }}" y1="{{ geo.cy }}" x2="{{ geo.cx }}" y2="{{ geo.cy - geo.needle_len }}" {% if n and n.dashed %}stroke-dasharray="7 5"{% endif %}/>
+        </g>
+      {% endfor %}
+      <circle class="im-hub" cx="{{ geo.cx }}" cy="{{ geo.cy }}" r="6"/>
+    </svg>
+  </div>
+
+  <div class="im-verdict">
+    <div class="im-agree">
+      <span class="num-lg">Δ <span data-im-delta>{{ '%.2f'|format(v.consistency.difference) if v.consistency.difference is not none else '—' }}</span></span>
+      <span class="im-status tone-{{ v.consistency.tone }}" data-im-status>{{ v.consistency.status }}</span>
+    </div>
+    <div class="stamp {{ v.tone }}" data-im-stamp role="status">
+      <span data-im-stamp-icon>{{ icon(stamp_icons[v.tone], 'lg') }}</span><span data-im-stamp-text>{{ v.decision.value }}</span>
+    </div>
+  </div>
+  <p class="im-rule" data-im-rule>Rule <span class="mono">{{ v.decision.rule_id }}</span>: {{ v.decision.reason }}.</p>
+
+  <div class="im-foot">
+    <p class="mono im-times" data-im-times>{% for s in v.stages %}{{ s.name }} {{ s.ms }}{{ ' · ' if not loop.last }}{% endfor %}</p>
+    <button class="btn quiet sm" type="button" data-im-run>{{ icon('rotate-cw', 'sm') }}<span>Run the checks again</span></button>
+  </div>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <p class="sr" aria-live="polite" data-im-live></p>
+</section>
+<script type="application/json" id="bench-data">{{ {'views': views, 'icons': stamp_icons}|tojson }}</script>
+{%- endmacro %}

@@ -77,16 +77,25 @@ def _sector(v1: float, v2: float) -> str:
     return f"M{x1} {y1} A{R_OUT} {R_OUT} 0 0 1 {x2} {y2} L{x3} {y3} A{R_IN} {R_IN} 0 0 0 {x4} {y4} Z"
 
 
-def meter(payload: dict) -> dict:
-    """Geometry for the 180° agreement gauge (server-rendered SVG; JS only animates it)."""
-    py, gtm, cons = payload["python"], payload["gtm"], payload["consistency"]
-    min_conf = cons["thresholds"].get("min_confidence") or 0.6
+def _ticks(min_conf: float) -> list[dict]:
     ticks = []
     for v in (0.25, 0.5, min_conf, 0.75):
         (x1, y1), (x2, y2) = _point(v, R_OUT + 4), _point(v, R_OUT + 14)
         lx, ly = _point(v, R_IN - 16) if v == min_conf else _point(v, R_OUT + 26)   # threshold label sits inside the arc
         ticks.append({"v": v, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "lx": lx, "ly": ly, "min": v == min_conf,
                       "label": f"min {v:.2f}" if v == min_conf else f"{v:.2f}"})
+    return ticks
+
+
+def meter_static(min_conf: float) -> dict:
+    """The parts of the gauge that do not depend on a claim: track, ticks, centre and needle length."""
+    return {"track": _sector(0, 1), "ticks": _ticks(min_conf), "cx": CX, "cy": CY, "needle_len": NEEDLE}
+
+
+def meter(payload: dict) -> dict:
+    """Geometry for the 180° agreement gauge (server-rendered SVG; JS only animates it)."""
+    py, gtm, cons = payload["python"], payload["gtm"], payload["consistency"]
+    ticks = _ticks(cons["thresholds"].get("min_confidence") or 0.6)
     tone = CONSISTENCY_TONE.get(cons["status"], "invalid")
     needles = []
     for key, cls in (("python", "py"), ("gtm", "gtm")):

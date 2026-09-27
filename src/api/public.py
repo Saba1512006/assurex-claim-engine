@@ -14,6 +14,7 @@ from src.services import model_card_service
 public_bp = Blueprint("public", __name__)
 ROOT = Path(__file__).resolve().parent.parent.parent
 BLOG = ROOT / "documentation" / "TECHNICAL_BLOG.md"
+ROLE_THUMBS = ROOT / "static" / "img" / "roles"          # role screenshots on the landing page
 TEST_CARDS = ROOT / "data" / "summary_cards" / "test"
 
 ROLE_LINES = {
@@ -29,8 +30,12 @@ def index():
     if g.get("user"):
         return redirect(url_for("auth.home"))
     from src.security import rbac
-    roles = [(rbac.policy()["roles"][r]["label"], ROLE_LINES[r]) for r in ROLE_LINES if r in rbac.policy()["roles"]]
-    return render_template("public/index.html", mc=model_card_service.build(), roles=roles)
+    from src.services import demo_bench
+    roles = [{"key": r, "label": rbac.policy()["roles"][r]["label"], "line": ROLE_LINES[r],
+              "thumb": f"img/roles/{r}.webp" if (ROLE_THUMBS / f"{r}.webp").exists() else None}
+             for r in ROLE_LINES if r in rbac.policy()["roles"]]
+    return render_template("public/index.html", mc=model_card_service.build(), roles=roles, bench=demo_bench.cached(),
+                           cases=demo_bench.CASES)
 
 
 @public_bp.get("/blog")

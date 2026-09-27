@@ -24,11 +24,12 @@ def _receipt(tmp_path, serial: str) -> str:
 def test_landing_bench_runs_the_real_pipeline(open_session):
     s = open_session()
     page = s.go("/")
-    for case, expected in (("Clean hardware fault", "Likely Valid"), ("Liquid damage", "Likely Invalid"),
-                           ("Warranty ended", "Manual Review Required")):
-        page.get_by_text(case).first.click()
-        page.get_by_role("button", name="Run the checks").click()
-        page.wait_for_function("(t) => document.querySelector('[x-data=bench]').innerText.includes(t)", arg=expected, timeout=15000)
+    for case, expected in (("Clean fault", "Likely Valid"), ("Liquid damage", "Likely Invalid"),
+                           ("Grace +4 d", "Manual Review Required")):
+        page.get_by_text(case, exact=True).click()
+        with page.expect_response(lambda r: "/api/demo/evaluate" in r.url and r.status == 200, timeout=15000):
+            page.get_by_role("button", name="Run the checks again").click()
+        page.wait_for_function("(t) => document.querySelector('[data-im-stamp-text]').textContent === t", arg=expected, timeout=5000)
     s.shot("landing")
 
 

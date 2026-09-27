@@ -529,38 +529,6 @@ a.plate:hover .name { text-decoration: underline; text-underline-offset: 3px; }
 .notif .m { display: block; font-size: var(--fs-xs); color: var(--ink-2); }
 .notif .w { display: block; font-size: var(--fs-2xs); color: var(--steel); font-family: var(--mono); }
 
-/* ------------------------------------------------------------------ landing */
-.hero { background: var(--paper); border-bottom: 1px solid var(--rule); }
-.hero .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: var(--s7); padding-top: var(--s8); padding-bottom: var(--s8); align-items: center; }
-.hero h1 { font-size: var(--fs-4xl); line-height: 1.05; letter-spacing: -0.02em; max-width: 14ch; }
-.hero .lede { font-size: var(--fs-lg); margin: var(--s4) 0 var(--s5); max-width: 44ch; }
-@media (max-width: 991px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-top: var(--s7); padding-bottom: var(--s7); } }
-@media (max-width: 767px) { .hero h1 { font-size: var(--fs-3xl); } }
-.bench { border: 1px solid var(--rule); border-radius: var(--r-panel); background: var(--mist); }
-.bench .panel-h { background: var(--paper); border-radius: var(--r-panel) var(--r-panel) 0 0; }
-.bench fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: var(--s2); }
-.bench legend { font-weight: 600; font-size: var(--fs-sm); margin-bottom: var(--s2); }
-.bench .opt { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: var(--s2); align-items: start; padding: var(--s3); background: var(--paper);
-  border: 1px solid var(--rule); border-radius: var(--r-control); cursor: pointer; font-size: var(--fs-sm); }
-.bench .opt:has(input:checked) { border-color: var(--teal); background: var(--teal-wash); }
-.bench .opt input { margin-top: 3px; accent-color: var(--teal); width: 16px; height: 16px; }
-.bench .opt small { display: block; color: var(--ink-2); font-size: var(--fs-xs); }
-.bench-result { display: grid; gap: var(--s3); justify-items: center; text-align: center; }
-.band { padding: var(--s8) 0; }
-.band + .band { border-top: 1px solid var(--rule); }
-.band h2 { font-size: var(--fs-2xl); margin-bottom: var(--s2); }
-.band .lede { margin-bottom: var(--s5); }
-.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: var(--r-panel); background: var(--paper); counter-reset: f; }
-.flow li { padding: var(--s4); border-right: 1px solid var(--rule); counter-increment: f; min-width: 0; }
-.flow li:last-child { border-right: 0; }
-.flow li::before { content: counter(f); display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1.5px solid var(--ink); border-radius: var(--r-bar); font-weight: 600; font-size: var(--fs-xs); margin-bottom: var(--s2); }
-.flow h3 { font-size: var(--fs-sm); margin-bottom: var(--s1); }
-.flow p { margin: 0; color: var(--ink-2); font-size: var(--fs-xs); }
-@media (max-width: 991px) { .flow { grid-template-columns: minmax(0, 1fr); } .flow li { border-right: 0; border-bottom: 1px solid var(--rule); } .flow li:last-child { border-bottom: 0; } }
-.who-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s4); }
-.who-list li { padding: var(--s4); border: 1px solid var(--rule); border-radius: var(--r-panel); background: var(--paper); font-size: var(--fs-sm); }
-@media (max-width: 767px) { .who-list { grid-template-columns: minmax(0, 1fr); } }
-
 /* confusion matrix grid */
 .cmx { display: grid; font-size: var(--fs-xs); }
 .cmx > span, .cmx-row > span { padding: var(--s2) var(--s1); text-align: center; }
@@ -687,10 +655,6 @@ dialog .panel-b { display: grid; gap: var(--s3); }
 
 /* print */
 @media print { .topbar, .footer, .no-print, .btn, .toasts, .decision-bar { display: none !important; } body { background: var(--paper); } .panel, .card { break-inside: avoid; } }
-.bench-meter { width: 100%; max-width: 300px; height: auto; overflow: visible; }
-.bench-meter.swept .needle { animation: sweep 450ms cubic-bezier(.2, .8, .2, 1) both; }
-.bench-meter.swept .needle.gtm { animation-delay: 120ms; }
-@media (prefers-reduced-motion: reduce) { .bench-meter.swept .needle { animation: none; } }
 .steps-plain { display: grid; gap: var(--s4); margin: 0; padding-left: var(--s5); max-width: 420px; color: var(--ink-2); }
 .steps-plain b { color: var(--ink); font-weight: 600; }
 .stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -900,3 +864,25 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .bench .choice:has(input:checked) { background: color-mix(in srgb, var(--teal-bright) 12%, transparent); box-shadow: inset 0 0 0 1px var(--bench-line), inset 3px 0 0 var(--teal-bright); }
 .bench .choice:has(input:checked) .ck { background: var(--teal-bright); border-color: var(--teal-bright); color: var(--bench); }
 .bench .choice:has(input:focus-visible) { box-shadow: var(--focus-bench); }
+
+/* ---- navbar over the bench (landing): transparent until the page scrolls 24px, then paper */
+.nav-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 24px; pointer-events: none; }
+.nav-overlay .topbar { position: fixed; left: 0; right: 0; background: transparent; border-bottom-color: transparent;
+  transition: background-color 200ms, border-color 200ms; }
+.nav-overlay .topbar:not(.scrolled) .brand { color: var(--on-bench); }
+.nav-overlay .topbar:not(.scrolled) .m-body { fill: var(--on-bench); }
+.nav-overlay .topbar:not(.scrolled) .m-line { stroke: var(--bench); }
+.nav-overlay .topbar:not(.scrolled) .m-dot { fill: var(--teal-mark); }
+.nav-overlay .topbar:not(.scrolled) .btn { background: var(--teal-bright); border-color: var(--teal-bright); color: var(--bench); }
+.nav-overlay .topbar:not(.scrolled) .btn.ghost { background: transparent; border-color: transparent; color: var(--on-bench); }
+.nav-overlay .topbar:not(.scrolled) .btn.ghost:hover { background: rgba(255, 255, 255, .06); }
+.nav-overlay .topbar:not(.scrolled) :focus-visible { box-shadow: var(--focus-bench); }
+.nav-overlay .topbar.scrolled { background: var(--paper); border-bottom-color: var(--rule); }
+@media (prefers-reduced-motion: reduce) { .nav-overlay .topbar { transition: none; } }
+
+/* ---- footer on the bench everywhere */
+.footer { background: var(--bench); color: var(--on-bench-2); border-top: 0; }
+.footer a { color: var(--on-bench-2); }
+.footer a:hover { color: var(--on-bench); }
+.footer .versions { color: var(--on-bench-2); }
+.footer :focus-visible { box-shadow: var(--focus-bench); }

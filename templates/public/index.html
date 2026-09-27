@@ -1,94 +1,105 @@
 {% extends "components/base.html" %}
-{# Landing: proves the system works (live bench on real sample claims), shows measured results, explains the flow. #}
-{% from "components/ui.html" import button, tag %}
+{# Landing. The first screen shows the product deciding a real claim before anyone clicks (the instrument), then how
+   a claim is decided, measured results, who uses it and a closing band. Every number comes from the model files. #}
+{% from "components/ui.html" import icon, metric %}
 {% from "public/_cmx.html" import cmx %}
+{% from "public/_instrument.html" import instrument %}
+{# icons: inbox scan-text layers scale stamp #}
 {% block title %}Warranty claims, checked twice{% endblock %}
-{% block description %}AssureX checks every warranty claim with a Python model, a Google Teachable Machine image model and a warranty policy engine. Try it on a real sample claim.{% endblock %}
+{% block description %}AssureX checks every warranty claim with a Python model, a Google Teachable Machine image model and a warranty policy engine. See it decide a real sample claim.{% endblock %}
+{% block body_class %}nav-overlay{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ asset('css/pages/landing.css') }}">{% endblock %}
 {% block main %}
-<section class="hero" aria-labelledby="hero-h">
-  <div class="wrap">
-    <div>
-      <h1 id="hero-h">Every warranty claim, checked twice.</h1>
+{% set test_n = mc.dataset.splits.get('test') if mc.dataset else none %}
+<section class="bench grid-bg hero" aria-labelledby="hero-h">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <span class="itag">Warranty claim adjudication</span>
+      <h1 id="hero-h"><span class="l">Every warranty claim,</span> <span class="l">checked twice.</span></h1>
       <p class="lede">Two independent models and a policy engine agree, or a person decides.</p>
-      <div class="row">
-        <a class="btn lg" href="{{ url_for('auth.login', _anchor='personas') }}">Sign in as evaluator</a>
+      <div class="row hero-actions">
+        <a class="btn lg" href="{{ url_for('auth.login') }}">Sign in as evaluator</a>
         <a class="btn lg quiet" href="{{ url_for('public.model_card') }}">Read the model card</a>
       </div>
+      <div class="metric-row hero-metrics">
+        {{ metric('%.1f'|format(mc.python.accuracy * 100) if mc.python else none, '%', 'Python model, test accuracy') }}
+        {{ metric('%.1f'|format(mc.gtm.accuracy * 100) if mc.gtm else none, '%', 'Teachable Machine, test accuracy') }}
+        {{ metric(test_n, '', 'Test claims neither model saw in training') }}
+      </div>
     </div>
-    <section class="bench" aria-labelledby="bench-h" x-data="bench" data-url="{{ url_for('api.demo_evaluate') }}">
-      <div class="panel-h"><h2 id="bench-h">Try a real claim</h2><span class="hint">Runs both models and the rules; nothing is saved</span></div>
-      <form class="panel-b stack-sm" x-on:submit.prevent="run" data-novalidate-ui>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <fieldset>
-          <legend>Pick a sample claim</legend>
-          <label class="opt"><input type="radio" name="case" value="valid" checked><span>Clean hardware fault<small>Laptop motherboard failure, 7 months old, every document on file</small></span></label>
-          <label class="opt"><input type="radio" name="case" value="invalid"><span>Liquid damage<small>Refrigerator control board, water ingress confirmed by a technician</small></span></label>
-          <label class="opt"><input type="radio" name="case" value="boundary"><span>Warranty ended 4 days ago<small>Inside the 7-day grace period: a boundary case</small></span></label>
-        </fieldset>
-        <button class="btn block" type="submit" x-bind:disabled="busy"><span x-text="buttonLabel">Run the checks</span></button>
-        <div class="bench-result" aria-live="polite" x-show="done" x-cloak>
-          <svg viewBox="-24 -12 368 196" role="img" data-bench-meter class="bench-meter">
-            <path data-track fill="var(--mist)" stroke="var(--rule)"/>
-            <path data-arc fill-opacity=".2" stroke-opacity=".5"/>
-            <g class="needle py" data-needle="python"><line x1="160" y1="160" x2="160" y2="42" stroke="var(--teal)" stroke-width="3" stroke-linecap="round"/></g>
-            <g class="needle gtm" data-needle="gtm"><line x1="160" y1="160" x2="160" y2="42" stroke="var(--gtm)" stroke-width="3" stroke-linecap="round"/></g>
-            <circle cx="160" cy="160" r="6" fill="var(--ink)"/>
-          </svg>
-          <p class="small mb-0"><span class="tag teal"><span class="dot" aria-hidden="true"></span><span x-text="pyText"></span></span>
-            <span class="tag gtm"><span class="dot" aria-hidden="true"></span><span x-text="gtmText"></span></span></p>
-          <p class="small mb-0" x-text="consistencyText"></p>
-          <div class="stamp compact" x-bind:class="stampClass"><span x-text="stampText"></span></div>
-          <p class="tiny muted mb-0" x-text="timingText"></p>
-        </div>
-        <p class="callout bad small" x-show="error" x-cloak x-text="error"></p>
-      </form>
-    </section>
+    <div class="hero-visual">{{ instrument(bench, cases) }}</div>
   </div>
 </section>
 
-<section class="band" id="how" aria-labelledby="how-h">
+<section class="band paper-band" id="how" aria-labelledby="how-h">
   <div class="wrap">
-    <h2 id="how-h">How a claim is decided</h2>
-    <p class="lede">The same five steps run for every claim, in this order, and every step is stored with the result.</p>
-    <ol class="flow">
-      <li><h3>Intake</h3><p>The customer or a service center files the claim; a checklist says what is missing before submission.</p></li>
-      <li><h3>Documents</h3><p>Receipts are read by OCR, files are checked by their contents and fingerprinted, and conflicts are flagged.</p></li>
-      <li><h3>Two models</h3><p>A Python classifier reads the claim record; a Teachable Machine model reads a picture of the same facts.</p></li>
-      <li><h3>Policy</h3><p>Sixteen checks from the category's warranty policy run: coverage, deadlines, exclusions, serials, repairs.</p></li>
-      <li><h3>Decision</h3><p>A decision table combines everything. When the models disagree or are unsure, a reviewer decides.</p></li>
+    <div class="band-head">
+      <div><h2 id="how-h" class="display">How a claim is decided</h2>
+        <p class="lede">The same five steps run for every claim, in this order.</p></div>
+      <span class="itag">Stored with every result</span>
+    </div>
+    <ol class="pipeline">
+      {% for ic, title, text in [('inbox', 'Intake', 'The customer or a service center files the claim; a checklist says what is missing before it is sent.'),
+                                 ('scan-text', 'Documents', 'Receipts are read by OCR, every file is fingerprinted, and conflicting details are flagged.'),
+                                 ('layers', 'Two models', 'A Python model reads the claim record; a Teachable Machine model reads a picture of the same facts.'),
+                                 ('scale', 'Policy', "Sixteen checks from the category's warranty policy: cover, deadlines, exclusions, serials, repairs."),
+                                 ('stamp', 'Decision', 'A decision table combines everything. When the models disagree or are unsure, a person decides.')] %}
+        <li><span class="node" aria-hidden="true">{{ icon(ic, 'lg') }}</span><h3>{{ title }}</h3><p>{{ text }}</p></li>
+      {% endfor %}
     </ol>
   </div>
 </section>
 
-<section class="band" id="models" aria-labelledby="models-h">
+<section class="band mist-band" id="models" aria-labelledby="models-h">
   <div class="wrap">
-    <h2 id="models-h">Measured, not claimed</h2>
-    <p class="lede">Both models on the same {{ mc.dataset.splits.get('test') or 'held-out' }} test claims that neither saw in training. Numbers are read from the evaluation files when this page loads.</p>
-    <div class="grid grid-2">
+    <div class="band-head">
+      <div><h2 id="models-h" class="display">Measured, not claimed</h2>
+        <p class="lede">Both models on the same {{ test_n or 'held-out' }} test claims that neither saw in training, read from the evaluation files when this page loads.</p></div>
+    </div>
+    <div class="grid grid-2 models-grid">
       {% for key, name, m in [('python', 'Python classification model', mc.python), ('gtm', 'Google Teachable Machine', mc.gtm)] %}
       <section class="panel" aria-labelledby="m-{{ key }}-h">
-        <div class="panel-h"><h3 id="m-{{ key }}-h">{{ tag(name, 'teal' if key == 'python' else 'gtm') }}</h3>{% if m %}<span class="id">{{ (m.version or '')[:20] }}</span>{% endif %}</div>
-        <div class="panel-b stack-sm">
+        <div class="panel-h"><h3 id="m-{{ key }}-h" class="h-tag"><span class="itag {{ 'gtm' if key == 'gtm' }}">{{ name }}</span></h3>{% if m %}<span class="id">{{ (m.version or '')[:20] }}</span>{% endif %}</div>
+        <div class="panel-b model-body">
           {% if m %}
-          <div class="metric-grid">
-            <div class="metric"><div class="v">{{ m.accuracy|pct(1) }}</div><div class="l">Test accuracy</div></div>
-            <div class="metric"><div class="v">{{ m.f1|pct(1) }}</div><div class="l">Macro F1</div></div>
-          </div>
-          {{ cmx(m.matrix, name) }}
-          {% else %}<p class="small">Not evaluated yet.</p>{% endif %}
+            <div class="metric-row">
+              {{ metric('%.1f'|format(m.accuracy * 100), '%', 'Test accuracy') }}
+              {{ metric('%.1f'|format(m.f1 * 100), '%', 'Macro F1') }}
+            </div>
+            {{ cmx(m.matrix, name) }}
+          {% else %}<p class="small mb-0">Not evaluated yet.</p>{% endif %}
         </div>
       </section>
       {% endfor %}
     </div>
-    <p class="mt-3"><a href="{{ url_for('public.model_card') }}">Full model card: dataset, calibration, per-class results and limitations</a></p>
+    {% if mc.gtm and mc.gtm.agreement is not none %}
+      <p class="agree-strip"><span class="num-xl">{{ '%.1f'|format(mc.gtm.agreement * 100) }}<small>%</small></span>
+        <span>of test claims get the same class from both models. When they don't, the claim goes to a person.</span></p>
+    {% endif %}
+    <div class="center-row"><a class="btn quiet" href="{{ url_for('public.model_card') }}">Open the full model card{{ icon('arrow-right', 'sm') }}</a></div>
   </div>
 </section>
 
-<section class="band" aria-labelledby="who-h">
+<section class="band paper-band" aria-labelledby="who-h">
   <div class="wrap">
-    <h2 id="who-h">Who uses it</h2>
-    <ul class="who-list mt-3">{% for label, line in roles %}<li><b>{{ label }}.</b> {{ line }}</li>{% endfor %}</ul>
+    <div class="band-head"><h2 id="who-h" class="display">Who uses it</h2></div>
+    <ul class="roles">
+      {% for r in roles %}
+        <li>
+          <span class="itag {{ {'customer': 'customer', 'service_center_staff': 'staff', 'claim_reviewer': 'reviewer', 'administrator': 'admin'}[r.key] }}">{{ r.label }}</span>
+          <p>{{ r.line }}</p>
+          {% if r.thumb %}<img class="role-shot" src="{{ asset(r.thumb) }}" alt="{{ r.label }}'s main page in AssureX" width="800" height="500" loading="lazy">{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="bench grid-bg closing" aria-labelledby="close-h">
+  <div class="wrap closing-row">
+    <h2 id="close-h">Sign in with an evaluator account and file a claim end to end.</h2>
+    <a class="btn lg" href="{{ url_for('auth.login') }}">Sign in as evaluator{{ icon('arrow-right', 'sm') }}</a>
   </div>
 </section>
 {% endblock %}
-{% block page_js %}<script src="{{ asset('js/bench.js') }}" defer></script>{% endblock %}
+{% block page_js %}<script src="{{ asset('js/instrument.js') }}" defer></script>{% endblock %}

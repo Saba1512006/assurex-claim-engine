@@ -1,6 +1,7 @@
 """Build static/img/icons.svg: a sprite of the Lucide icons the templates use (ISC licence, static/vendor/lucide/).
 
 Icons are referenced in templates with the ui macro  icon('name')  and in JavaScript with  data-icon="name".
+Icons whose name is chosen at render time are declared in a template comment:  {# icons: check x eye #}.
 Run after using a new icon (needs the lucide-static npm package once, not at runtime):
 
     npm install lucide-static && python scripts/build_icon_sprite.py node_modules/lucide-static/icons
@@ -14,13 +15,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SPRITE = ROOT / "static" / "img" / "icons.svg"
 USE = re.compile(r"""icon\(\s*['"]([a-z0-9-]+)['"]|data-icon=["']([a-z0-9-]+)["']""")
+DECLARED = re.compile(r"\{#\s*icons:\s*([a-z0-9 -]+?)\s*#\}")
 
 
 def used_icons() -> set[str]:
     names = set()
     for path in [*ROOT.glob("templates/**/*.html"), *ROOT.glob("static/js/*.js")]:
-        for a, b in USE.findall(path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        for a, b in USE.findall(text):
             names.add(a or b)
+        for group in DECLARED.findall(text):
+            names.update(group.split())
     return names
 
 
