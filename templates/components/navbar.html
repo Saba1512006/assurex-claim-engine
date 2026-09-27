@@ -41,6 +41,7 @@
             {% else %}
               <p class="empty small">No unread notifications.</p>
             {% endfor %}
+            <a class="menu-all" href="{{ url_for('claims.notifications', show='unread' if unread else 'all') }}">See all notifications<i class="bi bi-chevron-right" aria-hidden="true"></i></a>
           </div>
         </div>
         <div class="menu" data-menu>
@@ -55,7 +56,7 @@
               <div class="mt-1"><span class="id">{{ current_user.user_id }}</span></div>
             </div>
             <a href="{{ url_for('auth.profile') }}"><i class="bi bi-person" aria-hidden="true"></i>Profile</a>
-            <a href="{{ url_for('auth.profile', _anchor='notifications') }}"><i class="bi bi-bell" aria-hidden="true"></i>Notifications</a>
+            <a href="{{ url_for('claims.notifications') }}" {% if ep == 'claims.notifications' %}aria-current="page"{% endif %}><i class="bi bi-bell" aria-hidden="true"></i>Notifications{% if unread %}<span class="menu-hint">{{ unread|length }}{{ '+' if unread|length >= 20 }} unread</span>{% endif %}</a>
             {% if can('settings.manage') %}
               <p class="menu-label">Administration</p>
               <a href="{{ url_for('admin.models') }}" {% if ep == 'admin.models' %}aria-current="page"{% endif %}><i class="bi bi-cpu" aria-hidden="true"></i>Models<span class="menu-hint">install and version</span></a>

@@ -1,0 +1,61 @@
+{% extends "components/base.html" %}
+{# Notifications: everything the system told this person (claim updates, reviewer questions, expiring cover),
+   unread first by default. Opening one marks it read and goes to its claim. #}
+{% from "components/ui.html" import csrf, empty_state, pager %}
+{% block title %}Notifications{% endblock %}
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <h1>Notifications</h1>
+    <p class="lede">Claim updates, questions from reviewers and warranties about to end. Opening one marks it as read.</p>
+  </div>
+  {% if unread %}
+  <form method="post" action="{{ url_for('claims.read_all_notifications') }}">{{ csrf() }}
+    <button class="btn quiet" type="submit"><i class="bi bi-check2-circle" aria-hidden="true"></i>Mark all as read</button></form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block content %}
+<div class="stack">
+  <nav class="tabs" aria-label="Which notifications">
+    <a href="{{ url_for('claims.notifications') }}" {% if show == 'unread' %}aria-current="page"{% endif %}>Unread <span class="count">{{ unread }}</span></a>
+    <a href="{{ url_for('claims.notifications', show='all') }}" {% if show == 'all' %}aria-current="page"{% endif %}>All <span class="count">{{ total }}</span></a>
+  </nav>
+
+  <section class="panel" aria-labelledby="nt-h">
+    <div class="panel-h"><h2 id="nt-h">{{ 'Unread' if show == 'unread' else 'All notifications' }}</h2>
+      <span class="hint">Newest first</span></div>
+    {% if page.items %}
+      <ul class="list notif-list">
+        {% for n in page.items %}
+          <li class="{{ 'is-unread' if not n.is_read }}">
+            <span class="ico" aria-hidden="true"><i class="bi {{ notif_icon(n.notification_type) }}"></i></span>
+            <div class="grow">
+              <div class="ttl">{% if not n.is_read %}<span class="unread-dot" aria-hidden="true"></span><span class="sr">Unread: </span>{% endif %}{{ n.title }}</div>
+              <div class="sub">{{ n.message }}</div>
+              <div class="when"><span title="{{ n.created_at }}">{{ n.created_at|ago }}</span>{% if n.related_claim_id %} · <span class="mono">{{ n.related_claim_id }}</span>{% endif %}</div>
+            </div>
+            <div class="row tight notif-actions">
+              {% if n.related_claim_id %}
+                <form method="post" action="{{ url_for('claims.read_notification', notification_id=n.notification_id) }}">{{ csrf() }}<input type="hidden" name="open" value="1">
+                  <button class="btn sm" type="submit">Open claim</button></form>
+              {% endif %}
+              {% if not n.is_read %}
+                <form method="post" action="{{ url_for('claims.read_notification', notification_id=n.notification_id) }}">{{ csrf() }}
+                  <button class="btn sm quiet" type="submit">Mark as read</button></form>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+      {{ pager(page) }}
+    {% else %}
+      {% if show == 'unread' %}
+        {{ empty_state('You are all caught up', 'No unread notifications. Older ones are under All.', url_for('claims.notifications', show='all'), 'See all notifications', 'bi-check2-circle') }}
+      {% else %}
+        {{ empty_state('No notifications yet', 'Claim updates and reviewer questions will appear here.', icon='bi-bell') }}
+      {% endif %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

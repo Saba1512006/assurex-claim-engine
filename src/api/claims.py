@@ -80,6 +80,19 @@ def dashboard():
         buckets=analytics_service.warranty_buckets(products_q))
 
 
+@claim_bp.get("/notifications")
+@require()
+def notifications():
+    """Every notification for the signed-in person, newest first: unread by default, or all of them."""
+    show = "all" if request.args.get("show") == "all" else "unread"
+    mine = Notification.query.filter_by(user_id=g.user.id)
+    unread = mine.filter_by(is_read=False).count()
+    q = mine if show == "all" else mine.filter_by(is_read=False)
+    items = q.order_by(Notification.id.desc()).all()
+    page = ListPage(items, request.args.get("page", 1, type=int), per_page=20)
+    return render_template("claims/notifications.html", page=page, show=show, unread=unread, total=mine.count())
+
+
 @claim_bp.post("/notifications/<string:notification_id>/read")
 @require()
 def read_notification(notification_id):
