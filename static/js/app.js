@@ -45,11 +45,10 @@
     debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; },
   };
 
-  /* ---------------------------------------------------------------- preloader (home page loads and the first page of a session)
+  /* ---------------------------------------------------------------- preloader (opening the site, a new tab or a reload; not link clicks inside it)
      The logo animation plays (about 2 s), the finished logo holds for a beat, then it leaves once the page has also
      loaded; a 5 s ceiling guards against a stalled asset. With reduced motion a still logo shows briefly, then fades. */
   const pre = $("[data-preloader]");
-  try { if (sessionStorage.getItem("ax-seen") !== "off") sessionStorage.setItem("ax-seen", "1"); } catch { /* storage blocked */ }
   if (pre) {
     if (!document.documentElement.classList.contains("first-view")) pre.remove();
     else {
