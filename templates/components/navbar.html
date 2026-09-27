@@ -7,7 +7,7 @@
 {% set models_ready = mv.python != 'not installed' and mv.gtm != 'not installed' %}
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="{{ url_for('auth.home') if current_user else url_for('public.index') }}">
+    <a class="brand" href="{{ url_for('public.index') }}" aria-label="AssureX home page">
       <span class="brand-tile">{% include "components/mark.svg" %}</span><span class="brand-name">AssureX<small>Claim Engine</small></span>
     </a>
     {% if current_user %}
@@ -57,6 +57,12 @@
             </div>
             <a href="{{ url_for('auth.profile') }}"><i class="bi bi-person" aria-hidden="true"></i>Profile</a>
             <a href="{{ url_for('claims.notifications') }}" {% if ep == 'claims.notifications' %}aria-current="page"{% endif %}><i class="bi bi-bell" aria-hidden="true"></i>Notifications{% if unread %}<span class="menu-hint">{{ unread|length }}{{ '+' if unread|length >= 20 }} unread</span>{% endif %}</a>
+            <p class="menu-label">Website</p>
+            <a href="{{ url_for('auth.home') }}"><i class="bi bi-inbox" aria-hidden="true"></i>My dashboard</a>
+            <a href="{{ url_for('public.index') }}" {% if ep == 'public.index' %}aria-current="page"{% endif %}><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>Home page<span class="menu-hint">you stay signed in</span></a>
+            <a href="{{ url_for('public.model_card') }}" {% if ep == 'public.model_card' %}aria-current="page"{% endif %}><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i>Model card</a>
+            <a href="{{ url_for('public.blog') }}" {% if ep == 'public.blog' %}aria-current="page"{% endif %}><i class="bi bi-card-heading" aria-hidden="true"></i>Technical blog</a>
+            <hr class="menu-sep">
             {% if can('settings.manage') %}
               <p class="menu-label">Administration</p>
               <a href="{{ url_for('admin.models') }}" {% if ep == 'admin.models' %}aria-current="page"{% endif %}><i class="bi bi-cpu" aria-hidden="true"></i>Models<span class="menu-hint">install and version</span></a>

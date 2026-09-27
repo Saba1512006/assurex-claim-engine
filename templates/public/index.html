@@ -18,7 +18,8 @@
       <h1 id="hero-h"><span class="l">Every warranty claim,</span> <span class="l">checked twice.</span></h1>
       <p class="lede">Two independent models and a policy engine agree, or a person decides.</p>
       <div class="row hero-actions">
-        <a class="btn lg" href="{{ url_for('auth.login') }}">Sign in as evaluator</a>
+        {% if current_user %}<a class="btn lg" href="{{ url_for('auth.home') }}">Go to my dashboard</a>
+        {% else %}<a class="btn lg" href="{{ url_for('auth.login') }}">Sign in as evaluator</a>{% endif %}
         <a class="btn lg quiet" href="{{ url_for('public.model_card') }}">Read the model card</a>
       </div>
       <div class="metric-row hero-metrics">
@@ -97,8 +98,13 @@
 
 <section class="bench grid-bg closing" aria-labelledby="close-h">
   <div class="wrap closing-row">
+    {% if current_user %}
+    <h2 id="close-h">You are signed in as {{ current_user.full_name }}. Pick up where you left off.</h2>
+    <a class="btn lg" href="{{ url_for('auth.home') }}">Go to my dashboard{{ icon('arrow-right', 'sm') }}</a>
+    {% else %}
     <h2 id="close-h">Sign in with an evaluator account and file a claim end to end.</h2>
     <a class="btn lg" href="{{ url_for('auth.login') }}">Sign in as evaluator{{ icon('arrow-right', 'sm') }}</a>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

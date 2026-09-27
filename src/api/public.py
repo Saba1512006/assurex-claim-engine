@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import markdown
-from flask import Blueprint, abort, current_app, g, jsonify, redirect, render_template, send_file, url_for
+from flask import Blueprint, abort, current_app, jsonify, render_template, send_file
 
 from src.core.gtm_classifier_v2 import find_model_file
 from src.core.python_classifier import model_card as python_model_card
@@ -27,8 +27,7 @@ ROLE_LINES = {
 
 @public_bp.get("/")
 def index():
-    if g.get("user"):
-        return redirect(url_for("auth.home"))
+    # Signed-in people can open the website too (logo, account menu); they stay signed in.
     from src.security import rbac
     from src.services import demo_bench
     roles = [{"key": r, "label": rbac.policy()["roles"][r]["label"], "line": ROLE_LINES[r],

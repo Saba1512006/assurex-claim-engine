@@ -143,3 +143,9 @@
   .hero-metrics .l { font-size: var(--fs-2xs); }
   .hero-instrument .segmented span { padding-inline: var(--s2); white-space: nowrap; font-size: var(--fs-xs); }
 }
+
+/* keep the headline to two lines on laptop and desktop widths */
+@media (min-width: 1081px) {
+  .hero h1 { font-size: clamp(2.75rem, 3.9vw, 3.75rem); }
+  .hero h1 .l { white-space: nowrap; }
+}
