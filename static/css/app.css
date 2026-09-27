@@ -1050,3 +1050,131 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
   .nav-glide { transition: opacity 160ms !important; }
   .topbar .wrap { transition: none; }
 }
+
+/* ================================================================== workspace premium layer (signed-in pages)
+   A paper header band with a faint measurement grid and soft teal/indigo light sits behind the page title and
+   the floating navbar; content below lives on the mist in raised sheets. Depth from layered shadows only. */
+main { position: relative; overflow-x: clip; }
+.page > .page-head { position: relative; isolation: isolate; padding-bottom: var(--s5); margin-bottom: var(--s6); }
+.page > .page-head::before { content: ""; position: absolute; z-index: -1; left: 50%; width: 100vw; translate: -50% 0;
+  top: calc(-1 * (var(--s6) + var(--nav-h))); bottom: 0; pointer-events: none;
+  background:
+    radial-gradient(600px 240px at 12% 0%, color-mix(in srgb, var(--teal-mark) 9%, transparent), transparent 70%),
+    radial-gradient(520px 220px at 88% 10%, color-mix(in srgb, var(--gtm) 8%, transparent), transparent 70%),
+    linear-gradient(var(--paper), var(--paper));
+  box-shadow: 0 1px 0 rgba(21, 32, 43, .06), 0 18px 30px -28px rgba(21, 32, 43, .35); }
+.page > .page-head::after { content: ""; position: absolute; z-index: -1; left: 50%; width: 100vw; translate: -50% 0;
+  top: calc(-1 * (var(--s6) + var(--nav-h))); bottom: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(rgba(21, 32, 43, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(21, 32, 43, .045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 100% at 50% 0%, #000 30%, transparent 80%); mask-image: radial-gradient(ellipse 70% 100% at 50% 0%, #000 30%, transparent 80%); }
+.page-head h1 { font-size: clamp(1.75rem, 2.6vw, 2.25rem); letter-spacing: -0.025em; line-height: 1.12; }
+.page-head .eyebrow, .page-head .itag { margin-bottom: var(--s3); }
+.page-head .lede { margin-top: var(--s2); }
+
+/* raised sheets */
+.panel, .card { border-radius: 14px;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .06), 0 1px 2px rgba(21, 32, 43, .05), 0 18px 36px -28px rgba(21, 32, 43, .38); }
+.panel.selected { box-shadow: inset 3px 0 0 var(--teal-mark), 0 0 0 1px rgba(21, 32, 43, .06), 0 18px 36px -28px rgba(21, 32, 43, .38); }
+.panel.soft, .card.soft { box-shadow: inset 0 0 0 1px rgba(21, 32, 43, .05); }
+.panel-h, .card-h { border-bottom-color: rgba(21, 32, 43, .07); }
+.panel-h h2, .card-h h2 { font-size: 1.0625rem; letter-spacing: -0.01em; }
+.panel-f, .card-f { border-top-color: rgba(21, 32, 43, .07); background: linear-gradient(180deg, transparent, rgba(238, 241, 244, .5)); border-radius: 0 0 14px 14px; }
+
+/* KPI strip: separate raised tiles; a teal line wakes up on hover of a linked tile */
+.stats { gap: var(--s3); background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+.stat { position: relative; overflow: hidden; border-right: 0; border-radius: 14px; background: var(--paper);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .06), 0 14px 28px -24px rgba(21, 32, 43, .45);
+  transition: transform var(--t-fast), box-shadow var(--t-fast); }
+.stat::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--teal-mark), var(--gtm)); opacity: .0; transition: opacity var(--t-fast); }
+.stat .v { font-size: clamp(1.625rem, 2.2vw, 2rem); }
+a.stat:hover { background: var(--paper); transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .08), 0 22px 36px -24px rgba(21, 32, 43, .55); }
+a.stat:hover::before { opacity: 1; }
+@media (max-width: 767px) { .stat { border-bottom: 0; } }
+
+/* tables: quiet header, a teal edge on the row under the pointer */
+.table th { color: var(--steel); font-weight: 600; font-size: var(--fs-2xs); letter-spacing: .02em; border-bottom-color: rgba(21, 32, 43, .08); }
+.table td { border-bottom-color: rgba(21, 32, 43, .06); }
+.table tbody tr { transition: background-color var(--t-fast); }
+.table tbody tr:hover { background: color-mix(in srgb, var(--teal-wash) 45%, var(--paper)); }
+.table tbody tr:hover > :first-child { box-shadow: inset 3px 0 0 var(--teal-mark); }
+
+/* fields: recessed wells, a soft teal glow on focus */
+.input, .select, .textarea { border-radius: 10px; border-color: rgba(21, 32, 43, .16); box-shadow: inset 0 1px 2px rgba(21, 32, 43, .07); }
+.input:hover, .select:hover, .textarea:hover { border-color: rgba(21, 32, 43, .28); }
+.input:focus, .select:focus, .textarea:focus { border-color: var(--teal-mark);
+  box-shadow: inset 0 1px 2px rgba(21, 32, 43, .05), 0 0 0 3px var(--teal-wash), 0 8px 18px -12px color-mix(in srgb, var(--teal-mark) 60%, transparent); }
+
+/* list rows (needs your attention, notifications): raised icon tiles */
+.list > li { transition: background-color var(--t-fast); border-bottom-color: rgba(21, 32, 43, .06); }
+.list > li:hover { background: color-mix(in srgb, var(--mist) 55%, transparent); }
+.list .ico { width: 36px; height: 36px; border-radius: 10px; border: 0; background: linear-gradient(160deg, #FFFFFF, #EDF1F4);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .08), 0 6px 12px -8px rgba(21, 32, 43, .4); }
+.list .ico.review { background: linear-gradient(160deg, #FFF8EC, var(--review-wash)); box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px color-mix(in srgb, var(--review-mark) 45%, transparent), 0 6px 12px -8px color-mix(in srgb, var(--review-mark) 70%, transparent); }
+
+/* product plates: lift on hover; the life bar becomes a rounded gauge */
+a.plate { border: 0; border-radius: 14px; background: linear-gradient(180deg, #FFFFFF, #FAFBFC);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 1px 2px rgba(21, 32, 43, .05), 0 16px 30px -26px rgba(21, 32, 43, .5);
+  transition: transform var(--t-fast), box-shadow var(--t-fast); }
+a.plate:hover { transform: translateY(-3px); border-color: transparent;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .09), 0 4px 8px rgba(21, 32, 43, .05), 0 26px 40px -26px rgba(21, 32, 43, .55); }
+.lifebar { height: 8px; border: 0; border-radius: var(--r-dot); background: #E6EAEE; box-shadow: inset 0 1px 2px rgba(21, 32, 43, .12); }
+.lifebar > i { border-radius: var(--r-dot); background: linear-gradient(90deg, #33485A, var(--ink)); }
+.lifebar.expiring > i { background: linear-gradient(90deg, #D69A3C, var(--review-mark)); }
+.lifebar.expired > i { background: linear-gradient(90deg, #D9604A, var(--invalid)); }
+.lifebar > b { top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: var(--teal-mark); box-shadow: 0 0 0 2px var(--paper); }
+
+/* chips and tags get a crisp inner ring */
+.verdict-chip { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 18%, transparent); }
+@media (prefers-reduced-motion: reduce) { a.stat:hover, a.plate:hover { transform: none; } }
+
+/* ---- the verdict instrument: the upper half of every verdict panel is a dark bench surface.
+   Palette tokens are remapped inside it, so the meter, probability bars, tags and stamp all switch to their
+   bench variants without touching the markup or verdict.js. */
+.verdict { overflow: hidden; }
+.verdict-bench { --grid-x: 50%; position: relative;
+  --paper: var(--bench-2); --mist: rgba(255, 255, 255, .06); --rule: var(--bench-line); --ink: var(--on-bench); --ink-2: var(--on-bench-2);
+  --steel: var(--on-bench-2); --steel-line: rgba(255, 255, 255, .3); --teal: var(--teal-bright); --teal-mark: var(--teal-bright); --gtm: var(--gtm-bright);
+  --valid: var(--valid-bright); --valid-mark: var(--valid-bright); --invalid: var(--invalid-bright); --invalid-mark: var(--invalid-bright);
+  --review: var(--review-bright); --review-mark: var(--review-bright); --teal-wash: rgba(63, 184, 174, .14); --gtm-wash: rgba(142, 160, 230, .14);
+  --valid-wash: rgba(76, 192, 127, .14); --invalid-wash: rgba(240, 118, 95, .14); --review-wash: rgba(229, 169, 74, .14);
+  color: var(--on-bench); background: radial-gradient(700px 300px at 50% 0%, rgba(63, 184, 174, .10), transparent 70%), var(--bench); }
+.verdict-bench .verdict-head { border-bottom-color: var(--bench-line); }
+.verdict-bench .id, .verdict-bench .muted, .verdict-bench .small.muted { color: var(--on-bench-2); }
+.verdict-bench .tag { background: rgba(255, 255, 255, .04); }
+.verdict-bench .pbar .t { background: rgba(255, 255, 255, .08); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35); border-radius: var(--r-dot); }
+.verdict-bench .pbar .t i { border-radius: var(--r-dot); }
+.verdict-bench .gauge .delta { font: 600 1.5rem/1 var(--font-num); letter-spacing: -0.01em; }
+.verdict-bench .stamp { background: var(--bench-2); box-shadow: 1px 1px 0 currentColor, 0 18px 36px -16px rgba(0, 0, 0, .8); border-width: 2px; }
+.verdict-bench .stamp .who { color: var(--on-bench-2); }
+.verdict-bench .superseded { color: var(--on-bench-2); }
+.verdict-bench .superseded s { color: var(--on-bench-2); opacity: .7; }
+.verdict-bench .callout { background: rgba(255, 255, 255, .05); color: var(--on-bench); }
+.verdict-bench :focus-visible { box-shadow: var(--focus-bench); }
+
+/* checklist rows without an icon (the "choose a product" placeholder) span the full width */
+.checks li:not(:has(> i)) { display: block; }
+
+/* stepper (claim wizard, product registration): raised pills joined by a line that fills as steps are done */
+.steps { gap: var(--s4); }
+.steps li { position: relative; }
+.steps li:not(:last-child)::after { content: ""; position: absolute; top: 50%; right: calc(-1 * var(--s4)); width: var(--s4); height: 2px; margin-top: -1px;
+  background: rgba(21, 32, 43, .12); border-radius: 2px; }
+.steps li:has(button.done):not(:last-child)::after { background: linear-gradient(90deg, var(--ink), var(--teal-mark)); }
+.steps button { border: 0; border-radius: var(--r-dot); min-height: 46px; padding: 0 var(--s4) 0 8px; background: var(--paper); color: var(--ink-2); font-weight: 500;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .08), 0 8px 18px -14px rgba(21, 32, 43, .45);
+  transition: box-shadow var(--t-fast), color var(--t-fast); }
+.steps button:hover { color: var(--ink); box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .14), 0 12px 22px -14px rgba(21, 32, 43, .5); }
+.steps button b { width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--mist); color: var(--ink-2); box-shadow: inset 0 1px 2px rgba(21, 32, 43, .12); }
+.steps button[aria-current="step"] { color: var(--ink); box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1.5px var(--teal-mark), 0 10px 24px -12px color-mix(in srgb, var(--teal-mark) 70%, transparent); }
+.steps button[aria-current="step"] b { background: linear-gradient(160deg, #1B9C98, var(--teal-mark)); color: var(--paper); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 4px 10px -4px var(--teal-mark); }
+.steps button.done { color: var(--ink); }
+.steps button.done b { background: linear-gradient(160deg, #33485A, var(--ink)); color: var(--paper); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2); }
+.steps button:focus-visible { box-shadow: var(--focus); }
+@media (max-width: 767px) { .steps li::after { display: none; } .steps { gap: var(--s2); } }
+
+/* reviewer decision bar: floating glass tray above the page bottom */
+.decision-bar { border-top: 0; background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 -1px 0 rgba(21, 32, 43, .08), 0 -18px 40px -24px rgba(21, 32, 43, .45); }

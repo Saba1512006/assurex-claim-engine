@@ -56,6 +56,7 @@
 {% macro verdict(v, claim, details=True, compact=False) -%}
 {% set p, m = v.p, v.meter %}
 <section class="panel verdict {{ 'animate' if v.fresh }}" aria-labelledby="verdict-h" data-verdict>
+  <div class="verdict-bench bench grid-bg">{# the machine's answer sits on the bench; the reasons below stay on paper #}
   <div class="verdict-head">
     <div class="ttl"><h2 id="verdict-h" class="sr">Verdict</h2><span class="id">{{ p.claim_id }}</span><span class="strong">{{ claim.product.product_name }}</span><span class="small muted">{{ claim.product.category }}</span></div>
     {% if p.total_ms %}<span class="small muted">Decided in <span class="mono">{{ '%.2f'|format(p.total_ms / 1000) }} s</span></span>{% endif %}
@@ -78,6 +79,7 @@
       <p class="superseded">Automated recommendation: {{ p.decision.value }}. Reviewer comment: {{ p.override.reason }}</p>
     {% endif %}
   </div></div>
+  </div>
   {% if not compact %}
   <div class="verdict-why">
     {{ verdict_why(p, details) }}
