@@ -1,53 +1,63 @@
 {% extends "components/base.html" %}
-{# Customer self-registration: field-level errors from the server, password strength hint, invite note for other roles. #}
-{% from "components/ui.html" import csrf, field %}
+{# Customer self-registration: the same split as sign in. Field-level errors from the server, a four-step strength meter,
+   a live match check on the confirmation, and the invite note for other roles. No role picker. #}
+{% from "components/ui.html" import csrf, field, icon %}
+{% from "auth/_scanner.html" import scanner %}
+{% set inline_alerts = true %}
 {% block title %}Create account{% endblock %}
 {% block description %}Create a customer account to register products and file warranty claims.{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ asset('css/pages/auth.css') }}">{% endblock %}
 {% block main %}
-<div class="auth">
-  <div class="auth-form">
-    <div class="box stack">
-      <div>
-        <h1>Create your account</h1>
-        <p class="muted mt-1">Public sign-up creates customer accounts. Service-center staff, reviewers and administrators are invited by an administrator.</p>
-      </div>
-      <form method="post" class="form-grid">
+{% set alerts = get_flashed_messages(with_categories=true, category_filter=['danger', 'error', 'warning']) %}
+<div class="auth-split">
+  <section class="auth-side" aria-labelledby="register-h">
+    <div class="auth-col wide">
+      <span class="auth-mark" aria-hidden="true">{% include "components/mark.svg" %}</span>
+      <h1 id="register-h">Create your account</h1>
+      <p class="auth-lede">Customer accounts register products and file claims.</p>
+      {% for cat, msg in alerts %}
+        <div class="form-alert {{ 'warn' if cat == 'warning' }}" role="alert">{{ icon('circle-alert') }}<span>{{ msg }}</span></div>
+      {% endfor %}
+      <form method="post" class="auth-form-fields form-2{{ ' shake' if alerts }}">
         {{ csrf() }}
-        <div class="full">{{ field('full_name', 'Full name', form.get('full_name', ''), required=True, error=errors.full_name,
-                                   attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}</div>
-        <div class="full">{{ field('email', 'Email', form.get('email', ''), type='email', required=True, error=errors.email,
-                                   attrs={'autocomplete': 'email', 'maxlength': '120'}) }}</div>
-        <div class="field full">
+        {{ field('full_name', 'Full name', form.get('full_name', ''), required=True, error=errors.full_name,
+                 attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}
+        {{ field('email', 'Email', form.get('email', ''), type='email', required=True, error=errors.email,
+                 attrs={'autocomplete': 'email', 'maxlength': '120'}) }}
+        <div class="field">
           <label for="f-password">Password <span class="req">(required)</span></label>
           <div class="pw">
             <input class="input" id="f-password" type="password" name="password" autocomplete="new-password" required minlength="10"
                    pattern="(?=.*[A-Za-z])(?=.*\d).{10,}" {% if errors.password %}aria-invalid="true"{% endif %} aria-describedby="f-password-d f-password-s">
             <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-password" aria-pressed="false">Show</button>
           </div>
-          <div class="strength" data-strength="f-password" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div class="strength-row">
+            <div class="strength" data-strength="f-password" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <span class="strength-word" id="f-password-s" data-strength-label="f-password" aria-live="polite"></span>
+          </div>
           {% if errors.password %}<span class="err" id="f-password-d" role="alert">{{ errors.password }}</span>
           {% else %}<span class="help" id="f-password-d">10 or more characters, with at least one letter and one number.</span>{% endif %}
-          <span class="tiny muted" id="f-password-s" data-strength-label="f-password" aria-live="polite"></span>
         </div>
-        <div class="full">{{ field('confirm_password', 'Confirm password', type='password', required=True, error=errors.confirm_password,
-                                   attrs={'autocomplete': 'new-password', 'minlength': '10'}) }}</div>
+        <div class="field">
+          <label for="f-confirm_password">Confirm password <span class="req">(required)</span></label>
+          <input class="input" id="f-confirm_password" type="password" name="confirm_password" autocomplete="new-password" required minlength="10"
+                 {% if errors.confirm_password %}aria-invalid="true"{% endif %} aria-describedby="f-confirm_password-d" data-match="f-password">
+          {% if errors.confirm_password %}<span class="err" id="f-confirm_password-d" role="alert">{{ errors.confirm_password }}</span>
+          {% else %}<span class="help match-hint" id="f-confirm_password-d" data-match-label aria-live="polite"></span>{% endif %}
+        </div>
         {{ field('phone', 'Phone', form.get('phone', ''), type='tel', hint='Optional. 7 to 15 digits.', error=errors.phone,
                  attrs={'autocomplete': 'tel', 'placeholder': '+92 300 1234567'}) }}
         {{ field('address', 'City or address', form.get('address', ''), hint='Optional.', attrs={'autocomplete': 'street-address', 'maxlength': '200'}) }}
         <div class="full"><button class="btn lg block" type="submit">Create account</button></div>
       </form>
-      <p class="small muted">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a>.</p>
+      <div class="auth-links">
+        <p>Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a>.</p>
+        <p class="quiet">Service-center staff, reviewers and administrators are invited by an administrator.</p>
+      </div>
+      <p class="auth-legal">AssureX Claim Engine · Built for TechWiz 7 · <a href="{{ url_for('public.model_card') }}">Model card</a></p>
     </div>
-  </div>
-  <div class="auth-art">
-    <div class="stack">
-      <h2>Register once, claim in minutes.</h2>
-      <ol class="steps-plain small">
-        <li><b>Add a product</b> with its receipt. OCR reads the invoice and you confirm what it found.</li>
-        <li><b>Watch the cover</b>. The product plate shows how much warranty is left and warns before it ends.</li>
-        <li><b>File a claim</b>. A checklist says what is missing before you submit; two models and the policy decide.</li>
-      </ol>
-    </div>
-  </div>
+  </section>
+  {{ scanner(card, reading) }}
 </div>
 {% endblock %}
+{% block footer %}{% endblock %}

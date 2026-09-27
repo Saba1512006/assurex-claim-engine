@@ -13,6 +13,7 @@ from src.security import rbac
 from src.security.guards import (LOCKED_MESSAGE, invalidate_sessions, login_user, registration_role, require,
                                  safe_next)
 from src.services.audit import audit
+from src.services.demo_bench import card_reading
 
 auth_bp = Blueprint("auth", __name__)
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
@@ -58,7 +59,8 @@ def login():
               user.user_id if user else None, user=None, email=email, reason=reason)
         db.session.commit()
         flash(message, "danger")
-    return render_template("auth/login.html", email=email), (401 if request.method == "POST" else 200)
+    return render_template("auth/login.html", email=email, card=Config.LOGIN_CARD,
+                           reading=card_reading(Config.LOGIN_CARD)), (401 if request.method == "POST" else 200)
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -82,7 +84,8 @@ def register():
             errors["email"] = "An account with this email already exists. Sign in instead."
         if errors:
             flash("Some details need attention. Check the highlighted fields.", "warning")
-            return render_template("auth/register.html", form=form, errors=errors), 400
+            return render_template("auth/register.html", form=form, errors=errors, card=Config.REGISTER_CARD,
+                                   reading=card_reading(Config.REGISTER_CARD)), 400
         user = User(full_name=name, email=email, role=registration_role(form.get("role")),
                     phone_number=form.get("phone", "").strip() or None, address=form.get("address", "").strip() or None)
         user.set_password(password)
@@ -92,7 +95,8 @@ def register():
         db.session.commit()
         flash("Your account is ready. Sign in to register your first product.", "success")
         return redirect(url_for("auth.login", email=email))
-    return render_template("auth/register.html", form={}, errors={})
+    return render_template("auth/register.html", form={}, errors={}, card=Config.REGISTER_CARD,
+                           reading=card_reading(Config.REGISTER_CARD))
 
 
 @auth_bp.post("/logout")

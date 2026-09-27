@@ -7,6 +7,8 @@ database either way.
 """
 from __future__ import annotations
 
+import csv
+import functools
 import json
 import threading
 import time
@@ -17,7 +19,9 @@ from src.core import features as feature_builder
 from src.core.pipeline import run as run_pipeline
 from src.services import verdict
 
-SAMPLES = Path(__file__).resolve().parent.parent.parent / "sample_claims"
+ROOT = Path(__file__).resolve().parent.parent.parent
+SAMPLES = ROOT / "sample_claims"
+COMPARISON = ROOT / "reports" / "model_comparison_test.csv"
 # key: (sample file, short label for the segmented control, one-line description)
 CASES = {
     "valid": ("01_valid_claim.json", "Clean fault", "Laptop motherboard failure, 7 months old, every document on file"),
@@ -85,3 +89,24 @@ def cached() -> dict:
             _cache.update(key=key, views={c: view(c, p) for c, p in payloads.items()},
                           meter=verdict.meter_static(first["consistency"]["thresholds"].get("min_confidence") or 0.6))
         return {"views": _cache["views"], "meter": _cache["meter"]}
+
+
+@functools.lru_cache(maxsize=8)
+def card_reading(card_filename: str) -> dict | None:
+    """How both models scored one test-split card in the offline evaluation (reports/model_comparison_test.csv),
+    for the caption under the scanner bed on the sign-in and register pages. None when the report is missing."""
+    try:
+        with COMPARISON.open(newline="", encoding="utf-8") as fh:
+            row = next((r for r in csv.DictReader(fh) if r["card_filename"] == card_filename), None)
+    except OSError:
+        return None
+    if row is None:
+        return None
+    col = {"Valid Claim": "valid", "Invalid Claim": "invalid", "Manual Review": "manual"}
+
+    def score(model):
+        predicted = row[f"{model}_predicted"]
+        return {"predicted": predicted, "top": float(row[f"{model}_{col.get(predicted, 'manual')}"])}
+    return {"claim_id": row["claim_id"], "actual": row["actual_class"], "python": score("python"), "gtm": score("gtm"),
+            "status": row["consistency_status"], "decision": row["final_decision"],
+            "tone": DECISION_TONE.get(row["final_decision"], "none")}

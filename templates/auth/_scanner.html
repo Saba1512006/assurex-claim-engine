@@ -1,0 +1,30 @@
+{# The bench side of the sign-in and register pages: a test-split Claim Summary Card on the "scanner bed"
+   (pixels unchanged; only the frame is styled), and how both models scored it in the offline evaluation. #}
+{% from "components/ui.html" import icon %}
+{% macro scanner(card, reading) -%}
+<aside class="bench grid-bg auth-bench" aria-labelledby="scan-h">
+  <div class="auth-bench-inner">
+    <figure class="scanner">
+      <div class="scanner-meta mono" aria-hidden="true">
+        <span>{{ reading.claim_id if reading else card[:9] }}</span><span>test split</span>
+      </div>
+      <div class="scanner-bed">
+        <div class="scanner-card"><img class="summary-card-img" src="{{ url_for('public.test_card', name=card) }}"
+             alt="Claim Summary Card for test claim {{ reading.claim_id if reading else '' }}" width="600" height="600" fetchpriority="high"></div>
+        <span class="scan-line" aria-hidden="true"></span>
+      </div>
+      <figcaption class="scanner-cap">
+        <h2 class="itag" id="scan-h">What the image model reads</h2>
+        <p>A Claim Summary Card from the test split. The Python model reads the same facts as numbers.</p>
+      </figcaption>
+    </figure>
+    {% if reading %}
+    <dl class="readout" aria-label="How both models scored this card in the offline evaluation">
+      <div><dt>Teachable Machine</dt><dd><span class="cls {{ reading.gtm.predicted|lower|replace(' claim', '')|replace('manual review', 'review') }}">{{ reading.gtm.predicted }}</span><span class="num-lg">{{ '%.2f'|format(reading.gtm.top) }}</span></dd></div>
+      <div><dt>Python model</dt><dd><span class="cls {{ reading.python.predicted|lower|replace(' claim', '')|replace('manual review', 'review') }}">{{ reading.python.predicted }}</span><span class="num-lg">{{ '%.2f'|format(reading.python.top) }}</span></dd></div>
+      <div><dt>Decision</dt><dd><span class="verdict-chip {{ reading.tone }}">{{ reading.decision }}</span><span class="small">{{ reading.status }}</span></dd></div>
+    </dl>
+    {% endif %}
+  </div>
+</aside>
+{%- endmacro %}

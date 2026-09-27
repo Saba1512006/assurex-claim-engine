@@ -1,0 +1,120 @@
+/* Sign in and register: split screen. Left half is the workspace (form), right half is the bench (scanner bed).
+   No page scroll on a 1366×768 laptop; the footer is replaced by one legal line under the form. */
+
+.auth-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100svh - var(--nav-h)); }
+
+/* ---------------------------------------------------------------- the form (workspace) */
+.auth-side { display: flex; align-items: center; background: var(--paper);
+  padding: var(--s3) var(--s6) var(--s3) clamp(var(--s5), 7vw, 120px); }
+.auth-col { width: 100%; max-width: 440px; display: grid; gap: 10px; }
+.auth-col.wide { max-width: 480px; }
+.auth-mark { display: block; width: 32px; height: 32px; }
+.auth-mark svg { width: 32px; height: 32px; display: block; }
+.auth-col h1 { font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
+.auth-lede { margin: -6px 0 var(--s1); color: var(--ink-2); }
+.auth-form-fields { display: grid; gap: 10px; }
+.auth-form-fields .help:empty { display: none; }
+.auth-form-fields .btn.lg { min-height: 48px; margin-top: var(--s1); }
+.form-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--s4); }
+.form-2 .full { grid-column: 1 / -1; }
+.lock-hint { display: inline-flex; align-items: center; gap: 6px; color: var(--steel); font-size: var(--fs-xs); }
+.lock-hint .ic { flex: none; }
+
+.auth-links { display: grid; gap: 2px; font-size: var(--fs-sm); color: var(--ink-2); }
+.auth-links p { margin: 0; }
+.auth-links .quiet { font-size: var(--fs-xs); color: var(--steel); }
+.auth-legal { margin: 0; font-size: var(--fs-2xs); color: var(--steel); }
+.auth-legal a { color: inherit; }
+
+/* error bar above the fields, and one horizontal shake of the form */
+.form-alert { display: flex; align-items: flex-start; gap: var(--s2); padding: var(--s3) var(--s4); border-radius: var(--r-control);
+  background: var(--invalid-wash); color: var(--invalid); box-shadow: inset 3px 0 0 var(--invalid-mark); font-size: var(--fs-sm); font-weight: 500; }
+.form-alert .ic { flex: none; margin-top: 2px; }
+.form-alert.warn { background: var(--review-wash); color: var(--review); box-shadow: inset 3px 0 0 var(--review-mark); }
+.shake { animation: shake 240ms cubic-bezier(.36, .07, .19, .97) 1; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* strength meter with its word, and the live match check */
+.strength-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s3); margin-top: 2px; }
+.strength-word { font-size: var(--fs-xs); font-weight: 500; color: var(--steel); min-width: 5.5em; text-align: right; }
+.strength-word[data-score="1"] { color: var(--invalid); } .strength-word[data-score="2"] { color: var(--review); }
+.strength-word[data-score="3"] { color: var(--teal); } .strength-word[data-score="4"] { color: var(--valid); }
+.help[data-state="ok"] { color: var(--valid); } .help[data-state="no"] { color: var(--review); }
+
+/* ---------------------------------------------------------------- evaluator accounts: ID badges */
+.personas-wrap { display: grid; gap: var(--s2); padding-top: var(--s3); border-top: 1px solid var(--rule); }
+.personas-wrap .itag { justify-self: start; font-size: var(--fs-xs); }
+.personas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
+.persona { --rc: var(--role-admin); position: relative; display: grid; gap: 2px; align-content: center; min-height: 48px; min-width: 0;
+  padding: var(--s2) var(--s3) var(--s2) calc(var(--s3) + 4px); border: 0; border-radius: var(--r-control); background: var(--paper);
+  box-shadow: inset 4px 0 0 var(--rc), var(--e1); text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+  transition: box-shadow var(--t-fast); }
+.persona.role-customer { --rc: var(--role-customer); } .persona.role-staff { --rc: var(--role-staff); }
+.persona.role-reviewer { --rc: var(--role-reviewer); } .persona.role-admin { --rc: var(--role-admin); }
+.persona b { font-size: .9375rem; font-weight: 600; line-height: 1.3; padding-right: var(--s5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.persona .mono { font-size: var(--fs-xs); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.persona .go { position: absolute; top: 10px; right: var(--s2); display: grid; place-items: center; width: 20px; height: 20px;
+  color: var(--teal); opacity: 0; transform: translateX(-3px); transition: opacity var(--t-fast), transform var(--t-fast); }
+.persona:hover, .persona:focus-visible { box-shadow: inset 4px 0 0 var(--rc), var(--e2); }
+.persona:focus-visible { box-shadow: inset 4px 0 0 var(--rc), var(--focus); }
+.persona:hover .go, .persona:focus-visible .go { opacity: 1; transform: none; }
+.persona-note { margin: 0; font-size: var(--fs-xs); color: var(--steel); }
+
+/* ---------------------------------------------------------------- the scanner bed (bench) */
+.auth-bench { --grid-x: 50%; display: grid; place-items: center; padding: var(--s6) var(--s5); overflow: clip; }
+.auth-bench-inner { width: min(420px, 100%, calc((100svh - var(--nav-h)) * .52)); display: grid; gap: var(--s4); }
+.scanner { margin: 0; display: grid; gap: var(--s3); }
+.scanner-meta { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--on-bench-2); letter-spacing: .02em; }
+.scanner-bed { position: relative; padding: 24px; border-radius: var(--r-instrument); background: var(--bench-2); box-shadow: var(--e3); }
+/* four viewfinder corner brackets, drawn as gradients on one pseudo-element */
+.scanner-bed::before { --c: var(--teal-bright); --l: 18px; --w: 2px; content: ""; position: absolute; inset: 9px; pointer-events: none;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--w) var(--l) no-repeat; }
+.scanner-card { transform: rotate(-2deg); border-radius: 4px; overflow: hidden; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, .7); }
+.scanner-card img { display: block; width: 100%; height: auto; }
+/* one scan across the card on load; none with reduced motion */
+.scan-line { position: absolute; left: 20px; right: 20px; top: 24px; height: 2px; border-radius: 2px; opacity: 0; pointer-events: none;
+  background: var(--teal-bright); box-shadow: 0 0 24px 6px color-mix(in srgb, var(--teal-bright) 45%, transparent);
+  animation: scan 1.6s cubic-bezier(.45, 0, .55, 1) 300ms 1 both; }
+@keyframes scan { 0% { top: 24px; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } 100% { top: calc(100% - 26px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .scan-line { display: none; } .shake { animation: none; } }
+
+.scanner-cap { display: grid; gap: var(--s2); }
+.scanner-cap .itag { justify-self: start; font-size: var(--fs-xs); margin: 0; }
+.scanner-cap p { margin: 0; font-size: var(--fs-sm); color: var(--on-bench-2); line-height: 1.5; }
+
+/* how both models scored this card in the offline evaluation */
+.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-top: var(--s4); border-top: 1px solid var(--bench-line); }
+.readout > div { display: grid; gap: var(--s2); align-content: start; padding: 0 var(--s3); border-left: 1px solid var(--bench-line); min-width: 0; }
+.readout > div:first-child { padding-left: 0; border-left: 0; }
+.readout dt { font-size: var(--fs-2xs); color: var(--on-bench-2); }
+.readout dd { margin: 0; display: grid; gap: var(--s1); justify-items: start; font-size: var(--fs-xs); }
+.readout .cls { font-size: var(--fs-xs); }
+.readout .num-lg { font-size: 1.5rem; line-height: 1; }
+.readout .small { color: var(--on-bench-2); font-size: var(--fs-2xs); }
+
+/* ---------------------------------------------------------------- smaller screens */
+@media (max-width: 991px) {
+  .auth-split { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .auth-bench { order: -1; height: 200px; padding: var(--s5) var(--s5) 0; place-items: start center; }
+  .auth-bench-inner { width: min(360px, 100%); }
+  .scanner-meta, .scanner-cap, .readout { display: none; }
+  .auth-side { padding: var(--s7) var(--s5); justify-content: center; }
+}
+@media (max-width: 599px) {
+  .auth-bench { display: none; }
+  .auth-side { padding: var(--s6) var(--s4); }
+  .form-2 { grid-template-columns: minmax(0, 1fr); }
+  .personas { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* after a failed sign-in the error bar takes the lede's place, so the page still fits a laptop screen */
+.has-alert .auth-lede, .has-alert .persona-note { display: none; }
+.has-alert .form-alert { padding-block: var(--s2); }

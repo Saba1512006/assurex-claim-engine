@@ -1,17 +1,24 @@
 {% extends "components/base.html" %}
-{# Sign in: form on the left, a scanned test-split Claim Summary Card on the right; evaluator persona chips when enabled. #}
-{% from "components/ui.html" import csrf, field %}
+{# Sign in: the form on the workspace (left), a scanned test-split Claim Summary Card on the bench (right).
+   Errors show inline above the fields; evaluator accounts are one-click ID badges when enabled. #}
+{% from "components/ui.html" import csrf, field, icon %}
+{% from "auth/_scanner.html" import scanner %}
+{% set inline_alerts = true %}
 {% block title %}Sign in{% endblock %}
 {% block description %}Sign in to AssureX to file, review or administer warranty claims.{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ asset('css/pages/auth.css') }}">{% endblock %}
 {% block main %}
-<div class="auth">
-  <div class="auth-form">
-    <div class="box stack" data-login>
-      <div>
-        <h1>Sign in</h1>
-        <p class="muted mt-1">Use the email you registered with.</p>
-      </div>
-      <form method="post" class="stack">
+{% set alerts = get_flashed_messages(with_categories=true, category_filter=['danger', 'error', 'warning']) %}
+<div class="auth-split">
+  <section class="auth-side" aria-labelledby="signin-h">
+    <div class="auth-col{{ " has-alert" if alerts }}" data-login>
+      <span class="auth-mark" aria-hidden="true">{% include "components/mark.svg" %}</span>
+      <h1 id="signin-h">Sign in</h1>
+      <p class="auth-lede">Use the email you registered with.</p>
+      {% for cat, msg in alerts %}
+        <div class="form-alert" role="alert">{{ icon('circle-alert') }}<span>{{ msg }}</span></div>
+      {% endfor %}
+      <form method="post" class="auth-form-fields{{ ' shake' if alerts }}">
         {{ csrf() }}
         {{ field('email', 'Email', email or request.args.get('email', ''), type='email', required=True,
                  attrs={'autocomplete': 'username', 'autofocus': True}) }}
@@ -21,32 +28,32 @@
             <input class="input" id="f-password" type="password" name="password" autocomplete="current-password" required aria-describedby="f-password-d">
             <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-password" aria-pressed="false">Show</button>
           </div>
-          <span class="help" id="f-password-d">Five wrong attempts lock the account for 15 minutes.</span>
+          <span class="help lock-hint" id="f-password-d">{{ icon('lock', 'sm') }}Five wrong attempts lock the account for 15 minutes.</span>
         </div>
         <button class="btn lg block" type="submit">Sign in</button>
       </form>
-      <p class="small muted">New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>.
-        Service-center staff, reviewers and administrators are invited by an administrator.</p>
+      <div class="auth-links">
+        <p>New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>.</p>
+        <p class="quiet">Service-center staff, reviewers and administrators are invited by an administrator.</p>
+      </div>
       {% if config.SHOW_DEMO_ACCOUNTS %}
-      <section class="stack-sm" aria-labelledby="personas-h">
-        <h2 class="eyebrow" id="personas-h">Evaluator accounts</h2>
+      <section class="personas-wrap" aria-labelledby="personas-h">
+        <h2 class="itag" id="personas-h">Evaluator accounts</h2>
         <div class="personas">
           {% for role, e, pw in config.DEMO_ACCOUNTS %}
-            <button class="persona" type="button" data-persona data-email="{{ e }}" data-password="{{ pw }}">
-              <b>{{ role }}</b><span>{{ e }}</span>
+            {% set rc = {'Customer': 'customer', 'Service-center staff': 'staff', 'Claim reviewer': 'reviewer', 'Administrator': 'admin'}.get(role, 'admin') %}
+            <button class="persona role-{{ rc }}" type="button" data-persona data-email="{{ e }}" data-password="{{ pw }}">
+              <b>{{ role }}</b><span class="mono">{{ e }}</span><span class="go" aria-hidden="true" title="Sign in">{{ icon('arrow-right', 'sm') }}</span>
             </button>
           {% endfor %}
         </div>
-        <p class="tiny muted">One click signs in with the seeded account for that role.</p>
+        <p class="persona-note">One click signs in with the seeded account for that role.</p>
       </section>
       {% endif %}
+      <p class="auth-legal">AssureX Claim Engine · Built for TechWiz 7 · <a href="{{ url_for('public.model_card') }}">Model card</a></p>
     </div>
-  </div>
-  <div class="auth-art" aria-hidden="true">
-    <figure>
-      <div class="scan"><img class="summary-card-img" src="{{ url_for('public.test_card', name=config.LOGIN_CARD) }}" alt="" width="600" height="600"></div>
-      <figcaption class="small muted">A Claim Summary Card from the test split. The image model reads this picture; the Python model reads the same facts as numbers.</figcaption>
-    </figure>
-  </div>
+  </section>
+  {{ scanner(card, reading) }}
 </div>
 {% endblock %}
+{% block footer %}{% endblock %}

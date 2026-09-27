@@ -1,6 +1,7 @@
 <!doctype html>
-{# Page shell: skip link, navbar, toasts, main, footer. Blocks: title, description, page_css, page_header, content, page_js.
-   A page that draws charts sets `{% set needs_charts = true %}` so only it loads Chart.js. #}
+{# Page shell: skip link, navbar, toasts, main, footer. Blocks: title, description, page_css, page_header, content, footer, page_js.
+   A page that draws charts sets `{% set needs_charts = true %}` so only it loads Chart.js.
+   A page that shows its own warnings and errors inline (sign in, register) sets `{% set inline_alerts = true %}`. #}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -23,7 +24,7 @@
   <div class="nav-sentinel" data-nav-sentinel aria-hidden="true"></div>
   <div class="toasts" data-toasts>
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}
+      {% for cat, msg in messages if not (inline_alerts and cat in ('danger', 'error', 'warning')) %}
         {% set c = {'success': 'success', 'warning': 'warning', 'danger': 'danger', 'error': 'danger'}.get(cat, 'info') %}
         <div class="toast {{ c }}" role="{{ 'alert' if c == 'danger' else 'status' }}" data-toast data-sticky="{{ '1' if c == 'danger' else '0' }}">
           <i class="bi {{ {'success': 'bi-check-circle', 'warning': 'bi-exclamation-triangle', 'danger': 'bi-x-circle'}.get(c, 'bi-info-circle') }}" aria-hidden="true"></i>
@@ -41,7 +42,7 @@
     </div>
     {% endblock %}
   </main>
-  {% include "components/footer.html" %}
+  {% block footer %}{% include "components/footer.html" %}{% endblock %}
   {% if needs_charts %}<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>{% endif %}
   <script src="{{ asset('js/app.js') }}" defer></script>
   {% block page_js %}{% endblock %}

@@ -538,26 +538,13 @@ a.plate:hover .name { text-decoration: underline; text-underline-offset: 3px; }
 .metric .v { font-size: var(--fs-xl); font-weight: 600; }
 .metric .l { font-size: var(--fs-xs); color: var(--ink-2); }
 
-/* ------------------------------------------------------------------ auth */
-.auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100vh - var(--nav-h)); }
-.auth-form { display: grid; place-items: center; padding: var(--s7) var(--s5); background: var(--paper); }
-.auth-form .box { width: 100%; max-width: 420px; }
-.auth-art { display: grid; place-items: center; padding: var(--s7); border-left: 1px solid var(--rule); background: var(--mist); }
-.auth-art figure { margin: 0; display: grid; gap: var(--s3); max-width: 420px; }
-.auth-art .scan { position: relative; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--r-bar); background: var(--paper); }
-.auth-art .scan::after { content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 1px; background: var(--teal); animation: scanv 900ms ease-out 200ms forwards; }
-@keyframes scanv { to { top: 100%; } }
-@media (prefers-reduced-motion: reduce) { .auth-art .scan::after { display: none; } }
-@media (max-width: 900px) { .auth { grid-template-columns: minmax(0, 1fr); } .auth-art { display: none; } }
-.personas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
-.persona { display: grid; gap: 2px; min-height: 48px; padding: var(--s2) var(--s3); border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--paper);
-  text-align: left; font: inherit; cursor: pointer; color: var(--ink); }
-.persona:hover { border-color: var(--teal); }
-.persona b { font-size: var(--fs-sm); font-weight: 500; } .persona span { font-size: var(--fs-2xs); color: var(--ink-2); }
-.strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
-.strength i { height: 4px; background: var(--rule); border-radius: var(--r-bar); }
-.strength[data-score="1"] i:nth-child(-n+1), .strength[data-score="2"] i:nth-child(-n+2) { background: var(--review-mark); }
-.strength[data-score="3"] i:nth-child(-n+3), .strength[data-score="4"] i { background: var(--valid); }
+/* ------------------------------------------------------------------ password strength (register, profile) */
+.strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.strength i { height: 4px; background: var(--rule); border-radius: var(--r-bar); transition: background-color var(--t-fast); }
+.strength[data-score="1"] i:nth-child(-n+1) { background: var(--invalid-mark); }
+.strength[data-score="2"] i:nth-child(-n+2) { background: var(--review-mark); }
+.strength[data-score="3"] i:nth-child(-n+3) { background: var(--teal-mark); }
+.strength[data-score="4"] i { background: var(--valid-mark); }
 
 /* ------------------------------------------------------------------ reviewer workbench */
 .workbench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--s4); align-items: start; padding-bottom: 120px; }

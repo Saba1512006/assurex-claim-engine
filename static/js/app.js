@@ -182,13 +182,28 @@
     const words = ["Too short", "Weak", "Fair", "Good", "Strong"];
     input.addEventListener("input", () => {
       const v = input.value;
-      let s = v.length >= 8 ? 1 : 0;
-      if (s && /[a-z]/.test(v) && /[A-Z]/.test(v)) s++;
-      if (s && /\d/.test(v)) s++;
-      if (s && (/[^A-Za-z0-9]/.test(v) || v.length >= 14)) s++;
+      let s = v.length >= 10 ? 1 : 0;                          // the server's minimum
+      if (s && /[A-Za-z]/.test(v) && /\d/.test(v)) s++;
+      if (s > 1 && /[a-z]/.test(v) && /[A-Z]/.test(v)) s++;
+      if (s > 2 && (/[^A-Za-z0-9]/.test(v) || v.length >= 14)) s++;
       meter.dataset.score = String(s);
-      if (label) label.textContent = v ? `Password strength: ${words[s]}` : "";
+      if (label) { label.textContent = v ? words[s] : ""; label.dataset.score = String(s); }
     });
+  });
+  /* confirmation field: says whether it matches the password as the person types */
+  $$("[data-match]").forEach((confirm) => {
+    const pw = document.getElementById(confirm.dataset.match);
+    const hint = document.getElementById(confirm.getAttribute("aria-describedby"));
+    if (!pw || !hint || !hint.hasAttribute("data-match-label")) return;
+    const upd = () => {
+      const state = !confirm.value ? "" : confirm.value === pw.value ? "ok" : "no";
+      confirm.setCustomValidity(state === "no" ? "The two passwords don't match." : "");
+      if (confirm.getAttribute("aria-invalid") === "true") check(confirm);   // clear an earlier error once it is fixed
+      if (hint.classList.contains("err")) return;                            // an error message is showing; keep it
+      hint.dataset.state = state;
+      hint.textContent = state === "ok" ? "Passwords match." : state === "no" ? "Doesn't match the password yet." : "";
+    };
+    confirm.addEventListener("input", upd); pw.addEventListener("input", upd);
   });
 
   /* sign-in persona chips fill the seeded evaluator accounts (password never shown as text) */

@@ -40,6 +40,7 @@ class Config:
                      ("Claim reviewer", "reviewer@assurex.local", "ReviewerPass123!"),
                      ("Administrator", "admin@assurex.local", "AdminPass123!")]
     LOGIN_CARD = "CLM-00850_v0.jpg"                      # a correctly scored test-split card shown beside the sign-in form
+    REGISTER_CARD = "CLM-00078_v0.jpg"                   # the same for the registration page (an excluded-damage claim)
 
     # ----- domain constants (SRS)
     CLAIM_CLASS_VALID, CLAIM_CLASS_INVALID, CLAIM_CLASS_MANUAL_REVIEW = "Valid Claim", "Invalid Claim", "Manual Review"
