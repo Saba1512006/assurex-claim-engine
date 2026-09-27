@@ -111,9 +111,17 @@ def policies():
                   "on its predictions.", "warning")
         return redirect(url_for("admin.policies", category=category))
     selected = request.args.get("category") if request.args.get("category") in CATEGORIES else CATEGORIES[0]
+    history = (AuditLog.query.filter(AuditLog.action == "POLICY_UPDATED", AuditLog.entity_id == selected)
+               .order_by(AuditLog.id.desc()).limit(15).all())
+    decision_history = (AuditLog.query.filter(AuditLog.action == "DECISION_POLICY_UPDATED")
+                        .order_by(AuditLog.id.desc()).limit(10).all())
+    from src.services.verdict import DETAILS_KEY
+    from src.models.entities import SystemSetting
     return render_template("admin/policies.html", policies=policy_store.all_policies(), selected=selected,
                            catalog=policy_store.RULE_CATALOG, damage_types=DAMAGE_TYPES, categories=CATEGORIES,
-                           decision=decision_table.load_policy(), window=alert_days())
+                           decision=decision_table.load_policy(), window=alert_days(), history=history,
+                           decision_history=decision_history, card_fields=CARD_POLICY_FIELDS,
+                           show_details=SystemSetting.get_val(DETAILS_KEY, "1") == "1")
 
 
 @admin_bp.post("/settings/decision")
@@ -150,6 +158,22 @@ def alert_settings():
     db.session.commit()
     flash(f"Owners are now alerted {days} days before a warranty ends.", "success")
     return redirect(url_for("admin.policies", _anchor="alerts"))
+
+
+@admin_bp.post("/settings/customer-view")
+@require("settings.manage")
+def customer_view_settings():
+    """SRS xix: whether customers see model probabilities and rule IDs on their claim (reviewers always do)."""
+    from src.models.entities import SystemSetting
+    from src.services.verdict import DETAILS_KEY
+    show = request.form.get("show_model_details") == "1"
+    SystemSetting.set_val(DETAILS_KEY, "1" if show else "0",
+                          description="Customers see model probabilities and rule IDs on their claims")
+    audit("SETTING_UPDATED", "Settings", DETAILS_KEY, value=show)
+    db.session.commit()
+    flash("Customers now see model probabilities and rule IDs." if show else
+          "Customers now see the decision and its reasons without model probabilities.", "success")
+    return redirect(url_for("admin.policies", _anchor="customer-view"))
 
 
 @admin_bp.post("/alerts/dispatch")

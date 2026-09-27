@@ -14,7 +14,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -329,3 +329,39 @@ def test_batch_upload_is_rate_limited(tmp_path, monkeypatch):
         assert codes == [400, 400, 400, 429]
         db.session.remove()
         db.drop_all()
+
+
+def test_policy_save_shows_up_in_version_history(app, client, tmp_path, monkeypatch):
+    import shutil
+    from src.rules import policy_store
+    shutil.copytree(policy_store.POLICY_DIR, tmp_path / "policies")
+    monkeypatch.setattr(policy_store, "POLICY_DIR", tmp_path / "policies")
+    policy_store.reload()
+    try:
+        make_user("ad@x.io", "administrator")
+        login(client, "ad@x.io")
+        p = policy_store.get_policy("Home Appliances")
+        form = {"category": "Home Appliances", **{k: p[k] for k in policy_store.EDITABLE}, "grace_period_days": p["grace_period_days"] + 1,
+                "excluded_damage_types": p["excluded_damage_types"]}
+        form.update({f"rule_{rid}": ("hard_fail" if rid in p["hard_fail_rules"] else "manual_review" if rid in p["manual_review_rules"]
+                                     else "warning" if rid in p["warning_rules"] else "off") for rid in policy_store.RULE_CATALOG})
+        client.post("/admin/policies", data=form)
+        html = client.get("/admin/policies?category=Home+Appliances").get_data(as_text=True)
+        assert f"<del>{p['grace_period_days']}</del> → <ins>{p['grace_period_days'] + 1}</ins>" in html
+    finally:
+        policy_store.reload()
+
+
+def test_customer_view_setting_hides_model_details_from_customers_only(app, client, gtm):
+    _, c = _submitted_claim(client, gtm)
+    client.post("/logout")
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    client.post("/admin/settings/customer-view", data={})                 # unchecked box: off
+    client.post("/logout")
+    login(client, "c@x.io")
+    customer_html = client.get(f"/claims/{c.claim_id}").get_data(as_text=True)
+    assert 'aria-label="Python model:' not in customer_html                # no gauge for the customer
+    client.post("/logout")
+    login(client, "ad@x.io")
+    assert 'aria-label="Python model:' in client.get(f"/claims/{c.claim_id}").get_data(as_text=True)

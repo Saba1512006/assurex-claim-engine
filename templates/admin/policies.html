@@ -1,93 +1,144 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import csrf %}
-{% block title %}Policies &amp; decision settings{% endblock %}
-{% block content %}
-{% set p = policies[selected] %}
+{# Policies: per-category warranty policy with a live diff of unsaved changes (card-affecting fields flagged),
+   its version history from the audit trail, then decision routing, customer view and expiry alerts. #}
+{% from "components/ui.html" import csrf, tag, panel as ui_panel %}
+{% block title %}Policies and settings{% endblock %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="eyebrow">Configuration</div>
-    <h1>Warranty policies &amp; decision settings</h1>
-    <p class="lede">Rules live in <code>policies/*.json</code> and <code>config/decision_policy.json</code>. Changes apply to new evaluations immediately; recorded results never change. Every save is audited.</p>
-    <p class="callout warn small mb-0"><b>Teachable Machine:</b> the grace period, reporting period, excluded causes, diagnosis threshold and repeat-repair threshold are drawn on the Claim Summary Card. Changing them means the image model must be retrained on rebuilt cards.</p>
+    <h1>Warranty policies and decision settings</h1>
+    <p class="lede">Changes apply to new evaluations immediately; recorded results never change. Every save is versioned in the audit trail.</p>
   </div>
-</div>
-
-<nav class="tabs" aria-label="Categories">
-  {% for c in categories %}<a href="{{ url_for('admin.policies', category=c) }}" {% if c == selected %}aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
-  <a href="#decision">Decision settings</a>
-</nav>
-
-<form method="post" action="{{ url_for('admin.policies') }}" class="split">{{ csrf() }}
-  <input type="hidden" name="category" value="{{ selected }}">
-  <div class="stack">
-    <section class="card">
-      <div class="card-h"><h2>{{ p.policy_name }}</h2><span class="hint">{{ selected }}</span></div>
-      <div class="card-b form-grid">
-        <label class="field"><span>Standard coverage (months)</span><input class="input" type="number" min="1" max="120" name="coverage_duration_months" value="{{ p.coverage_duration_months }}" required></label>
-        <label class="field"><span>Grace period after expiry (days)</span><input class="input" type="number" min="0" max="90" name="grace_period_days" value="{{ p.grace_period_days }}" required></label>
-        <label class="field"><span>Report faults within (days)</span><input class="input" type="number" min="1" max="365" name="claim_reporting_period_days" value="{{ p.claim_reporting_period_days }}" required></label>
-        <label class="field"><span>Repeat-repair review threshold</span><input class="input" type="number" min="1" max="10" name="repeat_repair_review_threshold" value="{{ p.repeat_repair_review_threshold }}" required></label>
-        <label class="field full"><span>Diagnosis needed to confirm an exclusion</span><input class="input" type="number" step="0.01" min="0" max="1" name="exclusion_min_diagnostic_confidence" value="{{ p.exclusion_min_diagnostic_confidence }}" required>
-          <span class="help">An excluded cause with diagnostic confidence at or above this is a hard fail; below it, the claim goes to a reviewer.</span></label>
-        <div class="field full"><span>Excluded damage causes</span>
-          <div class="row" style="gap:8px 18px">{% for d in damage_types %}<label class="check"><input type="checkbox" name="excluded_damage_types" value="{{ d }}" {{ 'checked' if d in p.excluded_damage_types }}>{{ d }}</label>{% endfor %}</div></div>
-      </div>
-    </section>
-    <section class="card">
-      <div class="card-h"><h2>Rules &amp; severity</h2><span class="hint">Hard fail → Likely Invalid · Manual review → reviewer · Warning → shown, never blocks</span></div>
-      <div class="table-wrap"><table class="table compact">
-        <thead><tr><th>Rule</th><th>Severity</th></tr></thead>
-        <tbody>{% for rid, title in catalog.items() %}
-          {% set sev = 'hard_fail' if rid in p.hard_fail_rules else ('manual_review' if rid in p.manual_review_rules else ('warning' if rid in p.warning_rules else 'off')) %}
-          <tr><td><div class="t-main small">{{ title }}</div><div class="t-sub mono">{{ rid }}</div></td>
-            <td style="width:200px"><select class="select sm" name="rule_{{ rid }}">{% for v, l in [('hard_fail', 'Hard fail'), ('manual_review', 'Manual review'), ('warning', 'Warning'), ('off', 'Off')] %}<option value="{{ v }}" {{ 'selected' if sev == v }}>{{ l }}</option>{% endfor %}</select></td></tr>
-        {% endfor %}</tbody>
-      </table></div>
-      <div class="card-f row between"><span class="small muted">Saved to <code>policies/{{ selected|lower|replace(' ', '_') }}.json</code></span><button class="btn" type="submit"><i class="bi bi-save"></i>Save {{ selected }} policy</button></div>
-    </section>
-  </div>
-  <aside class="stack">
-    <section class="card soft"><div class="card-b stack-sm small">
-      <b>Covered faults</b><div class="muted">{{ p.covered_faults|join(', ') }}</div>
-      <b class="mt-1">Mandatory documents</b><div class="muted">{{ p.mandatory_documents|map('replace', '_', ' ')|join(', ') }}</div>
-      <b class="mt-1">Supporting documents</b><div class="muted">{{ p.supporting_documents|map('replace', '_', ' ')|join(', ') }}</div>
-      <b class="mt-1">Exclusions (wording)</b><div class="muted">{{ p.exclusions|join('; ') }}</div>
-    </div></section>
-  </aside>
-</form>
-
-<div class="grid grid-2 mt-3" id="decision">
-  <section class="card">
-    <div class="card-h"><h2>Model consistency &amp; routing</h2><span class="hint">version {{ decision.version }}</span></div>
-    <form class="card-b stack" method="post" action="{{ url_for('admin.decision_settings') }}">{{ csrf() }}
-      <div class="form-grid">
-        <label class="field"><span>Minimum confidence</span><input class="input" type="number" step="0.01" min="0" max="1" name="min_confidence" value="{{ decision.consistency.min_confidence }}"><span class="help">Below this either model's result is “Uncertain”.</span></label>
-        <label class="field"><span>Strong match if |Δ| ≤</span><input class="input" type="number" step="0.01" min="0" max="1" name="strong_max_diff" value="{{ decision.consistency.strong_max_diff }}"></label>
-        <label class="field"><span>Acceptable match if |Δ| ≤</span><input class="input" type="number" step="0.01" min="0" max="1" name="acceptable_max_diff" value="{{ decision.consistency.acceptable_max_diff }}"><span class="help">Above this, same class is a “Weak Match”.</span></label>
-      </div>
-      <div class="table-wrap"><table class="table compact small">
-        <thead><tr><th>Recommendation</th><th>Automatically moves the claim to</th></tr></thead>
-        <tbody>{% for d, s in decision.routing.items() %}<tr><td>{{ d }}</td><td><select class="select sm" name="route_{{ d }}">{% for opt in ['Approved', 'Rejected', 'Manual Review'] %}<option {{ 'selected' if opt == s }}>{{ opt }}</option>{% endfor %}</select></td></tr>{% endfor %}</tbody>
-      </table></div>
-      <div><button class="btn" type="submit">Save decision settings</button></div>
-    </form>
-  </section>
-  <section class="card">
-    <div class="card-h"><h2>Decision table</h2><span class="hint">first matching row wins</span></div>
-    <div class="table-wrap"><table class="table compact small">
-      <thead><tr><th>Row</th><th>When</th><th>Recommendation</th></tr></thead>
-      <tbody>{% for r in decision.decision_table %}<tr><td class="mono">{{ r.id }}</td>
-        <td>{% for k, cs in r.when.items() %}<span class="muted">{{ k }}:</span> {% for c in cs %}<code>{{ c[0] }} {{ c[1] }} {{ c[2] if c[2] is string else c[2]|join(', ') if c[2] is iterable else c[2] }}</code>{{ ', ' if not loop.last }}{% endfor %}{% endfor %}</td>
-        <td>{{ r.decision }}</td></tr>{% endfor %}
-        <tr><td class="mono">{{ decision.default.id }}</td><td class="muted">otherwise</td><td>{{ decision.default.decision }}</td></tr></tbody>
-    </table></div>
-  </section>
-  <section class="card" id="alerts">
-    <div class="card-h"><h2>Warranty expiry alerts</h2></div>
-    <form class="card-b row" method="post" action="{{ url_for('admin.alert_settings') }}">{{ csrf() }}
-      <label class="field" style="flex:1"><span>Alert owners this many days before a warranty ends</span><input class="input" type="number" min="1" max="365" name="days" value="{{ window }}"></label>
-      <button class="btn" type="submit" style="align-self:flex-end">Save</button>
-    </form>
-  </section>
+  <a class="btn quiet" href="{{ url_for('admin.what_if') }}">Try thresholds in the what-if simulator</a>
 </div>
 {% endblock %}
+{% block content %}
+{% set p = policies[selected] %}
+{% set labels = {'coverage_duration_months': 'Standard coverage (months)', 'grace_period_days': 'Grace period after expiry (days)',
+                 'claim_reporting_period_days': 'Report faults within (days)', 'repeat_repair_review_threshold': 'Repeat repairs before review',
+                 'exclusion_min_diagnostic_confidence': 'Diagnosis needed to confirm an exclusion', 'excluded_damage_types': 'Excluded causes'} %}
+<div class="stack">
+  <nav class="tabs" aria-label="Policy category">
+    {% for c in categories %}<a href="{{ url_for('admin.policies', category=c) }}" {% if c == selected %}aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  </nav>
+
+  <form method="post" action="{{ url_for('admin.policies') }}" class="split" data-policy-form>
+    {{ csrf() }}<input type="hidden" name="category" value="{{ selected }}">
+    <div class="stack">
+      {% call ui_panel(p.policy_name, hint='policies/' ~ selected|lower|replace(' ', '_') ~ '.json') %}
+        <div class="form-grid">
+          {% for key, lo, hi, step in [('coverage_duration_months', 1, 120, 1), ('grace_period_days', 0, 90, 1), ('claim_reporting_period_days', 1, 365, 1),
+                                       ('repeat_repair_review_threshold', 1, 10, 1), ('exclusion_min_diagnostic_confidence', 0, 1, 0.01)] %}
+            <div class="field{{ ' full' if key == 'exclusion_min_diagnostic_confidence' }}">
+              <label for="p-{{ key }}">{{ labels[key] }}{% if key in card_fields %} {{ tag('on the card', 'gtm') }}{% endif %}</label>
+              <input class="input mono" id="p-{{ key }}" type="number" name="{{ key }}" min="{{ lo }}" max="{{ hi }}" step="{{ step }}" value="{{ p[key] }}" required
+                     data-track data-label="{{ labels[key] }}" data-initial="{{ p[key] }}" {% if key in card_fields %}data-card{% endif %}>
+              {% if key == 'exclusion_min_diagnostic_confidence' %}<span class="help">An excluded cause with a diagnosis at or above this is a hard fail; below it the claim goes to a reviewer.</span>{% endif %}
+            </div>
+          {% endfor %}
+          <fieldset class="field full" data-track-group data-label="{{ labels['excluded_damage_types'] }}" data-card data-initial="{{ p.excluded_damage_types|sort|join('|') }}">
+            <legend>{{ labels['excluded_damage_types'] }} {{ tag('on the card', 'gtm') }}</legend>
+            <div class="checks-row">{% for d in damage_types %}<label class="check"><input type="checkbox" name="excluded_damage_types" value="{{ d }}" {{ 'checked' if d in p.excluded_damage_types }}>{{ d }}</label>{% endfor %}</div>
+          </fieldset>
+        </div>
+      {% endcall %}
+
+      {% call ui_panel('Rules and severity', hint='Hard fail: Likely Invalid · Manual review: a reviewer · Warning: shown, never blocks', body='') %}
+        <div class="table-wrap"><table class="table compact">
+          <thead><tr><th scope="col">Rule</th><th scope="col">Severity</th></tr></thead>
+          <tbody>{% for rid, title in catalog.items() %}
+            {% set sev = 'hard_fail' if rid in p.hard_fail_rules else ('manual_review' if rid in p.manual_review_rules else ('warning' if rid in p.warning_rules else 'off')) %}
+            <tr><th scope="row"><span class="t-main small">{{ title }}</span> <span class="t-sub mono">{{ rid }}</span></th>
+              <td><label class="sr" for="r-{{ rid }}">Severity of {{ rid }}</label>
+                <select class="select sm" id="r-{{ rid }}" name="rule_{{ rid }}" data-track data-label="{{ rid }}" data-initial="{{ sev }}">
+                  {% for v, l in [('hard_fail', 'Hard fail'), ('manual_review', 'Manual review'), ('warning', 'Warning'), ('off', 'Off')] %}<option value="{{ v }}" {{ 'selected' if sev == v }}>{{ l }}</option>{% endfor %}</select></td></tr>
+          {% endfor %}</tbody>
+        </table></div>
+      {% endcall %}
+    </div>
+
+    <aside class="stack sticky" aria-label="Unsaved changes">
+      <section class="panel" aria-labelledby="diff-h">
+        <div class="panel-h"><h2 id="diff-h">Changes</h2><span class="hint" data-diff-count aria-live="polite">None yet</span></div>
+        <div class="panel-b stack-sm">
+          <ul class="chg" data-diff><li class="small muted">Edit a value to see the change here before saving.</li></ul>
+          <p class="callout warn small mb-0 hidden" data-diff-card><b>Retraining needed.</b> A value drawn on the Claim Summary Card changed, so the Teachable Machine model no longer matches its training cards. Rebuild the cards, retrain and reinstall it before relying on its predictions.</p>
+          <div class="row tight"><button class="btn" type="submit" data-diff-save disabled>Save {{ selected }} policy</button>
+            <button class="btn ghost" type="reset" data-diff-reset>Discard</button></div>
+        </div>
+      </section>
+      {% call ui_panel('Version history', hint=selected, body='') %}
+        <ol class="list chg-history">
+          {% for h in history %}
+            <li><div class="grow"><div class="ttl small">{{ h.timestamp|date('%d %b %Y %H:%M') }} · {{ h.actor.full_name if h.actor else 'System' }}</div>
+              <ul class="chg tiny">{% for k, ch in (h.details.get('changes') or {}).items() %}<li><span class="mono">{{ labels.get(k, k) }}</span>: <del>{{ ch['from']|join(', ') if ch['from'] is iterable and ch['from'] is not string else ch['from'] }}</del> → <ins>{{ ch['to']|join(', ') if ch['to'] is iterable and ch['to'] is not string else ch['to'] }}</ins></li>{% else %}<li class="muted">Saved with no changes</li>{% endfor %}</ul></div></li>
+          {% else %}<li class="small muted">No saved changes yet: this is the policy as shipped.</li>{% endfor %}
+        </ol>
+      {% endcall %}
+      {% call ui_panel('Fixed by the policy file') %}
+        <dl class="kv small">
+          <dt>Covered faults</dt><dd>{{ p.covered_faults|join(', ') }}</dd>
+          <dt>Mandatory</dt><dd>{{ p.mandatory_documents|map('replace', '_', ' ')|join(', ') }}</dd>
+          <dt>Supporting</dt><dd>{{ p.supporting_documents|map('replace', '_', ' ')|join(', ') }}</dd>
+        </dl>
+      {% endcall %}
+    </aside>
+  </form>
+
+  <div class="grid grid-2" id="decision">
+    <section class="panel" aria-labelledby="dec-h">
+      <div class="panel-h"><h2 id="dec-h">Agreement thresholds and routing</h2><span class="hint mono">version {{ decision.version }}</span></div>
+      <form class="panel-b stack" method="post" action="{{ url_for('admin.decision_settings') }}" data-confirm="Save the decision settings as a new version? New claims will use them.">{{ csrf() }}
+        <div class="form-grid">
+          {% for key, label, hint in [('min_confidence', 'Minimum confidence', 'Below this either model is “Uncertain”.'), ('strong_max_diff', 'Strong match: largest gap', ''), ('acceptable_max_diff', 'Acceptable match: largest gap', 'Wider than this is a “Weak Match”.')] %}
+            <div class="field"><label for="d-{{ key }}">{{ label }}</label><input class="input mono" id="d-{{ key }}" type="number" step="0.01" min="0" max="1" name="{{ key }}" value="{{ decision.consistency[key] }}" aria-describedby="d-{{ key }}-d"><span class="help" id="d-{{ key }}-d">{{ hint }}</span></div>
+          {% endfor %}
+        </div>
+        <div class="table-wrap"><table class="table compact small">
+          <thead><tr><th scope="col">Recommendation</th><th scope="col">Moves the claim to</th></tr></thead>
+          <tbody>{% for d, s in decision.routing.items() %}<tr><th scope="row">{{ d }}</th><td><label class="sr" for="rt-{{ loop.index }}">Route for {{ d }}</label><select class="select sm" id="rt-{{ loop.index }}" name="route_{{ d }}">{% for opt in ['Approved', 'Rejected', 'Manual Review'] %}<option {{ 'selected' if opt == s }}>{{ opt }}</option>{% endfor %}</select></td></tr>{% endfor %}</tbody>
+        </table></div>
+        <div><button class="btn" type="submit">Save decision settings</button></div>
+      </form>
+      {% if decision_history %}
+      <details class="panel-f"><summary>Earlier versions ({{ decision_history|length }})</summary>
+        <ol class="chg tiny mt-2">{% for h in decision_history %}{% set d = h.details %}
+          <li><span class="mono">{{ d.get('version', '') }}</span> · {{ h.timestamp|date('%d %b %H:%M') }} · {{ h.actor.full_name if h.actor else 'System' }}{% if d.get('source') %} · via {{ d.source }}{% endif %}
+            {% set b = d.get('before', {}).get('consistency', d.get('before', {})) %}{% set a = d.get('after', {}).get('consistency', d.get('after', {})) %}
+            {% for k in ['min_confidence', 'strong_max_diff', 'acceptable_max_diff'] if b.get(k) != a.get(k) %}<br><span class="mono">{{ k }}</span> <del>{{ b.get(k) }}</del> → <ins>{{ a.get(k) }}</ins>{% endfor %}</li>{% endfor %}</ol>
+      </details>
+      {% endif %}
+    </section>
+
+    <section class="panel" aria-labelledby="dt-h">
+      <div class="panel-h"><h2 id="dt-h">Decision table</h2><span class="hint">First matching row wins</span></div>
+      <div class="table-wrap"><table class="table compact small">
+        <thead><tr><th scope="col">Row</th><th scope="col">When</th><th scope="col">Recommendation</th></tr></thead>
+        <tbody>{% for r in decision.decision_table %}<tr><th scope="row" class="mono">{{ r.id }}</th>
+          <td>{% for k, cs in r.when.items() %}<span class="muted">{{ k }}:</span> {% for c in cs %}<code>{{ c[0] }} {{ c[1] }} {{ c[2] if c[2] is string else (c[2]|join(', ') if c[2] is iterable else c[2]) }}</code>{{ ', ' if not loop.last }}{% endfor %}{% endfor %}</td>
+          <td>{{ r.decision }}</td></tr>{% endfor %}
+          <tr><th scope="row" class="mono">{{ decision.default.id }}</th><td class="muted">otherwise</td><td>{{ decision.default.decision }}</td></tr></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel" id="customer-view" aria-labelledby="cv-h">
+      <div class="panel-h"><h2 id="cv-h">What customers see</h2></div>
+      <form class="panel-b stack-sm" method="post" action="{{ url_for('admin.customer_view_settings') }}">{{ csrf() }}
+        <label class="check"><input type="checkbox" name="show_model_details" value="1" {{ 'checked' if show_details }}>
+          <span>Show customers both models' probabilities, the agreement gauge and rule IDs on their claims.</span></label>
+        <p class="small muted mb-0">Off: customers see the decision, its reasons in plain words and what evidence is still needed. Reviewers and administrators always see everything.</p>
+        <div><button class="btn quiet" type="submit">Save</button></div>
+      </form>
+    </section>
+
+    <section class="panel" id="alerts" aria-labelledby="al-h">
+      <div class="panel-h"><h2 id="al-h">Warranty expiry alerts</h2></div>
+      <form class="panel-b filters" method="post" action="{{ url_for('admin.alert_settings') }}">{{ csrf() }}
+        <div class="field"><label for="al-days">Days before a warranty ends</label><input class="input mono" id="al-days" type="number" min="1" max="365" name="days" value="{{ window }}" required></div>
+        <button class="btn quiet" type="submit">Save</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block page_js %}<script src="{{ asset('js/policy.js') }}" defer></script>{% endblock %}
