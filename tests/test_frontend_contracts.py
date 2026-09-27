@@ -13,7 +13,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'claims/wizard.html', 'auth/login.html', 'admin/policies.html', 'admin/analytics.html', 'products/detail.html', 'auth/profile.html', 'products/list.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'claims/track.html', 'claims/dashboard.html', 'claims/search.html', 'products/register.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'claims/wizard.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'claims/track.html', 'claims/search.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -147,3 +147,9 @@ def test_demo_evaluate_is_rate_limited(tmp_path, monkeypatch):
         assert c.post("/api/demo/evaluate", json={"case": "nope"}).get_json()["error"]["code"] == "RATE_LIMITED"
         db.session.remove()
         db.drop_all()
+
+
+def test_macro_attributes_render_as_attributes_not_escaped_text(app, client):
+    html = client.get("/register").get_data(as_text=True)
+    assert 'placeholder="+92 300 1234567"' in html and 'autocomplete="email"' in html
+    assert not re.search(r"<(input|button|select|textarea)\b[^>]*&#34;", html)       # no escaped quotes inside a tag

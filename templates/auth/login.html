@@ -1,44 +1,52 @@
 {% extends "components/base.html" %}
+{# Sign in: form on the left, a scanned test-split Claim Summary Card on the right; evaluator persona chips when enabled. #}
+{% from "components/ui.html" import csrf, field %}
 {% block title %}Sign in{% endblock %}
+{% block description %}Sign in to AssureX to file, review or administer warranty claims.{% endblock %}
 {% block main %}
 <div class="auth">
-  <div class="auth-art">
-    <div>
-      <h2>Every claim, explained.</h2>
-      <p>See what each model predicted, which warranty rules passed, and why a claim was approved, rejected or sent for review.</p>
-      <div class="points">
-        <div><i class="bi bi-check2-circle"></i><span>Two independent models compared on every claim</span></div>
-        <div><i class="bi bi-check2-circle"></i><span>Receipts read by OCR and confirmed by you</span></div>
-        <div><i class="bi bi-check2-circle"></i><span>Track your claim through all eight stages</span></div>
-      </div>
-    </div>
-    <p class="small">Accounts lock for 15 minutes after five wrong passwords.</p>
-  </div>
   <div class="auth-form">
-    <div class="box stack">
+    <div class="box stack" data-login>
       <div>
         <h1>Sign in</h1>
-        <p class="muted mt-1">Welcome back. Use the email you registered with.</p>
+        <p class="muted mt-1">Use the email you registered with.</p>
       </div>
-      <form method="post" class="stack" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="field"><span>Email</span>
-          <input class="input" type="email" name="email" value="{{ email or request.args.get('email', '') }}" autocomplete="username" required autofocus></label>
-        <label class="field"><span>Password</span>
-          <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+      <form method="post" class="stack">
+        {{ csrf() }}
+        {{ field('email', 'Email', email or request.args.get('email', ''), type='email', required=True,
+                 attrs={'autocomplete': 'username', 'autofocus': True}) }}
+        <div class="field">
+          <label for="f-password">Password <span class="req">(required)</span></label>
+          <div class="pw">
+            <input class="input" id="f-password" type="password" name="password" autocomplete="current-password" required aria-describedby="f-password-d">
+            <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-password" aria-pressed="false">Show</button>
+          </div>
+          <span class="help" id="f-password-d">Five wrong attempts lock the account for 15 minutes.</span>
+        </div>
         <button class="btn lg block" type="submit">Sign in</button>
       </form>
-      <p class="small muted center">New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>. Staff, reviewers and administrators are invited by an administrator.</p>
-      {% if config.get('SHOW_DEMO_ACCOUNTS', True) %}
-      <details class="card soft"><summary class="card-b tight" style="cursor:pointer"><b class="small">Evaluator accounts</b></summary>
-        <div class="card-b demo-grid" style="padding-top:0">
-          {% for role, email_, pw in [('Customer', 'customer@assurex.local', 'CustomerPass123!'), ('Service-center staff', 'staff@assurex.local', 'StaffPass123!'), ('Claim reviewer', 'reviewer@assurex.local', 'ReviewerPass123!'), ('Administrator', 'admin@assurex.local', 'AdminPass123!')] %}
-            <button class="demo" type="button" data-fill-login="{{ email_ }}|{{ pw }}"><span><b>{{ role }}</b><span>{{ email_ }}</span></span><i class="bi bi-arrow-right"></i></button>
+      <p class="small muted">New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>.
+        Service-center staff, reviewers and administrators are invited by an administrator.</p>
+      {% if config.SHOW_DEMO_ACCOUNTS %}
+      <section class="stack-sm" aria-labelledby="personas-h">
+        <h2 class="eyebrow" id="personas-h">Evaluator accounts</h2>
+        <div class="personas">
+          {% for role, e, pw in config.DEMO_ACCOUNTS %}
+            <button class="persona" type="button" data-persona data-email="{{ e }}" data-password="{{ pw }}">
+              <b>{{ role }}</b><span>{{ e }}</span>
+            </button>
           {% endfor %}
         </div>
-      </details>
+        <p class="tiny muted">One click signs in with the seeded account for that role.</p>
+      </section>
       {% endif %}
     </div>
+  </div>
+  <div class="auth-art" aria-hidden="true">
+    <figure>
+      <div class="scan"><img class="summary-card-img" src="{{ url_for('public.test_card', name=config.LOGIN_CARD) }}" alt="" width="600" height="600"></div>
+      <figcaption class="small muted">A Claim Summary Card from the test split. The image model reads this picture; the Python model reads the same facts as numbers.</figcaption>
+    </figure>
   </div>
 </div>
 {% endblock %}

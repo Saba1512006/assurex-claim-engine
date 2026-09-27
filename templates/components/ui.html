@@ -7,18 +7,18 @@
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 {%- endmacro %}
 
-{% macro button(label, kind='primary', type='submit', icon=None, attrs='', size='') -%}
+{% macro button(label, kind='primary', type='submit', icon=None, attrs={}, size='') -%}
 {# Button: primary (ink), quiet, ghost, danger, approve or reject; label says what happens. #}
-<button class="btn {{ '' if kind == 'primary' else kind }} {{ size }}" type="{{ type }}" {{ attrs }}>{% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}{{ label }}</button>
+<button class="btn {{ '' if kind == 'primary' else kind }} {{ size }}" type="{{ type }}"{{ attrs|xmlattr }}>{% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}{{ label }}</button>
 {%- endmacro %}
 
-{% macro field(name, label, value='', type='text', hint=None, error=None, required=False, attrs='', mono=False, id=None) -%}
+{% macro field(name, label, value='', type='text', hint=None, error=None, required=False, attrs={}, mono=False, id=None) -%}
 {# Labelled input with hint below; an error replaces the hint and is announced (role=alert). #}
 {% set fid = id or 'f-' ~ name %}
 <div class="field">
   <label for="{{ fid }}">{{ label }}{% if required %} <span class="req">(required)</span>{% endif %}</label>
   <input class="input{{ ' mono' if mono }}" id="{{ fid }}" type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"
-         {{ 'required' if required }} {% if error %}aria-invalid="true"{% endif %} aria-describedby="{{ fid }}-d" {{ attrs }}>
+         {{ 'required' if required }} {% if error %}aria-invalid="true"{% endif %} aria-describedby="{{ fid }}-d"{{ attrs|xmlattr }}>
   {% if error %}<span class="err" id="{{ fid }}-d" role="alert">{{ error }}</span>
   {% else %}<span class="help" id="{{ fid }}-d">{{ hint or '' }}</span>{% endif %}
 </div>
@@ -169,4 +169,26 @@
   <td>{{ stage_timeline(c, compact=True) }}<span class="t-sub">{{ c.status }}</span></td>
   <td>{{ verdict_chip(c.final_decision) }}</td>
 </tr>
+{%- endmacro %}
+
+{% macro product_plate(p, claims_count=None, owner=False) -%}
+{# Product plate: name, serial, warranty tag and a life bar (used days, expiry marker, grace), linking to the product. #}
+{% set life = warranty_life(p.warranty) %}
+<a class="plate" href="{{ url_for('products.view_product', product_id=p.product_id) }}">
+  <div class="row between">
+    <span class="name">{{ p.product_name }}</span>
+    {% if life %}{{ tag(life.status, tag_kind('warranty', life.status)) }}{% else %}{{ tag('No warranty') }}{% endif %}
+  </div>
+  <span class="serial">{{ p.brand }} · {{ p.serial_number }}</span>
+  {% if life %}
+    <div class="stack-xs">
+      <b class="small">{% if life.over %}{{ 'Ended ' ~ life.over ~ ' days ago, inside the ' ~ life.grace ~ '-day grace period' if life.in_grace else 'Ended ' ~ life.over ~ ' days ago' }}{% else %}{{ life.left }} days left{% endif %}</b>
+      {{ life_bar(life.used, life.total, grace_days=life.grace,
+                  label=(life.left ~ ' of ' ~ life.total ~ ' warranty days left') if not life.over else ('Warranty ended ' ~ life.over ~ ' days ago')) }}
+      <div class="lifebar-legend"><span>{{ p.warranty.start_date|date }}</span><span>ends {{ p.warranty.expiry_date|date }}</span></div>
+    </div>
+  {% endif %}
+  {% if owner %}<span class="tiny muted"><i class="bi bi-person" aria-hidden="true"></i> {{ p.owner.full_name }}</span>{% endif %}
+  <div class="meta"><span>{{ p.category }}</span>{% if claims_count is not none %}<span>{{ claims_count }} claim{{ '' if claims_count == 1 else 's' }}</span>{% endif %}</div>
+</a>
 {%- endmacro %}

@@ -61,10 +61,10 @@ def test_scan_receipt_endpoint(app, client):
     login(client, "c@x.io")
     r = client.post("/products/scan-receipt", data={"receipt": file(standard_receipt(p), "r.pdf")},
                     content_type="multipart/form-data")
-    assert r.json["ok"] and r.json["entities"]["serial_number"] == p.serial_number
+    assert r.json["success"] and r.json["data"]["entities"]["serial_number"] == p.serial_number
     r = client.post("/products/scan-receipt", data={"receipt": file(b"GIF89a" + b"0" * 300, "r.png")},
                     content_type="multipart/form-data")
-    assert r.status_code == 400 and not r.json["ok"]
+    assert r.status_code == 400 and r.json["success"] is False and "receipt" in r.json["error"]["fields"]
 
 
 def test_full_claim_journey_with_agreeing_models(app, client, gtm):

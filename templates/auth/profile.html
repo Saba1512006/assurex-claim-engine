@@ -1,66 +1,78 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import csrf %}
+{# Profile: contact details, password change (signs out other devices), counts, recent activity, what the role allows. #}
+{% from "components/ui.html" import csrf, field, panel as ui_panel %}
 {% block title %}Profile{% endblock %}
-{% block content %}
+{% block page_header %}
 <div class="page-head">
-  <div class="row" style="gap:16px">
-    <span class="avatar lg">{{ user.full_name[:1]|upper }}</span>
+  <div class="row">
+    <span class="initials lg" aria-hidden="true">{{ user.full_name[:1]|upper }}</span>
     <div>
       <h1>{{ user.full_name }}</h1>
-      <div class="row mt-1"><span class="role role--{{ user.role }}">{{ role_label(user.role) }}</span><span class="id">{{ user.user_id }}</span>
-        {% if user.service_center %}<span class="chip"><i class="bi bi-geo-alt"></i>{{ user.service_center.name }}</span>{% endif %}</div>
+      <div class="row mt-1">
+        <span class="role role--{{ user.role }}">{{ role_label(user.role) }}</span><span class="id">{{ user.user_id }}</span>
+        {% if user.service_center %}<span class="chip"><i class="bi bi-geo-alt" aria-hidden="true"></i>{{ user.service_center.name }}</span>{% endif %}
+      </div>
     </div>
   </div>
 </div>
-
+{% endblock %}
+{% block content %}
 {% if user.must_change_password %}
-<div class="alert warning mb-0" style="margin-bottom:18px"><i class="lead bi bi-key-fill"></i><div><b>Set your own password.</b> You signed in with a one-time password from an administrator. Choose a new one below to unlock the rest of the application.</div></div>
+<div class="callout warn mb-4" role="status"><b>Set your own password.</b> You signed in with a one-time password from an administrator. Choose a new one below to unlock the rest of the application.</div>
 {% endif %}
 
 <div class="split">
   <div class="stack">
-    <section class="card">
-      <div class="card-h"><h2>Contact details</h2></div>
-      <form class="card-b form-grid" method="post">
+    {% call ui_panel('Contact details', id='details') %}
+      <form class="form-grid" method="post">
         {{ csrf() }}<input type="hidden" name="action" value="details">
-        <label class="field full"><span>Full name</span><input class="input" name="full_name" value="{{ user.full_name }}" required></label>
-        <label class="field"><span>Email</span><input class="input" value="{{ user.email }}" disabled><span class="help">Contact an administrator to change your sign-in email.</span></label>
-        <label class="field"><span>Phone</span><input class="input" type="tel" name="phone" value="{{ user.phone_number or '' }}"></label>
-        <label class="field full"><span>Address</span><input class="input" name="address" value="{{ user.address or '' }}"></label>
-        <div class="full row"><button class="btn" type="submit">Save details</button></div>
+        <div class="full">{{ field('full_name', 'Full name', user.full_name, required=True, attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}</div>
+        {{ field('email_ro', 'Email', user.email, hint='Ask an administrator to change your sign-in email.', attrs={'disabled': True}) }}
+        {{ field('phone', 'Phone', user.phone_number, type='tel', hint='Optional. 7 to 15 digits.', attrs={'autocomplete': 'tel'}) }}
+        <div class="full">{{ field('address', 'Address', user.address, hint='Optional.', attrs={'autocomplete': 'street-address', 'maxlength': '200'}) }}</div>
+        <div class="full"><button class="btn" type="submit">Save details</button></div>
       </form>
-    </section>
-    <section class="card" id="security">
-      <div class="card-h"><h2>Password</h2><span class="hint">Changing it signs out your other devices.</span></div>
-      <form class="card-b form-grid" method="post">
+    {% endcall %}
+    {% call ui_panel('Password', hint='Changing it signs out your other devices.', id='security') %}
+      <form class="form-grid" method="post">
         {{ csrf() }}<input type="hidden" name="action" value="password">
-        <label class="field full"><span>Current password</span><input class="input" type="password" name="current_password" autocomplete="current-password" required></label>
-        <label class="field"><span>New password</span><input class="input" type="password" name="new_password" autocomplete="new-password" minlength="10" required><span class="help">10+ characters with a letter and a number.</span></label>
-        <label class="field"><span>Confirm new password</span><input class="input" type="password" name="confirm_password" autocomplete="new-password" minlength="10" required></label>
+        <div class="full">{{ field('current_password', 'Current password', type='password', required=True, attrs={'autocomplete': 'current-password'}) }}</div>
+        <div class="field">
+          <label for="f-new_password">New password <span class="req">(required)</span></label>
+          <div class="pw">
+            <input class="input" id="f-new_password" type="password" name="new_password" autocomplete="new-password" required minlength="10"
+                   pattern="(?=.*[A-Za-z])(?=.*\d).{10,}" aria-describedby="f-new_password-d f-new_password-s">
+            <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-new_password" aria-pressed="false">Show</button>
+          </div>
+          <div class="strength" data-strength="f-new_password" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <span class="help" id="f-new_password-d">10 or more characters, with a letter and a number.</span>
+          <span class="tiny muted" id="f-new_password-s" data-strength-label="f-new_password" aria-live="polite"></span>
+        </div>
+        {{ field('confirm_password', 'Confirm new password', type='password', required=True, attrs={'autocomplete': 'new-password', 'minlength': '10'}) }}
         <div class="full"><button class="btn" type="submit">Change password</button></div>
       </form>
-    </section>
+    {% endcall %}
   </div>
-  <aside class="stack">
-    <section class="stats" style="grid-template-columns: repeat(3, 1fr)">
-      <div class="stat"><div class="v">{{ stats.products }}</div><div class="l">Products</div></div>
-      <div class="stat"><div class="v">{{ stats.claims }}</div><div class="l">Claims</div></div>
-      <div class="stat"><div class="v">{{ stats.unread }}</div><div class="l">Unread</div></div>
+  <aside class="stack" aria-label="Account summary">
+    <section class="stats stats-3" aria-label="Your records">
+      <div class="stat"><div class="v mono">{{ stats.products }}</div><div class="l">Products</div></div>
+      <div class="stat"><div class="v mono">{{ stats.claims }}</div><div class="l">Claims</div></div>
+      <div class="stat"><div class="v mono">{{ stats.unread }}</div><div class="l">Unread</div></div>
     </section>
-    <section class="card">
-      <div class="card-h"><h2>Recent activity</h2></div>
+    {% call ui_panel('Recent activity', body='') %}
       <ul class="list">
         {% for a in activity %}
-          <li><span class="ico"><i class="bi bi-clock-history"></i></span><div class="grow"><div class="ttl small">{{ a.action|replace('_', ' ')|capitalize }}</div><div class="sub">{{ a.timestamp|ago }}{% if a.ip_address %} · {{ a.ip_address }}{% endif %}</div></div></li>
+          <li><span class="ico" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+            <div class="grow"><div class="ttl small">{{ a.action|replace('_', ' ')|capitalize }}</div>
+              <div class="sub">{{ a.timestamp|ago }}{% if a.ip_address %} · <span class="mono">{{ a.ip_address }}</span>{% endif %}</div></div></li>
         {% else %}<li class="muted small">No activity yet.</li>{% endfor %}
       </ul>
-    </section>
-    <section class="card">
-      <div class="card-h"><h2>What your role allows</h2></div>
-      <div class="card-b" style="display:flex; flex-wrap:wrap; gap:6px">
-        {% for perm, scope in permissions %}<span class="chip small" title="scope: {{ scope }}">{{ perm }} · <span class="scope scope--{{ scope }}">{{ scope|replace('_', ' ') }}</span></span>{% endfor %}
-      </div>
-    </section>
+    {% endcall %}
+    {% call ui_panel('What your role allows') %}
+      <ul class="chips">
+        {% for perm, scope in permissions %}<li class="chip small">{{ perm }} <span class="scope scope--{{ scope }}">{{ scope|replace('_', ' ') }}</span></li>{% endfor %}
+      </ul>
+    {% endcall %}
   </aside>
 </div>
 {% endblock %}

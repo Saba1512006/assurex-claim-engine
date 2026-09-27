@@ -38,7 +38,7 @@ def phone_problem(phone: str) -> str | None:
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("10/minute;60/hour", methods=["POST"])
+@limiter.limit("5/minute;60/hour", methods=["POST"])
 def login():
     if g.get("user"):
         return redirect(url_for("auth.home"))
@@ -71,14 +71,18 @@ def register():
         name = form.get("full_name", "").strip()
         email = form.get("email", "").strip().lower()
         password = form.get("password", "")
-        problem = (None if 2 <= len(name) <= 100 else "Enter your full name.") or \
-            (None if EMAIL_RE.match(email) else "Enter a valid email address.") or \
-            password_problem(password, form.get("confirm_password", "")) or phone_problem(form.get("phone", ""))
-        if problem is None and User.query.filter_by(email=email).first():
-            problem = "An account with this email already exists. Sign in instead."
-        if problem:
-            flash(problem, "warning")
-            return render_template("auth/register.html", form=form), 400
+        errors = {k: v for k, v in {
+            "full_name": None if 2 <= len(name) <= 100 else "Enter your full name (2 to 100 characters).",
+            "email": None if EMAIL_RE.match(email) else "Enter a valid email address, like name@example.com.",
+            "password": password_problem(password),
+            "confirm_password": None if password == form.get("confirm_password", "") else "The two passwords don't match.",
+            "phone": phone_problem(form.get("phone", "")),
+        }.items() if v}
+        if "email" not in errors and User.query.filter_by(email=email).first():
+            errors["email"] = "An account with this email already exists. Sign in instead."
+        if errors:
+            flash("Some details need attention. Check the highlighted fields.", "warning")
+            return render_template("auth/register.html", form=form, errors=errors), 400
         user = User(full_name=name, email=email, role=registration_role(form.get("role")),
                     phone_number=form.get("phone", "").strip() or None, address=form.get("address", "").strip() or None)
         user.set_password(password)
@@ -88,7 +92,7 @@ def register():
         db.session.commit()
         flash("Your account is ready. Sign in to register your first product.", "success")
         return redirect(url_for("auth.login", email=email))
-    return render_template("auth/register.html", form={})
+    return render_template("auth/register.html", form={}, errors={})
 
 
 @auth_bp.post("/logout")

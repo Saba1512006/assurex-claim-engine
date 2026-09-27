@@ -127,10 +127,12 @@
     const el = e.target;
     if (el.matches && el.matches("form:not([data-novalidate-ui]) .input, form:not([data-novalidate-ui]) .select, form:not([data-novalidate-ui]) .textarea") && el.value !== "") check(el);
   });
+  /* JS owns validation when it runs: native bubbles off, inline messages on (without JS the browser still validates) */
+  $$("form:not([data-novalidate-ui])").forEach((f) => { if (!f.noValidate) { f.noValidate = true; f.dataset.axValidate = "1"; } });
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (f.dataset.confirm && !e.defaultPrevented && !confirm(f.dataset.confirm)) { e.preventDefault(); return; }
-    if (!f.noValidate && !f.hasAttribute("data-novalidate-ui")) {
+    if (f.dataset.axValidate && !(e.submitter && e.submitter.formNoValidate)) {
       const bad = $$(".input, .select, .textarea", f).filter((el) => !check(el));
       if (bad.length) { e.preventDefault(); bad[0].focus(); return; }
     }

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -15,13 +14,13 @@ from src.core.features import FeatureError, missing_mandatory, missing_supportin
 from src.core.vocab import CATEGORIES, DAMAGE_TYPES, DOCUMENT_LABELS, FAULTS, try_parse_date
 from src.models.entities import (Claim, ClaimDocument, ClaimStatusHistory, ModelEvaluation, Notification, Product, ProductWarranty,
                                  User)
-from src.ocr import document_processor as ocr
 from src.rules import validator
 from src.rules.policy_store import get_policy
 from src.security import rbac
 from src.security.guards import authorize_object, check, require, scoped_claims, scoped_products
 from src.services import analytics_service, claim_service, documents as doc_service, export_service, verdict
 from src.services.alert_service import alert_days, dispatch_expiry_alerts
+from src.services import receipt_scan
 from src.services.audit import audit
 from src.services.explain import explain, summarise
 from src.services.report_generator import build_pdf
@@ -46,26 +45,37 @@ def _upload_dir() -> Path:
 @claim_bp.get("/")
 @require("claim.read")
 def dashboard():
+    """Three rows: what needs the user now, their product plates, and every claim (20 per page)."""
     user = g.user
     if user.role == Config.ROLE_CUSTOMER and dispatch_expiry_alerts(user.id):
         db.session.commit()
     claims_q = scoped_claims(Claim)
     products_q = scoped_products(Product, Claim)
-    claims = claims_q.order_by(Claim.updated_at.desc()).all()
     window = alert_days()
-    pending = [c for c in claims if c.status in (Config.STATUS_DRAFT, Config.STATUS_ADDITIONAL_INFO)
-               or (c.missing_document_flag and c.status in UPLOAD_STATUSES)]
+    attention = []
+    for c in claims_q.filter(Claim.status.in_(UPLOAD_STATUSES)).order_by(Claim.updated_at.desc()).all():
+        if c.status == Config.STATUS_DRAFT:
+            attention.append({"icon": "bi-pencil-square", "tone": "", "title": f"Finish your draft for {c.product.product_name}",
+                              "text": "Not submitted yet. Nothing is checked until you submit.", "claim": c, "action": "Finish draft"})
+        elif c.status == Config.STATUS_ADDITIONAL_INFO:
+            attention.append({"icon": "bi-chat-left-dots", "tone": "review", "title": f"A reviewer needs more from you on {c.claim_id}",
+                              "text": c.reviewer_notes or "Open the claim to see what is needed.", "claim": c, "action": "Add evidence"})
+        elif c.missing_document_flag:
+            attention.append({"icon": "bi-cloud-upload", "tone": "review", "title": f"Missing documents on {c.claim_id}",
+                              "text": "Adding them lets the claim move on without a follow-up.", "claim": c, "action": "Add evidence"})
+    expiring = analytics_service.expiring_list(products_q, window)
+    page = claims_q.order_by(Claim.updated_at.desc()).paginate(page=request.args.get("page", 1, type=int),
+                                                               per_page=20, error_out=False)
+    products = products_q.order_by(Product.created_at.desc()).limit(6).all()
+    counts = dict(db.session.query(Claim.product_id, db.func.count(Claim.id))
+                  .filter(Claim.product_id.in_([p.id for p in products])).group_by(Claim.product_id).all())
     receipts = (ClaimDocument.query.filter(ClaimDocument.document_type == "receipt",
                                            ClaimDocument.product_id.in_(products_q.with_entities(Product.id)))
-                .order_by(ClaimDocument.created_at.desc()).limit(6).all())
+                .order_by(ClaimDocument.created_at.desc()).limit(4).all())
     return render_template(
-        "claims/dashboard.html", claims=claims[:8], total_claims=len(claims),
-        products=products_q.order_by(Product.created_at.desc()).limit(6).all(),
-        product_count=products_q.count(), buckets=analytics_service.warranty_buckets(products_q),
-        expiring=analytics_service.expiring_list(products_q, window), window=window, pending=pending,
-        receipts=receipts, recent_decisions=[c for c in claims if c.final_decision][:5],
-        notifications=Notification.query.filter_by(user_id=user.id, is_read=False)
-        .order_by(Notification.id.desc()).limit(8).all())
+        "claims/dashboard.html", attention=attention, receipts=receipts, expiring=expiring, window=window, page=page,
+        products=products, product_count=products_q.count(), claim_counts=counts,
+        buckets=analytics_service.warranty_buckets(products_q))
 
 
 @claim_bp.post("/notifications/<string:notification_id>/read")
@@ -267,22 +277,7 @@ def preparation_check():
 @require("claim.create")
 def ocr_extract():
     """SRS vi/vii: read a receipt in the wizard so the user can check the values before submitting."""
-    file = request.files.get("receipt")
-    try:
-        data, mime, ext = doc_service.validate(file, "receipt")
-    except doc_service.UploadError as exc:
-        return jsonify(ok=False, error=str(exc)), 400
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / f"receipt.{ext}"
-        path.write_bytes(data)
-        result = ocr.process(path, mime, "receipt")
-    if result["status"] == "unavailable":
-        return jsonify(ok=False, status="unavailable",
-                       error="Automatic reading isn't available for this file on this server. Enter the details yourself.")
-    if result["status"] != "ok" or not ocr.looks_like_receipt(result["entities"]):
-        return jsonify(ok=False, status="unreadable",
-                       error="We couldn't read invoice details from this file. Check it's the receipt and legible.")
-    return jsonify(ok=True, entities=result["entities"])
+    return receipt_scan.scan(request.files.get("receipt"))
 
 
 # ------------------------------------------------------------------ claim detail & lifecycle

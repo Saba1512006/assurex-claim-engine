@@ -1,141 +1,83 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import status, decision, claim_row, empty, csrf %}
+{# Customer / service-center desk: 1) what needs you now, 2) product plates with warranty life, 3) every claim, 20 per page. #}
+{% from "components/ui.html" import claim_row, empty_state, product_plate, tag, doc_icon, pager %}
 {% block title %}Dashboard{% endblock %}
-{% block content %}
+{% block page_header %}
 {% set staff = current_user.role == 'service_center_staff' %}
 <div class="page-head">
   <div>
-    <div class="eyebrow">{{ current_user.service_center.name if staff and current_user.service_center else 'My warranties' }}</div>
+    <p class="eyebrow">{{ current_user.service_center.name if staff and current_user.service_center else 'My warranties' }}</p>
     <h1>{% if staff %}Service center desk{% else %}Hello, {{ current_user.first_name }}{% endif %}</h1>
-    <p class="lede">{% if staff %}Claims and products for walk-in customers of your service center.{% else %}Your products, warranties and claims in one place.{% endif %}</p>
+    <p class="lede">{% if staff %}Claims and products for walk-in customers of your service center.{% else %}Your products, their warranty cover and every claim you have filed.{% endif %}</p>
   </div>
   <div class="row">
-    <a class="btn quiet" href="{{ url_for('products.register_product') }}"><i class="bi bi-box-seam"></i>Register product</a>
-    <a class="btn" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg"></i>New claim</a>
+    <a class="btn quiet" href="{{ url_for('products.register_product') }}"><i class="bi bi-box-seam" aria-hidden="true"></i>Register a product</a>
+    <a class="btn" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i>File a claim</a>
   </div>
 </div>
-
-<section class="stats" aria-label="Summary">
-  <a class="stat" href="{{ url_for('products.list_products') }}"><div class="v">{{ product_count }}</div><div class="l"><i class="bi bi-box-seam"></i>Registered products</div></a>
-  <a class="stat good" href="{{ url_for('products.list_products', warranty='Active') }}"><div class="v">{{ buckets.get('Active', 0) }}</div><div class="l"><i class="bi bi-shield-check"></i>Active warranties</div></a>
-  <a class="stat warn" href="{{ url_for('products.list_products', warranty='Expiring soon') }}"><div class="v">{{ buckets.get('Expiring soon', 0) }}</div><div class="l"><i class="bi bi-hourglass-split"></i>Ending within {{ window }} days</div></a>
-  <a class="stat" href="{{ url_for('claims.search') }}"><div class="v">{{ total_claims }}</div><div class="l"><i class="bi bi-folder2-open"></i>Claims</div></a>
-  <div class="stat {{ 'bad' if pending else '' }}"><div class="v">{{ pending|length }}</div><div class="l"><i class="bi bi-flag"></i>Need your action</div></div>
-</section>
-
-<div class="split mt-3">
-  <div class="stack">
-    {% if pending %}
-    <section class="card highlight">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-flag-fill"></i>Pending actions</h2><span class="hint">Finish these to keep your claims moving</span></div>
-      <ul class="list">
-        {% for c in pending %}
-          <li>
-            <span class="ico {{ 'warn' if c.status != 'Draft' else 'info' }}"><i class="bi {{ 'bi-pencil-square' if c.status == 'Draft' else 'bi-cloud-upload' }}"></i></span>
-            <div class="grow">
-              <div class="ttl">{{ c.product.product_name }} <span class="id">{{ c.claim_id }}</span></div>
-              <div class="sub">
-                {% if c.status == 'Draft' %}Draft not submitted yet.
-                {% elif c.status == 'Additional Information Required' %}The reviewer asked: “{{ c.reviewer_notes|truncate(90) }}”
-                {% else %}Missing documents slow this claim down.{% endif %}
-              </div>
-            </div>
-            <a class="btn sm" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}">{{ 'Finish draft' if c.status == 'Draft' else 'Add evidence' }}</a>
-          </li>
-        {% endfor %}
-      </ul>
-    </section>
+{% endblock %}
+{% block content %}
+{% set staff = current_user.role == 'service_center_staff' %}
+<div class="stack">
+  <section class="panel" aria-labelledby="att-h">
+    <div class="panel-h"><h2 id="att-h">Needs your attention</h2>
+      <span class="hint">{{ attention|length + expiring|length }} item{{ '' if (attention|length + expiring|length) == 1 else 's' }}</span></div>
+    {% if attention or expiring %}
+    <ul class="list">
+      {% for a in attention %}
+        <li>
+          <span class="ico {{ a.tone }}" aria-hidden="true"><i class="bi {{ a.icon }}"></i></span>
+          <div class="grow"><div class="ttl">{{ a.title }}</div><div class="sub">{{ a.text|truncate(140) }}</div></div>
+          <a class="btn sm" href="{{ url_for('claims.view_claim', claim_id=a.claim.claim_id) }}">{{ a.action }}</a>
+        </li>
+      {% endfor %}
+      {% for w in expiring %}
+        <li>
+          <span class="ico review" aria-hidden="true"><i class="bi bi-hourglass-split"></i></span>
+          <div class="grow"><div class="ttl">{{ w.product.product_name }}: warranty ends in {{ w.remaining_days() }} day{{ '' if w.remaining_days() == 1 else 's' }}</div>
+            <div class="sub">Cover ends {{ w.expiry_date|date }}. If something is wrong with it, file now.</div></div>
+          <a class="btn sm quiet" href="{{ url_for('claims.new_claim', product=w.product.product_id) }}">File a claim</a>
+        </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="panel-b small muted mb-0"><i class="bi bi-check2-circle" aria-hidden="true"></i> Nothing needs you right now. Drafts, reviewer questions and warranties ending within {{ window }} days show up here.</p>
     {% endif %}
+  </section>
 
-    <section class="card">
-      <div class="card-h"><h2>Recent claims</h2><a class="small" href="{{ url_for('claims.search') }}">All claims →</a></div>
-      {% if claims %}
-      <div class="table-wrap"><table class="table">
-        <thead><tr><th>Claim</th>{% if staff %}<th>Customer</th>{% endif %}<th>Status</th><th>Recommendation</th><th>Submitted</th></tr></thead>
-        <tbody>{% for c in claims %}{{ claim_row(c, show_customer=staff) }}{% endfor %}</tbody>
-      </table></div>
-      {% else %}
-        {{ empty('bi-folder2', 'No claims yet', 'When something stops working, file a claim and track it here.', url_for('claims.new_claim'), 'File a claim') }}
-      {% endif %}
-    </section>
-
-    <section class="card">
-      <div class="card-h"><h2>Products</h2><a class="small" href="{{ url_for('products.list_products') }}">All products →</a></div>
+  <section class="panel" aria-labelledby="prod-h">
+    <div class="panel-h"><h2 id="prod-h">Products</h2>
+      <span class="hint">{{ product_count }} registered · {{ buckets.get('Active', 0) }} active · {{ buckets.get('Expiring soon', 0) }} ending soon · {{ buckets.get('Expired', 0) }} expired
+        · <a href="{{ url_for('products.list_products') }}">All products</a></span></div>
+    <div class="panel-b stack">
       {% if products %}
-      <div class="card-b tiles">
-        {% for p in products %}
-          <a class="tile" href="{{ url_for('products.view_product', product_id=p.product_id) }}">
-            <div class="row between"><span class="cat"><i class="bi {{ {'Consumer Electronics': 'bi-laptop', 'Home Appliances': 'bi-house-gear', 'Industrial Tools': 'bi-tools'}.get(p.category, 'bi-box') }}"></i></span>
-              {% if p.warranty %}<span class="badge {{ tone('warranty', p.warranty.status) }}">{{ p.warranty.status }}</span>{% endif %}</div>
-            <div><b>{{ p.product_name }}</b><div class="small muted">{{ p.brand }} · {{ p.serial_number }}</div></div>
-            {% if p.warranty %}
-              <div class="meter {{ tone('warranty', p.warranty.status) }}"><i style="width: {{ (p.warranty.life_used * 100)|round }}%"></i></div>
-              <div class="small muted">{{ p.warranty.remaining_days() }} days left · ends {{ p.warranty.expiry_date|date }}</div>
-            {% endif %}
-          </a>
+        <ul class="plates">{% for p in products %}<li>{{ product_plate(p, claim_counts.get(p.id, 0)) }}</li>{% endfor %}</ul>
+      {% else %}
+        {{ empty_state('No products registered', 'Register a product with its receipt and the warranty is tracked from then on.', url_for('products.register_product'), 'Register a product', 'bi-box-seam') }}
+      {% endif %}
+      {% if receipts %}
+      <div class="receipts" aria-label="Saved receipts">
+        <span class="eyebrow">Saved receipts</span>
+        {% for d in receipts %}
+          <a class="chip" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener"><i class="bi {{ doc_icon('receipt') }}" aria-hidden="true"></i>{{ d.original_filename|truncate(28) }}</a>
         {% endfor %}
       </div>
-      {% else %}
-        {{ empty('bi-box-seam', 'No products registered', 'Register a product with its receipt to start tracking the warranty.', url_for('products.register_product'), 'Register product') }}
       {% endif %}
-    </section>
-  </div>
+    </div>
+  </section>
 
-  <aside class="stack">
-    <section class="card">
-      <div class="card-h"><h2>Notifications</h2>
-        {% if notifications %}<form method="post" action="{{ url_for('claims.read_all_notifications') }}">{{ csrf() }}<button class="btn ghost sm">Mark all read</button></form>{% endif %}</div>
-      {% for n in notifications[:5] %}
-        <div class="notif">
-          <span class="ico"><i class="bi {{ notif_icon(n.notification_type) }}"></i></span>
-          <div class="grow" style="flex:1; min-width:0">
-            <div class="small" style="font-weight:600">{{ n.title }}</div>
-            <div class="tiny muted">{{ n.message }}</div>
-            <div class="row mt-1">
-              <span class="tiny faint">{{ n.created_at|ago }}</span>
-              <form class="inline" method="post" action="{{ url_for('claims.read_notification', notification_id=n.notification_id) }}">{{ csrf() }}
-                {% if n.related_claim_id %}<input type="hidden" name="open" value="1"><button class="btn ghost sm" type="submit">Open</button>{% else %}<button class="btn ghost sm" type="submit">Dismiss</button>{% endif %}
-              </form>
-            </div>
-          </div>
-        </div>
-      {% else %}
-        {{ empty('bi-bell-slash', "You're all caught up") }}
-      {% endfor %}
-    </section>
-
-    <section class="card">
-      <div class="card-h"><h2>Warranties ending soon</h2><span class="hint">next {{ window }} days</span></div>
-      <ul class="list">
-        {% for w in expiring %}
-          <li><span class="ico warn"><i class="bi bi-hourglass-split"></i></span>
-            <div class="grow"><a class="ttl" href="{{ url_for('products.view_product', product_id=w.product.product_id) }}">{{ w.product.product_name }}</a>
-              <div class="sub">{{ w.remaining_days() }} days left · {{ w.expiry_date|date }}</div></div></li>
-        {% else %}<li class="small muted">Nothing ends in the next {{ window }} days.</li>{% endfor %}
-      </ul>
-    </section>
-
-    <section class="card">
-      <div class="card-h"><h2>Saved receipts</h2></div>
-      <ul class="list">
-        {% for d in receipts %}
-          <li><span class="ico"><i class="bi bi-receipt"></i></span>
-            <div class="grow"><a class="ttl small" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener">{{ d.original_filename }}</a>
-              <div class="sub">{{ d.product.product_name }} · {{ d.created_at|date }}</div></div></li>
-        {% else %}<li class="small muted">Receipts you upload appear here.</li>{% endfor %}
-      </ul>
-    </section>
-
-    {% if recent_decisions %}
-    <section class="card">
-      <div class="card-h"><h2>Recent decisions</h2></div>
-      <ul class="list">
-        {% for c in recent_decisions %}
-          <li><div class="grow"><a class="ttl small" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}">{{ c.product.product_name }}</a><div class="sub">{{ c.claim_id }}</div></div>{{ decision(c.final_decision) }}</li>
-        {% endfor %}
-      </ul>
-    </section>
+  <section class="panel" aria-labelledby="claims-h">
+    <div class="panel-h"><h2 id="claims-h">Claims</h2><span class="hint">{{ page.total }} total · <a href="{{ url_for('claims.search') }}">Search and filter</a></span></div>
+    {% if page.items %}
+      <div class="table-wrap"><table class="table">
+        <caption class="sr">Your claims, most recently updated first</caption>
+        <thead><tr><th scope="col">Claim</th>{% if staff %}<th scope="col">Customer</th>{% endif %}<th scope="col">Filed</th><th scope="col">Stage</th><th scope="col">Recommendation</th></tr></thead>
+        <tbody>{% for c in page.items %}{{ claim_row(c, show_customer=staff) }}{% endfor %}</tbody>
+      </table></div>
+      {{ pager(page) }}
+    {% else %}
+      {{ empty_state('No claims yet', 'When something stops working, file a claim and follow every stage here.', url_for('claims.new_claim'), 'File a claim', 'bi-folder2') }}
     {% endif %}
-  </aside>
+  </section>
 </div>
 {% endblock %}

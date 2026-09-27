@@ -56,6 +56,23 @@ def _money(value):
     return "—" if value is None else f"USD {value:,.2f}"
 
 
+def warranty_life(w) -> dict | None:
+    """Numbers behind a product plate's life bar: days used of the cover, the grace period, what is left."""
+    if w is None:
+        return None
+    from src.rules.policy_store import get_policy
+    today = date.today()
+    total = max(1, (w.expiry_date - w.start_date).days)
+    used = max(0, (today - w.start_date).days)
+    try:
+        grace = int(get_policy(w.product.category).get("grace_period_days", 0))
+    except Exception:                                   # unknown legacy category: no grace drawn
+        grace = 0
+    left = (w.expiry_date - today).days
+    return {"used": used, "total": total, "grace": grace, "left": max(0, left), "over": max(0, -left),
+            "in_grace": 0 < -left <= grace, "status": w.status}
+
+
 _GTM_VERSION_CACHE: dict = {}
 
 
@@ -118,7 +135,7 @@ def register_template_helpers(app) -> None:
     app.jinja_env.globals.update(
         tone=tone, tag_kind=tag_kind, url_with=url_with, unread_notifications=unread_notifications, asset=asset,
         decision_kind=lambda d: DECISION_KIND.get(d, "none"), decision_icon=lambda k: DECISION_ICON.get(k, "bi-dash"),
-        model_versions=model_versions, medium_url=app.config.get("MEDIUM_URL"), github_url=app.config.get("GITHUB_URL"),
+        model_versions=model_versions, warranty_life=warranty_life, medium_url=app.config.get("MEDIUM_URL"), github_url=app.config.get("GITHUB_URL"),
         doc_label=lambda t: DOCUMENT_LABELS.get(t, t.replace("_", " ").title()),
         notif_icon=lambda kind: NOTIF_ICON.get(kind, "bi-bell"))
 

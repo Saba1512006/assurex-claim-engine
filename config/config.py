@@ -32,6 +32,13 @@ class Config:
     WTF_CSRF_TIME_LIMIT = None                           # token lives as long as the session
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
+    # Seeded evaluator accounts offered as one-click chips on the sign-in page (turn off for a real deployment).
+    SHOW_DEMO_ACCOUNTS = os.environ.get("SHOW_DEMO_ACCOUNTS", "1") == "1"
+    DEMO_ACCOUNTS = [("Customer", "customer@assurex.local", "CustomerPass123!"),
+                     ("Service-center staff", "staff@assurex.local", "StaffPass123!"),
+                     ("Claim reviewer", "reviewer@assurex.local", "ReviewerPass123!"),
+                     ("Administrator", "admin@assurex.local", "AdminPass123!")]
+    LOGIN_CARD = "CLM-00850_v0.jpg"                      # a correctly scored test-split card shown beside the sign-in form
 
     # ----- domain constants (SRS)
     CLAIM_CLASS_VALID, CLAIM_CLASS_INVALID, CLAIM_CLASS_MANUAL_REVIEW = "Valid Claim", "Invalid Claim", "Manual Review"

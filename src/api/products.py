@@ -1,11 +1,9 @@
 """Products, warranties and repair history (SRS iii, iv, viii, xiii, xiv)."""
 from __future__ import annotations
 
-import tempfile
 from datetime import date, timedelta
-from pathlib import Path
 
-from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from sqlalchemy import or_
 
 from config.config import Config
@@ -13,13 +11,14 @@ from database.db import db
 from src.core.vocab import CATEGORIES, coverage_days, try_parse_date
 from src.models.entities import (Claim, Product, ProductWarranty, RepairHistory, ServiceCenter, User,
                                  WarrantyPolicy)
-from src.ocr import document_processor as ocr
 from src.rules import validator
 from src.rules.policy_store import get_policy
 from src.security.guards import authorize_object, check, require, scoped_products
 from src.services import documents as doc_service
 from src.services.alert_service import alert_days
+from src.services import receipt_scan
 from src.services.audit import audit
+from src.services.paging import ListPage
 
 product_bp = Blueprint("products", __name__, url_prefix="/products")
 PRODUCT_DOC_TYPES = ("receipt", "warranty_card", "serial_photo", "product_photo")
@@ -58,7 +57,10 @@ def list_products():
     status = request.args.get("warranty")
     if status:
         products = [p for p in products if (p.warranty.status if p.warranty else "No warranty") == status]
-    return render_template("products/list.html", products=products, categories=CATEGORIES)
+    page = ListPage(products, request.args.get("page", 1, type=int), per_page=24)
+    counts = dict(db.session.query(Claim.product_id, db.func.count(Claim.id))
+                  .filter(Claim.product_id.in_([p.id for p in page.items])).group_by(Claim.product_id).all())
+    return render_template("products/list.html", page=page, claim_counts=counts, categories=CATEGORIES)
 
 
 def _owner_for_new_product(form):
@@ -138,23 +140,7 @@ def register_product():
 @require("product.create")
 def scan_receipt():
     """Read a receipt for the registration form without storing it (SRS vi, vii)."""
-    file = request.files.get("receipt")
-    try:
-        data, mime, ext = doc_service.validate(file, "receipt")
-    except doc_service.UploadError as exc:
-        return jsonify(ok=False, error=str(exc)), 400
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / f"receipt.{ext}"
-        path.write_bytes(data)
-        result = ocr.process(path, mime, "receipt")
-    if result["status"] == "unavailable":
-        return jsonify(ok=False, status="unavailable",
-                       error="Automatic reading isn't available for this file type on this server. "
-                             "Type the details from your receipt.")
-    if result["status"] != "ok" or not ocr.looks_like_receipt(result["entities"]):
-        return jsonify(ok=False, status="unreadable", error="We couldn't find invoice details in this file. "
-                                                            "Check that it is the receipt and that it is legible.")
-    return jsonify(ok=True, entities=result["entities"])
+    return receipt_scan.scan(request.files.get("receipt"))
 
 
 @product_bp.get("/<string:product_id>")

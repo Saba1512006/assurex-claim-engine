@@ -1,43 +1,52 @@
 {% extends "components/base.html" %}
+{# Customer self-registration: field-level errors from the server, password strength hint, invite note for other roles. #}
+{% from "components/ui.html" import csrf, field %}
 {% block title %}Create account{% endblock %}
+{% block description %}Create a customer account to register products and file warranty claims.{% endblock %}
 {% block main %}
 <div class="auth">
-  <div class="auth-art">
-    <div>
-      <h2>Register once, claim in minutes.</h2>
-      <p>Add your products and receipts, get reminded before a warranty ends, and file a claim with everything already on file.</p>
-      <div class="points">
-        <div><i class="bi bi-hourglass-split"></i><span>Expiry reminders before cover ends</span></div>
-        <div><i class="bi bi-receipt"></i><span>Receipts stored securely and fingerprinted</span></div>
-        <div><i class="bi bi-list-check"></i><span>A checklist tells you what's missing before you submit</span></div>
-      </div>
-    </div>
-    <p class="small">Public sign-up creates customer accounts only.</p>
-  </div>
   <div class="auth-form">
     <div class="box stack">
       <div>
         <h1>Create your account</h1>
-        <p class="muted mt-1">Takes about a minute.</p>
+        <p class="muted mt-1">Public sign-up creates customer accounts. Service-center staff, reviewers and administrators are invited by an administrator.</p>
       </div>
       <form method="post" class="form-grid">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="field full"><span>Full name <span class="req">*</span></span>
-          <input class="input" name="full_name" value="{{ form.get('full_name', '') }}" autocomplete="name" required minlength="2" maxlength="100"></label>
-        <label class="field full"><span>Email <span class="req">*</span></span>
-          <input class="input" type="email" name="email" value="{{ form.get('email', '') }}" autocomplete="email" required></label>
-        <label class="field"><span>Password <span class="req">*</span></span>
-          <input class="input" type="password" name="password" autocomplete="new-password" required minlength="10">
-          <span class="help">10+ characters, with a letter and a number.</span></label>
-        <label class="field"><span>Confirm password <span class="req">*</span></span>
-          <input class="input" type="password" name="confirm_password" autocomplete="new-password" required minlength="10"></label>
-        <label class="field"><span>Phone</span>
-          <input class="input" type="tel" name="phone" value="{{ form.get('phone', '') }}" autocomplete="tel" placeholder="+92 300 1234567"></label>
-        <label class="field"><span>City / address</span>
-          <input class="input" name="address" value="{{ form.get('address', '') }}" autocomplete="street-address"></label>
+        {{ csrf() }}
+        <div class="full">{{ field('full_name', 'Full name', form.get('full_name', ''), required=True, error=errors.full_name,
+                                   attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}</div>
+        <div class="full">{{ field('email', 'Email', form.get('email', ''), type='email', required=True, error=errors.email,
+                                   attrs={'autocomplete': 'email', 'maxlength': '120'}) }}</div>
+        <div class="field full">
+          <label for="f-password">Password <span class="req">(required)</span></label>
+          <div class="pw">
+            <input class="input" id="f-password" type="password" name="password" autocomplete="new-password" required minlength="10"
+                   pattern="(?=.*[A-Za-z])(?=.*\d).{10,}" {% if errors.password %}aria-invalid="true"{% endif %} aria-describedby="f-password-d f-password-s">
+            <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-password" aria-pressed="false">Show</button>
+          </div>
+          <div class="strength" data-strength="f-password" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          {% if errors.password %}<span class="err" id="f-password-d" role="alert">{{ errors.password }}</span>
+          {% else %}<span class="help" id="f-password-d">10 or more characters, with at least one letter and one number.</span>{% endif %}
+          <span class="tiny muted" id="f-password-s" data-strength-label="f-password" aria-live="polite"></span>
+        </div>
+        <div class="full">{{ field('confirm_password', 'Confirm password', type='password', required=True, error=errors.confirm_password,
+                                   attrs={'autocomplete': 'new-password', 'minlength': '10'}) }}</div>
+        {{ field('phone', 'Phone', form.get('phone', ''), type='tel', hint='Optional. 7 to 15 digits.', error=errors.phone,
+                 attrs={'autocomplete': 'tel', 'placeholder': '+92 300 1234567'}) }}
+        {{ field('address', 'City or address', form.get('address', ''), hint='Optional.', attrs={'autocomplete': 'street-address', 'maxlength': '200'}) }}
         <div class="full"><button class="btn lg block" type="submit">Create account</button></div>
       </form>
-      <p class="small muted center">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+      <p class="small muted">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a>.</p>
+    </div>
+  </div>
+  <div class="auth-art">
+    <div class="stack">
+      <h2>Register once, claim in minutes.</h2>
+      <ol class="steps-plain small">
+        <li><b>Add a product</b> with its receipt. OCR reads the invoice and you confirm what it found.</li>
+        <li><b>Watch the cover</b>. The product plate shows how much warranty is left and warns before it ends.</li>
+        <li><b>File a claim</b>. A checklist says what is missing before you submit; two models and the policy decide.</li>
+      </ol>
     </div>
   </div>
 </div>

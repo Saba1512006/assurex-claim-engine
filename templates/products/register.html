@@ -1,87 +1,118 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import csrf %}
-{% block title %}Register product{% endblock %}
-{% block content %}
-{% set staff = current_user.role == 'service_center_staff' %}
+{# Register a product in two steps: 1) the receipt is read by OCR, 2) the person checks every prefilled detail and saves.
+   Without JavaScript both steps show as one form. #}
+{% from "components/ui.html" import csrf, field %}
+{% block title %}Register a product{% endblock %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="crumbs"><a href="{{ url_for('products.list_products') }}">Products</a><i class="bi bi-chevron-right"></i><span>Register</span></div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('products.list_products') }}">Products</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span aria-current="page">Register</span></nav>
     <h1>Register a product</h1>
-    <p class="lede">Upload the receipt first — we'll read it and fill in what we can. Check everything before saving.</p>
+    <p class="lede">Start with the receipt. We read what we can from it; you check every value before saving.</p>
   </div>
 </div>
-
-<form method="post" enctype="multipart/form-data" data-product-form data-scan-url="{{ url_for('products.scan_receipt') }}">
+{% endblock %}
+{% block content %}
+{% set staff = current_user.role == 'service_center_staff' %}
+<form method="post" enctype="multipart/form-data" data-product-form data-scan-url="{{ url_for('products.scan_receipt') }}"
+      data-start="{{ '2' if form else '1' }}">
   {{ csrf() }}
-  <div class="split">
+  <ol class="steps steps-2 pf-steps" aria-label="Registration steps">
+    <li><button type="button" data-pstep-btn="1"><b>1</b>Receipt</button></li>
+    <li><button type="button" data-pstep-btn="2"><b>2</b>Check details and save</button></li>
+  </ol>
+  <div class="split mt-3">
     <div class="stack">
-      <section class="card">
-        <div class="card-h"><h2 class="section-title"><i class="bi bi-receipt"></i>Receipt</h2><span class="hint">PDF, JPG or PNG · up to 10 MB</span></div>
-        <div class="card-b stack-sm">
-          <label class="dropzone" data-dropzone>
-            <span class="ico"><i class="bi bi-cloud-arrow-up"></i></span>
-            <span style="flex:1"><b class="small">Purchase receipt or tax invoice</b><div class="tiny muted">Stored securely and fingerprinted (SHA-256) to catch reused receipts.</div>
-              <input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png" data-scan-input></span>
+      <section class="panel" data-pstep="1" aria-labelledby="pr-h">
+        <div class="panel-h"><h2 id="pr-h">Receipt</h2><span class="hint">PDF, JPG or PNG, at most 10 MB</span></div>
+        <div class="panel-b stack-sm">
+          <label class="dropzone" data-dropzone data-max="10" data-accept=".pdf,.jpg,.jpeg,.png">
+            <span class="ico" aria-hidden="true"><i class="bi bi-receipt"></i></span>
+            <span class="grow"><b class="small">Purchase receipt or tax invoice</b>
+              <span class="meta" data-file-meta>Stored with a SHA-256 fingerprint so a reused receipt is caught.</span>
+              <input type="file" name="receipt" accept=".pdf,.jpg,.jpeg,.png" data-scan-input aria-describedby="pr-status"></span>
           </label>
-          <div class="small" data-scan-status></div>
+          <p class="small mb-0" id="pr-status" data-scan-status aria-live="polite"></p>
+          <div class="row pf-only">
+            <button class="btn" type="button" data-pstep-go="2">Continue</button>
+            <button class="btn ghost" type="button" data-pstep-go="2">I'll type the details</button>
+          </div>
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-h"><h2>Product</h2></div>
-        <div class="card-b form-grid">
-          {% if staff %}
-          <label class="field full"><span>Customer's email <span class="req">*</span></span>
-            <input class="input" type="email" name="customer_email" value="{{ form.get('customer_email', '') }}" required placeholder="The customer's AssureX account email">
-            <span class="help">The product is registered to the customer and linked to {{ current_user.service_center.name if current_user.service_center else 'your service center' }}.</span></label>
-          {% endif %}
-          <label class="field full"><span>Product name <span class="req">*</span></span><input class="input" name="product_name" value="{{ form.get('product_name', '') }}" required data-fill="product_name"></label>
-          <label class="field"><span>Category <span class="req">*</span></span>
-            <select class="select" name="category" required data-category>
-              <option value="">Choose…</option>
-              {% for c, pol in policies.items() %}<option value="{{ c }}" {{ 'selected' if form.get('category') == c }} data-months="{{ pol.coverage_duration_months }}">{{ c }}</option>{% endfor %}
-            </select></label>
-          <label class="field"><span>Brand <span class="req">*</span></span><input class="input" name="brand" value="{{ form.get('brand', '') }}" required></label>
-          <label class="field"><span>Model number <span class="req">*</span></span><input class="input" name="model_number" value="{{ form.get('model_number', '') }}" required data-fill="model_number"></label>
-          <label class="field"><span>Serial number <span class="req">*</span></span><input class="input mono" name="serial_number" value="{{ form.get('serial_number', '') }}" required minlength="4" data-fill="serial_number"></label>
-        </div>
-      </section>
+      <div class="stack" data-pstep="2">
+        {% if form %}<div class="callout warn" role="status">The product was not saved. Fix the details listed at the top of the page, attach the receipt again (files are not kept after a failed save) and save.</div>{% endif %}
+        <p class="callout teal hidden" data-prefill-note>Values marked <span class="prefilled-key">from receipt</span> were read automatically. Check each one against the paper receipt.</p>
+        <section class="panel" aria-labelledby="pp-h">
+          <div class="panel-h"><h2 id="pp-h">Product</h2></div>
+          <div class="panel-b form-grid">
+            {% if staff %}
+            <div class="full">{{ field('customer_email', "Customer's email", form.get('customer_email', ''), type='email', required=True,
+                hint="The product is registered to this customer's account and linked to " ~ (current_user.service_center.name if current_user.service_center else 'your service center') ~ '.',
+                attrs={'autocomplete': 'off'}) }}</div>
+            {% endif %}
+            <div class="full">{{ field('product_name', 'Product name', form.get('product_name', ''), required=True, attrs={'maxlength': '120', 'data-fill': 'product_name'}) }}</div>
+            <div class="field">
+              <label for="f-category">Category <span class="req">(required)</span></label>
+              <select class="select" id="f-category" name="category" required data-category aria-describedby="f-category-d">
+                <option value="">Choose a category</option>
+                {% for c, pol in policies.items() %}<option value="{{ c }}" {{ 'selected' if form.get('category') == c }} data-months="{{ pol.coverage_duration_months }}">{{ c }}</option>{% endfor %}
+              </select>
+              <span class="help" id="f-category-d">Decides which warranty policy applies.</span>
+            </div>
+            {{ field('brand', 'Brand', form.get('brand', ''), required=True, attrs={'maxlength': '60'}) }}
+            {{ field('model_number', 'Model number', form.get('model_number', ''), required=True, mono=True, attrs={'maxlength': '60', 'data-fill': 'model_number'}) }}
+            {{ field('serial_number', 'Serial number', form.get('serial_number', ''), required=True, mono=True, hint='As printed on the product label.',
+                     attrs={'minlength': '4', 'maxlength': '60', 'data-fill': 'serial_number'}) }}
+          </div>
+        </section>
 
-      <section class="card">
-        <div class="card-h"><h2>Purchase</h2></div>
-        <div class="card-b form-grid">
-          <label class="field"><span>Purchase date <span class="req">*</span></span><input class="input" type="date" name="purchase_date" value="{{ form.get('purchase_date', '') }}" max="{{ today.isoformat() }}" required data-fill="purchase_date"></label>
-          <label class="field"><span>Price paid <span class="req">*</span></span><input class="input" name="purchase_price" value="{{ form.get('purchase_price', '') }}" inputmode="decimal" required data-fill="purchase_amount"></label>
-          <label class="field"><span>Retailer <span class="req">*</span></span><input class="input" name="retailer" value="{{ form.get('retailer', '') }}" required data-fill="retailer"></label>
-          <label class="field"><span>Invoice number</span><input class="input mono" name="invoice_number" value="{{ form.get('invoice_number', '') }}" data-fill="invoice_number"></label>
-        </div>
-      </section>
+        <section class="panel" aria-labelledby="pu-h">
+          <div class="panel-h"><h2 id="pu-h">Purchase</h2></div>
+          <div class="panel-b form-grid">
+            {{ field('purchase_date', 'Purchase date', form.get('purchase_date', ''), type='date', required=True, attrs={'max': today.isoformat(), 'data-fill': 'purchase_date'}) }}
+            {{ field('purchase_price', 'Price paid', form.get('purchase_price', ''), required=True, mono=True, attrs={'inputmode': 'decimal', 'pattern': '[0-9]+([.,][0-9]{1,2})?', 'data-fill': 'purchase_amount'}) }}
+            {{ field('retailer', 'Retailer', form.get('retailer', ''), required=True, attrs={'maxlength': '120', 'data-fill': 'retailer'}) }}
+            {{ field('invoice_number', 'Invoice number', form.get('invoice_number', ''), mono=True, hint='Optional, but it lets us spot a receipt used twice.', attrs={'maxlength': '40', 'data-fill': 'invoice_number'}) }}
+          </div>
+        </section>
 
-      <section class="card">
-        <div class="card-h"><h2>Warranty</h2></div>
-        <div class="card-b form-grid">
-          <div class="field full"><span class="label">Type</span>
-            <div class="seg">
-              <label><input type="radio" name="warranty_type" value="standard" {{ 'checked' if form.get('warranty_type', 'standard') == 'standard' }}><span>Standard</span></label>
-              <label><input type="radio" name="warranty_type" value="extended" {{ 'checked' if form.get('warranty_type') == 'extended' }}><span>Extended</span></label>
-            </div></div>
-          <label class="field"><span>Length (months) <span class="req">*</span></span><input class="input" type="number" min="1" max="120" name="warranty_months" value="{{ form.get('warranty_months', '') }}" data-fill="warranty_duration_months" data-months required></label>
-          <label class="field"><span>Warranty provider</span><input class="input" name="warranty_provider" value="{{ form.get('warranty_provider', '') }}" placeholder="Defaults to the brand's manufacturer warranty"></label>
-          {% if not staff %}
-          <label class="field full"><span>Preferred authorised service center</span>
-            <select class="select" name="service_center_id"><option value="">No preference</option>{% for c in centers %}<option value="{{ c.id }}" {{ 'selected' if form.get('service_center_id') == c.id|string }}>{{ c.name }} — {{ c.city }}</option>{% endfor %}</select></label>
-          {% endif %}
-        </div>
-        <div class="card-f row between"><span class="small muted">Coverage starts on the purchase date. Expiry is calculated for you.</span><button class="btn" type="submit"><i class="bi bi-check2"></i>Register product</button></div>
-      </section>
+        <section class="panel" aria-labelledby="pw-h">
+          <div class="panel-h"><h2 id="pw-h">Warranty</h2></div>
+          <div class="panel-b form-grid">
+            <fieldset class="field full">
+              <legend>Type</legend>
+              <div class="seg">
+                <label><input type="radio" name="warranty_type" value="standard" {{ 'checked' if form.get('warranty_type', 'standard') == 'standard' }}><span>Standard</span></label>
+                <label><input type="radio" name="warranty_type" value="extended" {{ 'checked' if form.get('warranty_type') == 'extended' }}><span>Extended</span></label>
+              </div>
+            </fieldset>
+            {{ field('warranty_months', 'Length in months', form.get('warranty_months', ''), type='number', required=True, hint='Filled from the category when you choose one.',
+                     attrs={'min': '1', 'max': '120', 'data-months': True, 'data-fill': 'warranty_duration_months'}) }}
+            {{ field('warranty_provider', 'Warranty provider', form.get('warranty_provider', ''), hint="Leave empty for the brand's manufacturer warranty.", attrs={'maxlength': '100'}) }}
+            {% if not staff %}
+            <div class="field full">
+              <label for="f-center">Preferred authorised service center</label>
+              <select class="select" id="f-center" name="service_center_id"><option value="">No preference</option>
+                {% for c in centers %}<option value="{{ c.id }}" {{ 'selected' if form.get('service_center_id') == c.id|string }}>{{ c.name }}, {{ c.city }}</option>{% endfor %}</select>
+            </div>
+            {% endif %}
+          </div>
+          <div class="panel-f row between">
+            <span class="small muted">Cover starts on the purchase date; the expiry date is worked out for you.</span>
+            <div class="row tight"><button class="btn ghost pf-only" type="button" data-pstep-go="1">Back to receipt</button>
+              <button class="btn" type="submit"><i class="bi bi-check2" aria-hidden="true"></i>Register product</button></div>
+          </div>
+        </section>
+      </div>
     </div>
 
-    <aside class="stack sticky">
-      <section class="card soft">
-        <div class="card-h"><h2>Category policies</h2></div>
+    <aside class="stack sticky" aria-label="Category policies">
+      <section class="panel" aria-labelledby="pol-h">
+        <div class="panel-h"><h2 id="pol-h">What each category covers</h2></div>
         <ul class="list">
           {% for c, pol in policies.items() %}
-          <li><div class="grow"><div class="ttl small">{{ c }}</div>
+          <li data-policy="{{ c }}"><div class="grow"><div class="ttl small">{{ c }}</div>
             <div class="sub">{{ pol.coverage_duration_months }} months standard · report within {{ pol.claim_reporting_period_days }} days · {{ pol.grace_period_days }}-day grace</div>
             <div class="sub">Not covered: {{ pol.excluded_damage_types|join(', ')|lower }}</div></div></li>
           {% endfor %}
@@ -91,3 +122,4 @@
   </div>
 </form>
 {% endblock %}
+{% block page_js %}<script src="{{ asset('js/product_form.js') }}" defer></script>{% endblock %}
