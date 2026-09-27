@@ -1267,3 +1267,76 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 .menu-all { display: flex !important; justify-content: center; gap: var(--s1); margin-top: var(--s1); border-top: 1px solid rgba(21, 32, 43, .08);
   border-radius: 0 0 14px 14px !important; color: var(--teal) !important; font-weight: 500; }
 @media (max-width: 560px) { .notif-actions { width: 100%; margin-left: calc(36px + var(--s3)); } }
+
+/* ================================================================== claim detail and workbench
+   Progress as a node stepper, history as a rail, evidence tiles with depth, the document viewer as a light
+   scanner bed, and the reviewer's choice as a segmented control coloured by the decision it records. */
+
+/* progress stepper: round nodes joined by a rail that fills up to the current stage */
+.stage::before { width: 14px; height: 14px; top: 5px; border-radius: 50%; border: 2px solid rgba(21, 32, 43, .22); background: var(--paper);
+  box-shadow: 0 1px 2px rgba(21, 32, 43, .12); }
+.stage::after { top: 11px; left: 18px; right: 2px; height: 2px; border-radius: 2px; background: rgba(21, 32, 43, .1); }
+.stage.done::before { background: linear-gradient(160deg, #33485A, var(--ink)); border-color: var(--ink); }
+.stage.done::after { background: linear-gradient(90deg, var(--ink), #4A6275); }
+.stage.now::before { background: var(--teal-mark); border-color: var(--teal-mark);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal-mark) 20%, transparent), 0 4px 10px -4px var(--teal-mark); }
+.stage.now .n { color: var(--teal); }
+.stages.compact .stage::before { width: 12px; height: 12px; top: 0; border-width: 1.5px; }
+.stages.compact .stage.now::before { box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal-mark) 22%, transparent); }
+
+/* history rail */
+.timeline li { padding-left: 30px; padding-bottom: var(--s5); }
+.timeline li::before { left: 6px; top: 18px; width: 2px; border-radius: 2px; background: linear-gradient(180deg, rgba(21, 32, 43, .2), rgba(21, 32, 43, .06)); }
+.timeline .dot { width: 14px; height: 14px; top: 3px; border-radius: 50%; border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1.5px var(--ink), 0 2px 6px -2px rgba(21, 32, 43, .5); }
+.timeline li:first-child .dot { background: var(--teal-mark); box-shadow: 0 0 0 1.5px var(--teal-mark), 0 0 0 5px color-mix(in srgb, var(--teal-mark) 18%, transparent); }
+.timeline .small.strong { font-size: var(--fs-sm); }
+
+/* evidence tiles: present = raised ink plate with a tick, missing = hatched well */
+.evtile { position: relative; border: 0; border-radius: 10px; min-height: 52px; font-size: var(--fs-xs); font-weight: 600; line-height: 1.25; text-align: center; }
+.evtile.on { background: linear-gradient(160deg, #2B3D4C, var(--ink)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 8px 16px -10px rgba(21, 32, 43, .7); }
+.evtile.on::before { content: "✓"; position: absolute; top: 4px; right: 7px; font-size: 11px; color: var(--teal-bright); }
+.evtile.off { background: repeating-linear-gradient(-55deg, var(--paper) 0 6px, #EEF1F4 6px 8px);
+  box-shadow: inset 0 0 0 1.5px rgba(21, 32, 43, .18), inset 0 1px 3px rgba(21, 32, 43, .08); color: var(--ink-2); }
+.evtile.off::after { font-size: var(--fs-2xs); color: var(--steel); }
+
+/* document viewer: a light scanner bed with viewfinder corners */
+.viewer .frame { position: relative; border: 0; border-radius: 14px; padding: var(--s4);
+  background: radial-gradient(420px 220px at 50% 0%, #FFFFFF, #EEF1F4);
+  box-shadow: inset 0 0 0 1px rgba(21, 32, 43, .08), inset 0 2px 6px rgba(21, 32, 43, .06); }
+.viewer .frame::before { --c: var(--teal-mark); --l: 16px; --w: 2px; content: ""; position: absolute; inset: 8px; pointer-events: none; opacity: .8;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) top left / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) top right / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) bottom left / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) bottom right / var(--w) var(--l) no-repeat; }
+.viewer .frame img { border-radius: 6px; box-shadow: 0 12px 28px -14px rgba(21, 32, 43, .55); }
+.thumbs button { border: 0; border-radius: 10px; box-shadow: 0 0 0 1px rgba(21, 32, 43, .12), 0 4px 10px -6px rgba(21, 32, 43, .4); transition: box-shadow var(--t-fast), transform var(--t-fast); }
+.thumbs button:hover { transform: translateY(-2px); }
+.thumbs button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--teal-mark), 0 6px 14px -6px color-mix(in srgb, var(--teal-mark) 70%, transparent); }
+.thumbs img { border-radius: 10px; }
+
+/* keyboard hints */
+.kbd { border: 0; border-radius: 6px; padding: 1px 6px; background: linear-gradient(180deg, #FFFFFF, #EEF1F4);
+  box-shadow: inset 0 -1.5px 0 rgba(21, 32, 43, .18), 0 0 0 1px rgba(21, 32, 43, .12); color: var(--ink-2); }
+
+/* segmented controls, and the reviewer's decision coloured by what it records */
+.seg { border: 0; gap: 2px; padding: 4px; border-radius: 12px; background: rgba(21, 32, 43, .05); box-shadow: inset 0 1px 2px rgba(21, 32, 43, .08); }
+.seg span { border-radius: 9px; padding: 7px var(--s3); transition: background-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast); }
+.seg label:hover span { color: var(--ink); background: rgba(255, 255, 255, .7); }
+.seg input:checked + span { background: linear-gradient(160deg, #2B3D4C, var(--ink)); color: var(--paper); box-shadow: 0 6px 14px -8px rgba(21, 32, 43, .7); }
+.decision-seg input[value="approve"]:checked + span { background: linear-gradient(160deg, #22875A, var(--valid)); box-shadow: 0 8px 16px -8px var(--valid); }
+.decision-seg input[value="reject"]:checked + span { background: linear-gradient(160deg, #C24A36, var(--invalid)); box-shadow: 0 8px 16px -8px var(--invalid); }
+.decision-seg input[value="request_info"]:checked + span { background: linear-gradient(160deg, #9E6A18, var(--review)); box-shadow: 0 8px 16px -8px var(--review); }
+.seg input:checked + span .kbd { background: rgba(255, 255, 255, .16); color: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
+
+/* claim detail: key-value rows with hairlines */
+.panel .kv { row-gap: 0; }
+.panel .kv dt, .panel .kv dd { padding: 7px 0; border-bottom: 1px solid rgba(21, 32, 43, .06); }
+.panel .kv dt:last-of-type, .panel .kv dd:last-of-type { border-bottom: 0; }
+/* the workbench's column tabs exist only below 1280px (the tray style above must not bring them back) */
+@media (min-width: 1280px) { .tabs.wb-tabs { display: none; } }
+.decision-bar { background: color-mix(in srgb, var(--paper) 95%, transparent); }
+/* workbench: in the narrow verdict column each probability bar runs full width under its label */
+.workbench .pbar { grid-template-columns: minmax(0, 1fr) auto; row-gap: 4px; }
+.workbench .pbar .t { grid-column: 1 / -1; grid-row: 2; }
