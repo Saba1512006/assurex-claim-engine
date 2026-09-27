@@ -85,3 +85,15 @@ def autosave_draft():
     db.session.commit()
     return ok({"claim_id": claim.claim_id, "saved_at": claim.updated_at.strftime("%H:%M"),
                "url": url_for("claims.view_claim", claim_id=claim.claim_id)})
+
+
+@api_bp.post("/admin/what-if")
+@require("settings.manage")
+@limiter.limit("60/minute")
+def what_if():
+    """Replay decisions under proposed thresholds. Read-only: nothing is saved."""
+    from src.services import whatif
+    try:
+        return ok(whatif.simulate(request.get_json(silent=True) or {}))
+    except whatif.WhatIfError as exc:
+        return fail(ErrorCode.VALIDATION_FAILED, str(exc))

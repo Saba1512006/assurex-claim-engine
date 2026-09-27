@@ -1,0 +1,84 @@
+{% extends "components/base.html" %}
+{# What-if simulator: move the three consistency thresholds and see, before saving anything, how the 225 labelled
+   test claims and the live claims would be decided. Apply saves a new decision-policy version and audits it. #}
+{% from "components/ui.html" import csrf, panel as ui_panel %}
+{% block title %}What-if simulator{% endblock %}
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('admin.dashboard') }}">Overview</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span aria-current="page">What-if</span></nav>
+    <h1>What-if simulator</h1>
+    <p class="lede">Change when the two models count as agreeing and see the effect before it touches a single claim. Rule outcomes are replayed as stored; only the agreement check moves.</p>
+  </div>
+  <span class="small muted">Decision policy <span class="mono">{{ version }}</span></span>
+</div>
+{% endblock %}
+{% block content %}
+{% set t, c, pr = sim.test, sim.current, sim.proposed %}
+<form class="split" method="post" action="{{ url_for('admin.what_if_apply') }}" data-whatif data-url="{{ url_for('api.what_if') }}"
+      data-confirm="Save these thresholds as a new decision-policy version? New claims will use them.">
+  {{ csrf() }}
+  <div class="stack">
+    <section class="panel" aria-labelledby="res-h">
+      <div class="panel-h"><h2 id="res-h">On the 225 labelled test claims</h2><span class="hint" data-wi-status aria-live="polite">Current thresholds</span></div>
+      <div class="table-wrap"><table class="table">
+        <caption class="sr">Current versus proposed thresholds on the labelled test claims</caption>
+        <thead><tr><th scope="col">Measure</th><th scope="col" class="num">Current</th><th scope="col" class="num">Proposed</th><th scope="col" class="num">Change</th></tr></thead>
+        <tbody>
+          {% for key, label, kind in [('automation_rate', 'Decided without a person', 'pct'), ('auto_accuracy', 'Correct among those decisions', 'pct'),
+                                      ('auto_errors', 'Wrong automated decisions', 'n'), ('review_share', 'Sent to a reviewer', 'pct')] %}
+          <tr data-wi-row="{{ key }}" data-kind="{{ kind }}"><th scope="row">{{ label }}</th>
+            <td class="num mono">{{ ('%.1f%%'|format(t.current[key] * 100)) if kind == 'pct' else t.current[key] }}</td>
+            <td class="num mono" data-wi-new>{{ ('%.1f%%'|format(t.proposed[key] * 100)) if kind == 'pct' else t.proposed[key] }}</td>
+            <td class="num mono" data-wi-delta>±0</td></tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+      <p class="panel-f tiny muted mb-0">Accuracy counts an automated “Likely Valid” as right when the true label is Valid Claim, and “Likely Invalid” when it is Invalid Claim. Claims sent to a reviewer are not counted as errors.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="tr-h">
+      <div class="panel-h"><h2 id="tr-h">Where decisions move</h2><span class="hint"><span data-wi-changed>{{ t.changed }}</span> of 225 test claims change</span></div>
+      <div class="panel-b">
+        <div class="cmx cmx-3" role="table" aria-label="Test claims: current decision (rows) against proposed decision (columns)" data-wi-matrix>
+          <span class="axis" role="presentation">Rows: now · columns: with the proposed thresholds</span>
+          <span role="columnheader"></span>{% for d in ['Valid', 'Invalid', 'Review'] %}<span class="h" role="columnheader">{{ d }}</span>{% endfor %}
+          {% for row in t.transitions %}{% set r = loop.index0 %}
+            <span class="h" role="rowheader">{{ ['Valid', 'Invalid', 'Review'][r] }}</span>
+            {% for n in row %}<span class="c {{ 'diag' if loop.index0 == r }}" role="cell" data-cell="{{ r }}{{ loop.index0 }}">{{ n }}</span>{% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="live-h">
+      <div class="panel-h"><h2 id="live-h">Live claims</h2><span class="hint"><span data-wi-live-count>{{ sim.live.changed_count }}</span> of {{ sim.live.n }} evaluated claims would get a different recommendation</span></div>
+      <ul class="list" data-wi-live>
+        <li class="small muted">Move a threshold to see which claims change. Past decisions are never rewritten; this only shows what a re-evaluation would give.</li>
+      </ul>
+    </section>
+  </div>
+
+  <aside class="stack sticky" aria-label="Thresholds">
+    <section class="panel" aria-labelledby="th-h">
+      <div class="panel-h"><h2 id="th-h">Thresholds</h2></div>
+      <div class="panel-b stack">
+        {% for key, label, hint in [('min_confidence', 'Minimum confidence', 'Below this, either model counts as unsure: Uncertain Result.'),
+                                    ('strong_max_diff', 'Strong match: largest gap', 'Same class and confidences at most this far apart.'),
+                                    ('acceptable_max_diff', 'Acceptable match: largest gap', 'Wider than this is a Weak Match and goes to a reviewer.')] %}
+          <div class="field slider">
+            <label for="wi-{{ key }}">{{ label }} <output class="mono" for="wi-{{ key }}" data-out="{{ key }}">{{ '%.2f'|format(pr[key]) }}</output></label>
+            <input id="wi-{{ key }}" type="range" name="{{ key }}" min="0" max="1" step="0.01" value="{{ pr[key] }}" data-current="{{ c[key] }}" aria-describedby="wi-{{ key }}-d">
+            <span class="help" id="wi-{{ key }}-d">{{ hint }} Now <span class="mono">{{ '%.2f'|format(c[key]) }}</span>.</span>
+          </div>
+        {% endfor %}
+        <p class="err small mb-0 hidden" data-wi-error role="alert"></p>
+        <div class="row tight"><button class="btn quiet" type="button" data-wi-reset>Back to current</button>
+          <button class="btn" type="submit" data-wi-apply disabled>Apply thresholds</button></div>
+        <p class="tiny muted mb-0">Applying saves a new decision-policy version with the change and its simulated effect in the audit trail.</p>
+      </div>
+    </section>
+  </aside>
+</form>
+{% endblock %}
+{% block page_js %}<script src="{{ asset('js/whatif.js') }}" defer></script>{% endblock %}

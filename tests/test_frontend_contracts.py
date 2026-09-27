@@ -227,3 +227,42 @@ def test_workbench_opens_for_reviewers_only_and_decisions_return_to_it(app, clie
     assert r.headers["Location"].endswith(wb) and high.status == "Approved"
     r = client.post(f"/reviewer/claims/{low.claim_id}/decide", data={"action": "approve", "comments": "Checked.", "next": "https://evil.example"})
     assert "evil" not in r.headers["Location"]                            # open-redirect guard
+
+
+def test_what_if_simulation_is_read_only_and_reproduces_current_decisions(app, client):
+    from src.core import decision_table
+    from src.services import whatif
+    assert whatif.reproduces_stored() == 1.0                              # replay == stored decisions at current thresholds
+    make_user("ad@x.io", "administrator")
+    make_user("c@x.io")
+    before = decision_table.POLICY_PATH.read_text()
+    login(client, "c@x.io")
+    assert client.post("/api/admin/what-if", json={}).status_code == 403
+    client.post("/logout")
+    login(client, "ad@x.io")
+    cur = decision_table.load_policy()["consistency"]
+    same = client.post("/api/admin/what-if", json=cur).get_json()["data"]
+    assert same["test"]["changed"] == 0 and same["test"]["current"] == same["test"]["proposed"]
+    strict = client.post("/api/admin/what-if", json={**cur, "min_confidence": 0.95}).get_json()["data"]
+    assert strict["test"]["proposed"]["automation_rate"] <= strict["test"]["current"]["automation_rate"]
+    bad = client.post("/api/admin/what-if", json={**cur, "strong_max_diff": 0.5, "acceptable_max_diff": 0.2})
+    assert bad.status_code == 400 and bad.get_json()["error"]["code"] == "VALIDATION_FAILED"
+    assert decision_table.POLICY_PATH.read_text() == before              # simulation never saves
+    assert client.get("/admin/what-if").status_code == 200
+
+
+def test_what_if_apply_saves_a_new_version_and_audits(app, client):
+    from src.core import decision_table
+    from src.models.entities import AuditLog
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    before = decision_table.POLICY_PATH.read_text()
+    try:
+        old = decision_table.load_policy()
+        r = client.post("/admin/what-if/apply", data={**old["consistency"], "min_confidence": 0.65})
+        new = decision_table.load_policy()
+        assert r.status_code == 302 and new["consistency"]["min_confidence"] == 0.65 and new["version"] != old["version"]
+        log = AuditLog.query.filter_by(action="DECISION_POLICY_UPDATED").one()
+        assert "what-if" in log.details_json and "auto_accuracy" in log.details_json
+    finally:
+        decision_table.POLICY_PATH.write_text(before)

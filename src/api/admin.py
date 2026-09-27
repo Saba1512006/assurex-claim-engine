@@ -162,6 +162,43 @@ def dispatch_alerts():
     return redirect(request.referrer or url_for("admin.dashboard"))
 
 
+# ------------------------------------------------------------------ what-if simulator
+@admin_bp.get("/what-if")
+@require("settings.manage")
+def what_if():
+    from src.services import whatif
+    return render_template("admin/what_if.html", sim=whatif.simulate(decision_table.load_policy()["consistency"]),
+                           version=decision_table.load_policy()["version"])
+
+
+@admin_bp.post("/what-if/apply")
+@require("settings.manage")
+def what_if_apply():
+    from src.services import whatif
+    try:
+        proposed = whatif.validate(request.form)
+    except whatif.WhatIfError as exc:
+        flash(str(exc), "warning")
+        return redirect(url_for("admin.what_if"))
+    policy = decision_table.load_policy()
+    before = dict(policy["consistency"])
+    if before == {**before, **proposed}:
+        flash("These are already the thresholds in use; nothing changed.", "info")
+        return redirect(url_for("admin.what_if"))
+    sim = whatif.simulate(proposed, include_live=False)
+    policy["consistency"].update(proposed)
+    policy["version"] = datetime.now(timezone.utc).strftime("%Y.%m.%d.%H%M")
+    decision_table.save_policy(policy)
+    audit("DECISION_POLICY_UPDATED", "Settings", "decision_policy", source="what-if", before=before,
+          after=policy["consistency"], version=policy["version"],
+          simulated={"automation_rate": sim["test"]["proposed"]["automation_rate"],
+                     "auto_accuracy": sim["test"]["proposed"]["auto_accuracy"]})
+    db.session.commit()
+    flash(f"Thresholds applied as decision policy {policy['version']}. New claims use them; past decisions are unchanged.",
+          "success")
+    return redirect(url_for("admin.what_if"))
+
+
 # ------------------------------------------------------------------ models (SRS xviii-xxi, xlviii)
 @admin_bp.get("/models")
 @require("settings.manage")
