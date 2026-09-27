@@ -1570,7 +1570,5 @@ body:has(.decision-bar) .fab-top { bottom: 132px; }
 button[data-retry-lock]:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .retry-dial .retry-arc { transition: none; } }
 .row.center { justify-content: center; }
-/* footer bottom: the credit centred, back to top on the right (stacked and centred on small screens) */
-.footer-bottom .footer-credit { grid-column: 2; text-align: center; }
-.footer-bottom .to-top { grid-column: 3; justify-self: end; }
-@media (max-width: 991px) { .footer-bottom .footer-credit, .footer-bottom .to-top { grid-column: auto; justify-self: center; } }
+/* footer bottom: the credit, centred (the floating button handles back to top) */
+.footer .wrap.footer-bottom { grid-template-columns: 1fr; justify-items: center; text-align: center; }
