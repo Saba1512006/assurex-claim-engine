@@ -1247,3 +1247,9 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
   .stats.kpis:has(> :nth-child(4):last-child), .stats.kpis:has(> :nth-child(5):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .tabs { width: fit-content; max-width: 100%; }
+/* narrow screens: a list row's action drops under its text instead of squeezing it */
+@media (max-width: 560px) {
+  .list > li > .grow { flex: 1 1 calc(100% - 36px - var(--s3)); }
+  .list > li > .btn { margin-left: calc(36px + var(--s3)); }
+  .kpi { min-height: 0; padding: var(--s4); }
+}
