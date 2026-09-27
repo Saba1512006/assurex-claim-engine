@@ -207,7 +207,7 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 ## Links
 
 * Live deployment: https://assurexai.pythonanywhere.com (redeploy and re-seed after pulling this version)
-* Published blog (Medium, first version): https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111
+* Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
 * Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
 * Installation & troubleshooting: [`documentation/INSTALLATION.md`](documentation/INSTALLATION.md)

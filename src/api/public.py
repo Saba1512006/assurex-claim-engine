@@ -11,6 +11,7 @@ from src.core.gtm_classifier_v2 import evaluation as gtm_evaluation, find_model_
 from src.core.python_classifier import model_card
 
 public_bp = Blueprint("public", __name__)
+MEDIUM_URL = "https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c"
 BLOG = Path(__file__).resolve().parent.parent.parent / "documentation" / "TECHNICAL_BLOG.md"
 
 DEMO_ACCOUNTS = [
@@ -46,7 +47,7 @@ def blog():
                            extension_configs={"toc": {"toc_depth": "2"}})
     html = md.convert(text)
     words = len(re.findall(r"\w+", text))
-    return render_template("public/blog.html", html=html, toc=md.toc_tokens, words=words,
+    return render_template("public/blog.html", html=html, toc=md.toc_tokens, words=words, medium_url=MEDIUM_URL,
                            minutes=max(1, round(words / 220)))
 
 

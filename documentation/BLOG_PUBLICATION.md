@@ -5,8 +5,9 @@
 | Title | Building AssureX: two models, one rulebook, and why our first 100% was a bug |
 | Current text | [`documentation/TECHNICAL_BLOG.md`](TECHNICAL_BLOG.md) — about 3,000 words; also served in the app at `/blog` |
 | Medium-ready copy | [`documentation/medium/`](medium/README.md) — `medium_article.html` (paste into Medium) + 5 images + step-by-step guide |
-| Published (first version) | https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111 |
-| Action needed | **Republish** the current text using `documentation/medium/` (the Medium article describes version 1, including its 100% score that turned out to be label leakage) and replace the link above |
+| **Published (current version)** | https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c |
+| Earlier version (v1, superseded) | https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111 |
+| Status | Current text published on Medium on 27 September 2026 (tags: Machine Learning, Python, Teachable Machine, Data Science, Flask). The v1 article describes the leaked 100% model and should be unlisted |
 
 ## SRS topic coverage (page 35–36)
 
