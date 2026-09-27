@@ -1372,3 +1372,19 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 .menu-sep { margin: var(--s1) var(--s2); }
 /* open menus sit above toasts (toasts start below the navbar, so they never cover the island itself) */
 .topbar { z-index: 130; }
+
+/* ================================================================== brand: the AssureX X mark and wordmark
+   Two drawings of the same mark: deep check for light surfaces, bright check for the bench. */
+.brand { gap: 10px; }
+.brand-mark { display: block; width: 52px; height: 43px; flex: none; filter: drop-shadow(0 3px 6px rgba(13, 20, 27, .18)); }
+.brand-mark.on-dark { display: none; }
+.brand-name { display: grid; gap: 1px; line-height: 1; }
+.brand-word { font: 600 1.5rem/1 var(--font); letter-spacing: -0.035em; color: var(--ink); }
+.brand-x { background: linear-gradient(135deg, #22B3A9 10%, #0B7C80 55%, #2F5BAE); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand-name small { font-size: .625rem; font-weight: 600; letter-spacing: .22em; text-transform: none; color: var(--steel); }
+.nav-overlay .topbar:not(.scrolled) .brand-mark.on-light { display: none; }
+.nav-overlay .topbar:not(.scrolled) .brand-mark.on-dark { display: block; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45)); }
+.nav-overlay .topbar:not(.scrolled) .brand-word { color: var(--on-bench); }
+.nav-overlay .topbar:not(.scrolled) .brand-x { background-image: linear-gradient(135deg, #5DD3C9 10%, #22B3A9 55%, #8EA0E6); }
+.nav-overlay .topbar:not(.scrolled) .brand-name small { color: var(--on-bench-2); }
+@media (max-width: 991px) { .brand-mark { width: 40px; height: 33px; } .brand-word { font-size: 1.1875rem; } }

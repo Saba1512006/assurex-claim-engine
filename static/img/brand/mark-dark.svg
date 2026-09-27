@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100" role="img" aria-label="AssureX">
+  <defs>
+    <linearGradient id="a" x1="4" y1="6" x2="116" y2="94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#5DD3C9"/><stop offset=".55" stop-color="#22B3A9"/><stop offset="1" stop-color="#0E9A91"/></linearGradient>
+    <linearGradient id="b" x1="116" y1="6" x2="60" y2="38" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0FA3A0"/><stop offset="1" stop-color="#0B7C80"/></linearGradient>
+    <linearGradient id="c" x1="4" y1="94" x2="71" y2="58" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4F63C4"/><stop offset="1" stop-color="#3E4FA6"/></linearGradient>
+    <linearGradient id="k" x1="90" y1="34" x2="34" y2="47" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#EFFFFD"/><stop offset="1" stop-color="#7EDCD3"/></linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="100">
+      <rect width="120" height="100" fill="#fff"/>
+      <polyline points="31,44 55,66 93,31" fill="none" stroke="#000" stroke-width="15" stroke-linejoin="miter"/>
+    </mask>
+  </defs>
+  <g mask="url(#m)">
+    <polygon points="80,6 116,6 84.9,42 48.9,42" fill="url(#b)"/>
+    <polygon points="35.1,58 71.1,58 40,94 4,94" fill="url(#c)"/>
+    <polygon points="4,6 40,6 116,94 80,94" fill="url(#a)"/>
+  </g>
+  <polyline points="34,47 55,66 90,34" fill="none" stroke="url(#k)" stroke-width="8" stroke-linejoin="miter"/>
+</svg>

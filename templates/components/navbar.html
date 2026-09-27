@@ -8,7 +8,9 @@
 <header class="topbar">
   <div class="wrap">
     <a class="brand" href="{{ url_for('public.index') }}" aria-label="AssureX home page">
-      <span class="brand-tile">{% include "components/mark.svg" %}</span><span class="brand-name">AssureX<small>Claim Engine</small></span>
+      <img class="brand-mark on-light" src="{{ asset('img/brand/mark-light.svg') }}" alt="" width="46" height="38">
+      <img class="brand-mark on-dark" src="{{ asset('img/brand/mark-dark.svg') }}" alt="" width="46" height="38">
+      <span class="brand-name"><span class="brand-word">Assure<span class="brand-x">X</span></span><small>Claim Engine</small></span>
     </a>
     {% if current_user %}
       <nav class="nav" id="main-nav" aria-label="Main" data-sheet>

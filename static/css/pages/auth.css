@@ -164,3 +164,6 @@
 
 @media (prefers-reduced-motion: reduce) { .scanner-bed { transition: none; } .persona:hover { transform: none; } }
 @media (max-width: 991px) { .scanner-bed { --rx: 0deg; --ry: 0deg; } .auth-bench::before { display: none; } }
+/* the brand mark above the form, without a tile */
+.auth-mark { width: auto; height: auto; background: none; box-shadow: none; border-radius: 0; place-items: start; }
+.auth-mark img { display: block; width: 46px; height: 38px; filter: drop-shadow(0 3px 6px rgba(13, 20, 27, .18)); }
