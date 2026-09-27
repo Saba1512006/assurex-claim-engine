@@ -1,13 +1,53 @@
-{# One quiet footer row: product, event, links and the running model versions. #}
+{# Site footer on the bench: the brand with a one-line promise and the live model versions, three link columns
+   (product, resources, account: signed in or not), a bottom bar with the event credit and back to top, and a large
+   outlined wordmark as a quiet signature. Every figure shown is read from the installed model files. #}
+{% from "components/ui.html" import icon %}
+{# icons: external-link book-open file-code-2 cpu arrow-up shield-check #}
 {% set mv = model_versions() %}
-<footer class="footer">
-  <div class="wrap">
-    <span>AssureX Claim Engine · Built for TechWiz 7 · NextWave AI and ML</span>
-    <nav aria-label="Footer">
+<footer class="footer bench">
+  <div class="wrap footer-top">
+    <section class="footer-brand" aria-label="AssureX">
+      <a class="footer-logo" href="{{ url_for('public.index') }}" aria-label="AssureX home page">
+        <img src="{{ asset('img/brand/mark-dark.svg') }}" alt="" width="52" height="43">
+        <span class="brand-name"><span class="brand-word">Assure<span class="brand-x">X</span></span><small>Claim Engine</small></span>
+      </a>
+      <p class="footer-line">Every warranty claim checked twice: a Python model, a Teachable Machine image model and a policy engine agree, or a person decides.</p>
+      <ul class="footer-models" aria-label="Installed models">
+        <li><span class="status-dot {{ 'on' if mv.python != 'not installed' }}" aria-hidden="true"></span>Python model <span class="mono">{{ mv.python }}</span></li>
+        <li><span class="status-dot {{ 'on' if mv.gtm != 'not installed' }}" aria-hidden="true"></span>Teachable Machine <span class="mono">{{ mv.gtm }}</span></li>
+      </ul>
+    </section>
+
+    <nav class="footer-col" aria-labelledby="fc-product">
+      <h2 id="fc-product">Product</h2>
+      <a href="{{ url_for('public.index', _anchor='how') }}">How a claim is decided</a>
+      <a href="{{ url_for('public.index', _anchor='models') }}">Measured results</a>
       <a href="{{ url_for('public.model_card') }}">Model card</a>
-      <a href="{{ medium_url }}" rel="noopener">Technical blog</a>
-      <a href="{{ github_url }}" rel="noopener">GitHub repository</a>
     </nav>
+    <nav class="footer-col" aria-labelledby="fc-res">
+      <h2 id="fc-res">Resources</h2>
+      <a href="{{ url_for('public.blog') }}">Technical blog</a>
+      <a href="{{ medium_url }}" rel="noopener" target="_blank">Read it on Medium{{ icon('external-link', 'sm') }}</a>
+      <a href="{{ github_url }}" rel="noopener" target="_blank">GitHub repository{{ icon('external-link', 'sm') }}</a>
+    </nav>
+    <nav class="footer-col" aria-labelledby="fc-acc">
+      <h2 id="fc-acc">Account</h2>
+      {% if current_user %}
+        <a href="{{ url_for('auth.home') }}">My dashboard</a>
+        <a href="{{ url_for('claims.notifications') }}">Notifications</a>
+        <a href="{{ url_for('auth.profile') }}">Profile</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">Sign in</a>
+        <a href="{{ url_for('auth.register') }}">Create a customer account</a>
+      {% endif %}
+    </nav>
+  </div>
+
+  <div class="footer-mark" aria-hidden="true">AssureX</div>
+
+  <div class="wrap footer-bottom">
+    <span>AssureX Claim Engine · Built for TechWiz 7 · NextWave AI and ML</span>
     <span class="versions" title="Installed model versions">py {{ mv.python }} · {{ mv.gtm }} · times in server time (UTC)</span>
+    <a class="to-top" href="#main">Back to top{{ icon('arrow-up', 'sm') }}</a>
   </div>
 </footer>
