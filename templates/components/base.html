@@ -43,6 +43,13 @@
     {% endblock %}
   </main>
   {% block footer %}{% include "components/footer.html" %}{% endblock %}
+  {# Back to top: appears after scrolling, its ring fills with reading progress; smooth scroll unless reduced motion. #}
+  <button class="fab-top" type="button" data-to-top aria-label="Back to top" tabindex="-1" aria-hidden="true">
+    <svg class="fab-ring" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <circle class="fab-track" cx="24" cy="24" r="21"/><circle class="fab-bar" cx="24" cy="24" r="21" pathLength="100" data-to-top-bar/>
+    </svg>
+    <svg class="ic fab-arrow" aria-hidden="true" focusable="false"><use href="{{ asset('img/icons.svg') }}#i-arrow-up"></use></svg>
+  </button>
   {% if needs_charts %}<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>{% endif %}
   <script src="{{ asset('js/app.js') }}" defer></script>
   {% block page_js %}{% endblock %}

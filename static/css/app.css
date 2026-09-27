@@ -1473,3 +1473,40 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
   .topbar.tone-dark .nav a[aria-current="page"]::after { background: var(--teal-bright); }
 }
 .topbar.tone-dark .role--administrator::before, .topbar.tone-dark .role--claim_reviewer::before { background: var(--on-bench); }
+
+/* ================================================================== back to top
+   A round glass button, bottom right: it rises in with a spring once the reader is most of a screen down, its
+   teal-to-indigo ring fills with reading progress, it lifts and glows on hover, and on click the arrow launches up
+   and lands back while the page glides to the top. */
+.fab-top { position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); z-index: 70;
+  display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: var(--on-bench);
+  background: radial-gradient(circle at 30% 25%, #22313E, var(--bench) 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 1px rgba(255, 255, 255, .06), 0 14px 30px -10px rgba(13, 20, 27, .6), 0 4px 10px -4px rgba(13, 20, 27, .4);
+  opacity: 0; visibility: hidden; transform: translateY(18px) scale(.6);
+  transition: opacity 260ms var(--ease), transform 420ms cubic-bezier(.34, 1.56, .64, 1), visibility 0s linear 420ms, box-shadow 200ms var(--ease); }
+.fab-top.show { opacity: 1; visibility: visible; transform: none; transition: opacity 260ms var(--ease), transform 420ms cubic-bezier(.34, 1.56, .64, 1), visibility 0s, box-shadow 200ms var(--ease); }
+.fab-top:hover { transform: translateY(-3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(63, 184, 174, .35), 0 0 22px -2px rgba(63, 184, 174, .55), 0 18px 34px -12px rgba(13, 20, 27, .7); }
+.fab-top:active { transform: translateY(0) scale(.94); }
+.fab-top:focus-visible { outline: none; box-shadow: var(--focus-bench), 0 14px 30px -10px rgba(13, 20, 27, .6); }
+.fab-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.fab-track { fill: none; stroke: rgba(255, 255, 255, .1); stroke-width: 2.5; }
+.fab-bar { fill: none; stroke: var(--teal-bright); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100;
+  transition: stroke-dashoffset 120ms linear; filter: drop-shadow(0 0 3px rgba(63, 184, 174, .6)); }
+.fab-arrow { position: relative; width: 20px; height: 20px; transition: transform 220ms var(--ease); }
+.fab-top:hover .fab-arrow { transform: translateY(-3px); }
+.fab-top.launch .fab-arrow { animation: fab-launch 620ms cubic-bezier(.5, 0, .3, 1) both; }
+@keyframes fab-launch {
+  0% { transform: translateY(0); opacity: 1; }
+  45% { transform: translateY(-26px); opacity: 0; }
+  46% { transform: translateY(18px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+/* keep clear of the reviewer's decision tray */
+body:has(.decision-bar) .fab-top { bottom: 132px; }
+@media (max-width: 767px) { .fab-top { width: 46px; height: 46px; right: 14px; bottom: 16px; } }
+@media (prefers-reduced-motion: reduce) {
+  .fab-top, .fab-top.show { transition: opacity 1ms, visibility 0s; transform: none; }
+  .fab-top:hover { transform: none; } .fab-top.launch .fab-arrow { animation: none; } .fab-bar { transition: none; }
+}
+@media print { .fab-top { display: none !important; } }

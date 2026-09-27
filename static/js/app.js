@@ -439,3 +439,33 @@
   window.addEventListener("resize", queue);
   update();
 })();
+
+/* Back to top: shows after the reader has scrolled most of a screen, its ring tracks how far down the page they
+   are, and a click launches the arrow and scrolls up (instantly with reduced motion), then puts focus on main. */
+(() => {
+  const btn = document.querySelector("[data-to-top]");
+  if (!btn) return;
+  const bar = btn.querySelector("[data-to-top-bar]");
+  const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let queued = false;
+  const update = () => {
+    queued = false;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const p = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+    bar.style.strokeDashoffset = String(100 - p * 100);
+    const show = window.scrollY > window.innerHeight * 0.6;
+    btn.classList.toggle("show", show);
+    btn.tabIndex = show ? 0 : -1;
+    btn.setAttribute("aria-hidden", String(!show));
+  };
+  window.addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+  window.addEventListener("resize", update);
+  btn.addEventListener("click", () => {
+    btn.classList.remove("launch"); void btn.offsetWidth; btn.classList.add("launch");
+    window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" });
+    const main = document.getElementById("main");
+    if (main) setTimeout(() => main.focus({ preventScroll: true }), reduced() ? 0 : 600);
+  });
+  btn.addEventListener("animationend", () => btn.classList.remove("launch"));
+  update();
+})();
