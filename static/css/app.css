@@ -1178,3 +1178,9 @@ a.plate:hover { transform: translateY(-3px); border-color: transparent;
 .decision-bar { border-top: 0; background: color-mix(in srgb, var(--paper) 86%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px);
   box-shadow: 0 -1px 0 rgba(21, 32, 43, .08), 0 -18px 40px -24px rgba(21, 32, 43, .45); }
+
+/* account menu: an administration group (models, what-if, batch) */
+.menu-label { margin: var(--s2) var(--s3) var(--s1); font-size: var(--fs-2xs); font-weight: 600; color: var(--steel); letter-spacing: .02em; }
+.menu-sep { margin: var(--s2) var(--s2); border: 0; border-top: 1px solid rgba(21, 32, 43, .08); }
+.menu-panel a .menu-hint { margin-left: auto; font-size: var(--fs-2xs); color: var(--steel); }
+.menu-panel a[aria-current="page"] { background: var(--teal-wash); box-shadow: inset 3px 0 0 var(--teal-mark); }

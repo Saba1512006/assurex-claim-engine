@@ -56,6 +56,13 @@
             </div>
             <a href="{{ url_for('auth.profile') }}"><i class="bi bi-person" aria-hidden="true"></i>Profile</a>
             <a href="{{ url_for('auth.profile', _anchor='notifications') }}"><i class="bi bi-bell" aria-hidden="true"></i>Notifications</a>
+            {% if can('settings.manage') %}
+              <p class="menu-label">Administration</p>
+              <a href="{{ url_for('admin.models') }}" {% if ep == 'admin.models' %}aria-current="page"{% endif %}><i class="bi bi-cpu" aria-hidden="true"></i>Models<span class="menu-hint">install and version</span></a>
+              <a href="{{ url_for('admin.what_if') }}" {% if ep == 'admin.what_if' %}aria-current="page"{% endif %}><i class="bi bi-activity" aria-hidden="true"></i>What-if simulator</a>
+              <a href="{{ url_for('admin.batch') }}" {% if ep == 'admin.batch' %}aria-current="page"{% endif %}><i class="bi bi-collection" aria-hidden="true"></i>Batch evaluation</a>
+              <hr class="menu-sep">
+            {% endif %}
             <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="menu-item" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i>Sign out</button></form>
           </div>
         </div>
