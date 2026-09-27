@@ -1,24 +1,32 @@
 {% extends "components/base.html" %}
+{# Technical blog: rendered from docs Markdown in the repository (our own file, hence |safe), a sticky table of contents,
+   reading time, and schema.org Article data for search engines. #}
 {% block title %}Technical blog{% endblock %}
 {% block description %}How AssureX was built: dataset, Python model, Teachable Machine, rule engine, security and lessons learned.{% endblock %}
 {% block content %}
 <div class="blog-layout">
-  <aside class="sticky no-print">
-    <div class="card"><div class="card-b">
-      <div class="eyebrow">On this page</div>
-      <ul class="toc">
-        {% for h in toc %}
-          {% if h.level >= 2 %}<li><a href="#{{ h.id }}">{{ h.name }}</a></li>{% endif %}
-          {% for c in h.children %}<li><a href="#{{ c.id }}">{{ c.name }}</a></li>{% endfor %}
-        {% endfor %}
-      </ul>
-      <hr>
-      <div class="small muted">{{ '{:,}'.format(words) }} words · {{ minutes }} min read</div>
-      <a class="btn quiet sm mt-2" href="{{ medium_url }}" target="_blank" rel="noopener">Read on Medium <i class="bi bi-box-arrow-up-right"></i></a>
-    </div></div>
+  <aside class="sticky no-print" aria-label="On this page">
+    <nav class="panel" aria-labelledby="toc-h">
+      <div class="panel-b stack-sm">
+        <h2 class="eyebrow" id="toc-h">On this page</h2>
+        <ul class="toc">
+          {% for h in toc %}
+            {% if h.level >= 2 %}<li><a href="#{{ h.id }}">{{ h.name }}</a></li>{% endif %}
+            {% for c in h.children %}<li><a href="#{{ c.id }}">{{ c.name }}</a></li>{% endfor %}
+          {% endfor %}
+        </ul>
+        <p class="small muted mb-0"><span class="mono">{{ '{:,}'.format(words) }}</span> words · {{ minutes }} min read</p>
+        {% if medium_url %}<a class="btn quiet sm" href="{{ medium_url }}" target="_blank" rel="noopener">Read it on Medium <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>{% endif %}
+      </div>
+    </nav>
   </aside>
-  <article class="card"><div class="card-b" style="padding: 32px clamp(18px, 4vw, 48px);">
-    <div class="prose">{{ html|safe }}</div>
-  </div></article>
+  <article class="panel blog-article"><div class="panel-b prose">{{ html|safe }}</div></article>
 </div>
+<script type="application/ld+json" nonce="{{ csp_nonce() }}">{{ {
+  '@context': 'https://schema.org', '@type': 'TechArticle',
+  'headline': 'How AssureX was built', 'about': 'Warranty claim validation with two independent models and a policy engine',
+  'wordCount': words, 'timeRequired': 'PT' ~ minutes ~ 'M', 'inLanguage': 'en',
+  'publisher': {'@type': 'Organization', 'name': 'AssureX Claim Engine'},
+  'mainEntityOfPage': request.url
+}|tojson }}</script>
 {% endblock %}

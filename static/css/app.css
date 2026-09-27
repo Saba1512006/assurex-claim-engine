@@ -764,3 +764,4 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .stack-cell .t-main, .stack-cell .t-sub { display: block; }
 .table .row.end { flex-wrap: nowrap; }
 .stack-cell { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }
+.blog-article .panel-b { padding: var(--s7) clamp(var(--s4), 4vw, var(--s7)); }
