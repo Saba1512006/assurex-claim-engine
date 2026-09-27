@@ -2,13 +2,13 @@
    (pixels unchanged; only the frame is styled), and how both models scored it in the offline evaluation. #}
 {% from "components/ui.html" import icon %}
 {% macro scanner(card, reading) -%}
-<aside class="bench grid-bg auth-bench" aria-labelledby="scan-h">
+<aside class="bench grid-bg auth-bench" aria-labelledby="scan-h" data-tilt-zone>
   <div class="auth-bench-inner">
     <figure class="scanner">
       <div class="scanner-meta mono" aria-hidden="true">
         <span>{{ reading.claim_id if reading else card[:9] }}</span><span>test split</span>
       </div>
-      <div class="scanner-bed">
+      <div class="scanner-bed" data-tilt>
         <div class="scanner-card"><img class="summary-card-img" src="{{ url_for('public.test_card', name=card) }}"
              alt="Claim Summary Card for test claim {{ reading.claim_id if reading else '' }}" width="600" height="600" fetchpriority="high"></div>
         <span class="scan-line" aria-hidden="true"></span>

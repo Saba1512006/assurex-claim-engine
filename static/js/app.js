@@ -206,6 +206,25 @@
     confirm.addEventListener("input", upd); pw.addEventListener("input", upd);
   });
 
+  /* 3D tilt: the element leans toward the pointer inside its zone (fine pointers only, never with reduced motion) */
+  $$("[data-tilt-zone]").forEach((zone) => {
+    const el = $("[data-tilt]", zone);
+    if (!el || reduced() || !matchMedia("(pointer: fine)").matches) return;
+    let frame = 0;
+    zone.addEventListener("pointermove", (e) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const r = zone.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        el.style.setProperty("--ry", `${(x * 16).toFixed(2)}deg`);
+        el.style.setProperty("--rx", `${(-y * 12).toFixed(2)}deg`);
+        el.style.setProperty("--mx", `${((x + 0.5) * 100).toFixed(1)}%`);
+        el.style.setProperty("--my", `${((y + 0.5) * 100).toFixed(1)}%`);
+      });
+    });
+    zone.addEventListener("pointerleave", () => { cancelAnimationFrame(frame); ["--rx", "--ry", "--mx", "--my"].forEach((p) => el.style.removeProperty(p)); });
+  });
+
   /* sign-in persona chips fill the seeded evaluator accounts (password never shown as text) */
   $$("[data-persona]").forEach((b) => b.addEventListener("click", () => {
     const f = b.closest("[data-login]") || document;

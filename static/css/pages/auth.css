@@ -42,7 +42,7 @@
 .help[data-state="ok"] { color: var(--valid); } .help[data-state="no"] { color: var(--review); }
 
 /* ---------------------------------------------------------------- evaluator accounts: ID badges */
-.personas-wrap { display: grid; gap: var(--s2); padding-top: var(--s3); border-top: 1px solid var(--rule); }
+.personas-wrap { display: grid; gap: var(--s2); padding-top: 10px; border-top: 1px solid var(--rule); }
 .personas-wrap .itag { justify-self: start; font-size: var(--fs-xs); }
 .personas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
 .persona { --rc: var(--role-admin); position: relative; display: grid; gap: 2px; align-content: center; min-height: 48px; min-width: 0;
@@ -62,7 +62,7 @@
 
 /* ---------------------------------------------------------------- the scanner bed (bench) */
 .auth-bench { --grid-x: 50%; display: grid; place-items: center; padding: var(--s6) var(--s5); overflow: clip; }
-.auth-bench-inner { width: min(420px, 100%, calc((100svh - var(--nav-h)) * .52)); display: grid; gap: var(--s4); }
+.auth-bench-inner { width: min(420px, 100%, calc((100svh - var(--nav-h)) * .53)); display: grid; gap: var(--s4); }
 .scanner { margin: 0; display: grid; gap: var(--s3); }
 .scanner-meta { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--on-bench-2); letter-spacing: .02em; }
 .scanner-bed { position: relative; padding: 24px; border-radius: var(--r-instrument); background: var(--bench-2); box-shadow: var(--e3); }
@@ -92,9 +92,9 @@
 
 /* how both models scored this card in the offline evaluation */
 .readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding-top: var(--s4); border-top: 1px solid var(--bench-line); }
-.readout > div { display: grid; gap: var(--s2); align-content: start; padding: 0 var(--s3); border-left: 1px solid var(--bench-line); min-width: 0; }
+.readout > div { display: grid; gap: var(--s2); align-content: start; padding: 0 10px; border-left: 1px solid var(--bench-line); min-width: 0; }
 .readout > div:first-child { padding-left: 0; border-left: 0; }
-.readout dt { font-size: var(--fs-2xs); color: var(--on-bench-2); }
+.readout dt { font-size: var(--fs-2xs); color: var(--on-bench-2); white-space: nowrap; }
 .readout dd { margin: 0; display: grid; gap: var(--s1); justify-items: start; font-size: var(--fs-xs); }
 .readout .cls { font-size: var(--fs-xs); }
 .readout .num-lg { font-size: 1.5rem; line-height: 1; }
@@ -118,3 +118,49 @@
 /* after a failed sign-in the error bar takes the lede's place, so the page still fits a laptop screen */
 .has-alert .auth-lede, .has-alert .persona-note { display: none; }
 .has-alert .form-alert { padding-block: var(--s2); }
+
+/* ================================================================== depth: the scanner bed as a 3D object
+   The bed leans in perspective and follows the pointer, with a moving sheen on the plate, a deep layered
+   shadow and a teal ambient glow behind it. */
+.auth-bench { position: relative; perspective: 1400px; }
+.auth-bench::before { content: ""; position: absolute; left: 50%; top: 46%; width: min(620px, 90%); aspect-ratio: 1; translate: -50% -50%;
+  pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--teal-bright) 22%, transparent), transparent 70%); filter: blur(12px); }
+.auth-bench-inner { position: relative; }
+
+.scanner-bed { --rx: 5deg; --ry: -9deg; transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 500ms var(--ease);
+  background: linear-gradient(155deg, #1B2833, var(--bench-2) 45%, #111A22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 0 0 1px rgba(255, 255, 255, .07),
+    0 2px 4px rgba(0, 0, 0, .3), 0 30px 60px -20px rgba(0, 0, 0, .75), 0 60px 120px -40px rgba(0, 0, 0, .6); }
+
+.scanner-bed::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 30%) var(--my, 10%), rgba(255, 255, 255, .09), transparent 60%); }
+.scanner-card { position: relative; transform: rotate(-2deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .35), 0 24px 40px -16px rgba(0, 0, 0, .85); }
+
+
+/* the readout as a glass instrument strip */
+.readout { position: relative; padding: var(--s3) var(--s4); border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 0 0 1px rgba(255, 255, 255, .05), 0 18px 36px -24px rgba(0, 0, 0, .9); }
+
+/* ---- form side: faint depth in the paper, recessed inputs, raised ID badges */
+.auth-side { background: radial-gradient(900px 520px at 0% 0%, #F3F6F8, var(--paper) 60%); }
+.auth-side .input { box-shadow: inset 0 1px 2px rgba(21, 32, 43, .07); }
+.auth-side .input:focus { box-shadow: inset 0 1px 2px rgba(21, 32, 43, .05), 0 0 0 3px var(--teal-wash), 0 6px 16px -10px color-mix(in srgb, var(--teal-mark) 60%, transparent); }
+.auth-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px;
+  background: linear-gradient(160deg, #FFFFFF, #E7ECF1);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .08), 0 2px 4px rgba(21, 32, 43, .08), 0 12px 22px -12px rgba(21, 32, 43, .45); }
+.auth-mark svg { width: 24px; height: 24px; }
+.persona { background: linear-gradient(180deg, #FFFFFF, #F6F8FA);
+  box-shadow: inset 4px 0 0 var(--rc), inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 1px 2px rgba(21, 32, 43, .08), 0 6px 14px -10px rgba(21, 32, 43, .35);
+  transition: box-shadow var(--t-fast), transform var(--t-fast); }
+.persona:hover { transform: translateY(-2px);
+  box-shadow: inset 4px 0 0 var(--rc), inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .09), 0 4px 8px rgba(21, 32, 43, .06), 0 16px 28px -14px rgba(21, 32, 43, .5); }
+.persona:active { transform: translateY(0); box-shadow: inset 4px 0 0 var(--rc), inset 0 2px 4px rgba(21, 32, 43, .12), 0 0 0 1px rgba(21, 32, 43, .08); }
+.persona:focus-visible { box-shadow: inset 4px 0 0 var(--rc), var(--focus); }
+.form-alert { box-shadow: inset 3px 0 0 var(--invalid-mark), 0 8px 18px -12px color-mix(in srgb, var(--invalid-mark) 60%, transparent); }
+
+@media (prefers-reduced-motion: reduce) { .scanner-bed { transition: none; } .persona:hover { transform: none; } }
+@media (max-width: 991px) { .scanner-bed { --rx: 0deg; --ry: 0deg; } .auth-bench::before { display: none; } }

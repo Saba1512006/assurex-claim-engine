@@ -3,7 +3,7 @@
 <header class="topbar">
   <div class="wrap">
     <a class="brand" href="{{ url_for('auth.home') if current_user else url_for('public.index') }}">
-      {% include "components/mark.svg" %}<span>AssureX</span>
+      <span class="brand-tile">{% include "components/mark.svg" %}</span><span class="brand-name">AssureX<small>Claim Engine</small></span>
     </a>
     {% if current_user %}
       <nav class="nav" id="main-nav" aria-label="Main" data-sheet>

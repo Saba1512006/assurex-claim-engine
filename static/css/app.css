@@ -873,3 +873,99 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .footer a:hover { color: var(--on-bench); }
 .footer .versions { color: var(--on-bench-2); }
 .footer :focus-visible { box-shadow: var(--focus-bench); }
+
+/* ================================================================== premium depth layer
+   Glass navbar with a crown line, pill navigation, raised 3D buttons and floating menus. Depth comes from
+   layered shadows and a top highlight, never from colour, so contrast pairs above stay as checked. */
+
+/* ---- navbar: frosted glass, a thin teal-to-indigo crown line, soft shadow underneath */
+/* the blur sits on a pseudo-element: backdrop-filter on .topbar itself would make it the containing block of the
+   fixed mobile menu sheet */
+.topbar { background: color-mix(in srgb, var(--paper) 80%, transparent); border-bottom: 0;
+  box-shadow: 0 1px 0 rgba(21, 32, 43, .08), 0 10px 30px -22px rgba(21, 32, 43, .45); }
+.topbar::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--teal-mark) 18%, var(--gtm) 50%, var(--teal-mark) 82%, transparent); }
+.topbar::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px); }
+.topbar .wrap { gap: var(--s4); }
+.brand { gap: 10px; }
+.brand-tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; flex: none;
+  background: linear-gradient(160deg, #FFFFFF, #E7ECF1); box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .08),
+  0 2px 4px rgba(21, 32, 43, .08), 0 8px 16px -8px rgba(21, 32, 43, .35); }
+.brand-tile svg { width: 24px; height: 24px; }
+.brand-name { display: grid; line-height: 1.05; letter-spacing: -0.01em; }
+.brand-name small { font-size: var(--fs-2xs); font-weight: 500; letter-spacing: .02em; color: var(--steel); }
+
+/* pill navigation in a recessed tray; the current page is a raised pill with a teal tick */
+@media (min-width: 992px) {
+  .nav { flex: 0 1 auto; height: auto; align-items: center; gap: 2px; padding: 4px; margin-left: var(--s2); border-radius: var(--r-dot);
+    background: rgba(21, 32, 43, .045); box-shadow: inset 0 1px 2px rgba(21, 32, 43, .08), inset 0 0 0 1px rgba(21, 32, 43, .04); }
+  .nav a { position: relative; height: 34px; padding: 0 14px; margin: 0; border: 0; border-radius: var(--r-dot);
+    transition: color var(--t-fast), background-color var(--t-fast), box-shadow var(--t-fast); }
+  .nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .7); }
+  .nav a[aria-current="page"] { color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 1px 2px rgba(21, 32, 43, .1), 0 6px 14px -8px rgba(21, 32, 43, .4); }
+  .nav a[aria-current="page"]::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 14px; height: 2px; margin-left: -7px;
+    border-radius: 2px; background: var(--teal-mark); }
+  .nav a:focus-visible { box-shadow: var(--focus); }
+}
+.icon-btn { border-radius: var(--r-dot); transition: background-color var(--t-fast), color var(--t-fast); }
+.icon-btn:hover { background: rgba(21, 32, 43, .06); }
+.count-pip { background: linear-gradient(180deg, #D0503C, var(--invalid)); box-shadow: 0 0 0 2px var(--paper); }
+.user-btn { border: 0; border-radius: var(--r-dot); padding: 0 var(--s3) 0 4px; background: var(--paper);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .09), 0 1px 2px rgba(21, 32, 43, .08); transition: box-shadow var(--t-fast); }
+.user-btn:hover { box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .14), 0 6px 14px -8px rgba(21, 32, 43, .4); }
+.user-btn .initials { width: 32px; height: 32px; border-radius: var(--r-dot); background: linear-gradient(150deg, #33485A, var(--ink));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 0 0 2px var(--paper), 0 0 0 3.5px var(--teal-mark); }
+.user-btn .role { border: 0; padding: 0; background: none; }
+
+/* floating menus: glass, deep shadow, a short settle-in */
+.menu-panel { border: 0; border-radius: 14px; background: color-mix(in srgb, var(--paper) 94%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+  box-shadow: 0 0 0 1px rgba(21, 32, 43, .08), 0 2px 6px rgba(21, 32, 43, .06), 0 28px 56px -20px rgba(21, 32, 43, .38); }
+.menu-panel:not([hidden]) { animation: menu-in 160ms var(--ease) both; transform-origin: top right; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.menu-panel a, .menu-panel button.menu-item { border-radius: 8px; }
+
+/* landing: the bar floats over the bench, then turns to glass paper after 24px of scroll */
+.nav-overlay .topbar:not(.scrolled) { background: transparent; box-shadow: none; }
+.nav-overlay .topbar:not(.scrolled)::after { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.nav-overlay .topbar:not(.scrolled)::before { background: linear-gradient(90deg, transparent, var(--teal-bright) 20%, var(--gtm-bright) 50%, var(--teal-bright) 80%, transparent); opacity: .8; }
+.nav-overlay .topbar:not(.scrolled) .brand-tile { background: linear-gradient(160deg, #22313E, #131D26);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 18px -8px rgba(0, 0, 0, .8); }
+.nav-overlay .topbar:not(.scrolled) .brand-name small { color: var(--on-bench-2); }
+.nav-overlay .topbar.scrolled { background: color-mix(in srgb, var(--paper) 80%, transparent);
+  box-shadow: 0 1px 0 rgba(21, 32, 43, .08), 0 10px 30px -22px rgba(21, 32, 43, .45); }
+
+/* ---- buttons: raised, with a top highlight; lift a pixel on hover and press in on click */
+.btn { background-image: linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 55%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 1px 1px rgba(21, 32, 43, .24), 0 6px 14px -6px rgba(21, 32, 43, .45); }
+.btn:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 2px 3px rgba(21, 32, 43, .2), 0 12px 22px -10px rgba(21, 32, 43, .55); }
+.btn:active { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(0, 0, 0, .28), 0 1px 1px rgba(21, 32, 43, .2); }
+.btn:focus-visible { box-shadow: var(--focus); }
+.btn.quiet { background: var(--paper); background-image: linear-gradient(180deg, #FFFFFF, #F4F6F8); border-color: rgba(21, 32, 43, .14);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(21, 32, 43, .08); }
+.btn.quiet:hover { background: var(--paper); background-image: linear-gradient(180deg, #FFFFFF, #EEF1F4); border-color: rgba(21, 32, 43, .22);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 16px -10px rgba(21, 32, 43, .4); }
+.btn.quiet:active { box-shadow: inset 0 2px 4px rgba(21, 32, 43, .12); }
+.btn.ghost, .btn.danger { background-image: none; box-shadow: none; }
+.btn.ghost:hover, .btn.danger:hover { transform: none; box-shadow: none; }
+.btn[disabled], .btn[aria-disabled="true"] { background-image: none; box-shadow: none; transform: none; }
+.bench .btn { background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 60%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 1px 1px rgba(0, 0, 0, .3), 0 8px 22px -8px color-mix(in srgb, var(--teal-bright) 70%, transparent); }
+.bench .btn:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 2px 3px rgba(0, 0, 0, .3), 0 14px 30px -10px color-mix(in srgb, var(--teal-bright) 85%, transparent); }
+.bench .btn.quiet { background-image: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 6px 16px -10px rgba(0, 0, 0, .8); }
+.bench .btn.ghost, .bench .btn.danger { background-image: none; box-shadow: none; }
+.bench .btn:focus-visible { box-shadow: var(--focus-bench); }
+.nav-overlay .topbar:not(.scrolled) .btn:not(.ghost) { background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 60%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 22px -8px color-mix(in srgb, var(--teal-bright) 70%, transparent); }
+@media (prefers-reduced-motion: reduce) { .btn:hover, .btn:active { transform: none; } .menu-panel:not([hidden]) { animation: none; } }
+
+/* mobile sheet keeps its list look */
+@media (max-width: 991px) {
+  .brand-name small { display: none; }
+  .nav { box-shadow: -24px 0 60px -20px rgba(21, 32, 43, .4); }
+  .nav a { border-radius: 0; }
+  .nav .sheet-close { display: inline-grid; }     /* an earlier rule hid the close button at every width */
+}

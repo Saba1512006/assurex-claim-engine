@@ -138,7 +138,7 @@ def build() -> dict:
         },
         "by_category": _by_category(rows, test_rows),
         "noise": _noise(rows, scenarios),
-        "gtm_errors": _rows(FILES["gtm_errors"])[:5],
+        "gtm_errors": _rows(FILES["gtm_errors"])[:6],
     }
     _cache.update(key=key, data=data)
     return data
