@@ -1,4 +1,5 @@
 {% extends "components/base.html" %}
+{% from "components/ui.html" import retry_timer %}
 {# Error page: stamp tag with the code, a human sentence, one clear action; 500s show only a logged reference. #}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
@@ -7,8 +8,11 @@
     <span class="code-tag">{{ code }}{% if reason %} · {{ reason }}{% endif %}</span>
     <h1 id="err-title">{{ title }}</h1>
     <p class="muted">{{ message }}</p>
+    {% if retry_in %}{{ retry_timer(retry_in, 'Please wait a moment') }}{% endif %}
     {% if ref %}<p class="ref">Reference {{ ref }} — quote it if you contact support.</p>{% endif %}
-    {% if action_url %}<a class="btn" href="{{ action_url }}">{{ action_label }}</a>
+    {% if retry_in and retry_url %}<div class="row center"><a class="btn" href="{{ retry_url }}" data-retry-show hidden>Try again</a>
+      <a class="btn quiet" href="{{ url_for('auth.home') if current_user else url_for('public.index') }}">{{ 'Go to my dashboard' if current_user else 'Go to the home page' }}</a></div>
+    {% elif action_url %}<a class="btn" href="{{ action_url }}">{{ action_label }}</a>
     {% elif current_user %}<a class="btn" href="{{ url_for('auth.home') }}">Go to my dashboard</a>
     {% else %}<a class="btn" href="{{ url_for('public.index') }}">Go to the home page</a>{% endif %}
   </div>

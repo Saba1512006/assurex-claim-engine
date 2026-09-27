@@ -1,5 +1,6 @@
 """Relational schema (SRS xlvi). SQLite by default, any SQLAlchemy URL via DATABASE_URL."""
 import json
+import math
 import uuid
 from datetime import date, datetime, timezone
 
@@ -79,6 +80,14 @@ class User(db.Model):
             return False
         until = self.locked_until if self.locked_until.tzinfo else self.locked_until.replace(tzinfo=timezone.utc)
         return until > utcnow()
+
+    @property
+    def lock_seconds_left(self) -> int:
+        """Whole seconds until a locked account opens again (0 when it isn't locked)."""
+        if not self.is_locked:
+            return 0
+        until = self.locked_until if self.locked_until.tzinfo else self.locked_until.replace(tzinfo=timezone.utc)
+        return max(1, math.ceil((until - utcnow()).total_seconds()))
 
     @property
     def first_name(self) -> str:

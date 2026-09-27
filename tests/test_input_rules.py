@@ -1,4 +1,5 @@
-"""Field rules: names of people, places and organisations take no digits; phone numbers take no letters.
+"""Field rules: names of people, places and organisations take no digits; phone numbers take no letters; emails
+are well formed; a paused sign-in says how long it lasts.
 
 The browser filters keystrokes, but these are the checks that hold when a request skips the page."""
 from __future__ import annotations
@@ -6,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from src.models.entities import ServiceCenter, User
-from src.rules.validator import person_name_problem, phone_problem, product_form, words_problem
+from src.rules.validator import email_problem, person_name_problem, phone_problem, product_form, words_problem
 from tests.conftest import login, make_center, make_user
 
 
@@ -76,3 +77,53 @@ def test_invite_and_service_center_refuse_digits(client):
     assert ServiceCenter.query.filter(ServiceCenter.name.in_(["Fix Hub", "Care Point"])).count() == 0
     client.post("/admin/access/service-centers", data={"name": "Care Point", "city": "Lahore", "phone": "042 3576 1234"})
     assert ServiceCenter.query.filter_by(name="Care Point").count() == 1
+
+
+# ------------------------------------------------------------------ email and sign-in pauses
+@pytest.mark.parametrize("email", ["name@example.com", "a.b+tag@mail.co.uk", "x_y-z@sub.domain.pk", "USER@EXAMPLE.ORG"])
+def test_good_emails_pass(email):
+    assert email_problem(email) is None
+
+
+@pytest.mark.parametrize("email", ["", "plain", "a@b", "a@b.c", "a b@x.io", "a@@x.io", "a@x..io", ".a@x.io", "a.@x.io",
+                                   "a..b@x.io", "a@-x.io", "a@x-.io", "a@x.io.", "a@x.1o", "a,b@x.io", "a@x.io;b@y.io",
+                                   "a" * 65 + "@x.io", "a@" + "b" * 120 + ".io"])
+def test_bad_emails_fail(email):
+    assert email_problem(email)
+
+
+def test_login_with_a_malformed_email_is_refused_without_counting(client):
+    r = client.post("/login", data={"email": "abc@x", "password": "whatever"})
+    assert r.status_code == 400 and b"valid email address" in r.data
+
+
+def test_lockout_lasts_a_minute_and_the_page_counts_down(app, client):
+    from database.db import db
+    u = make_user("t@x.io")
+    for _ in range(5):
+        r = client.post("/login", data={"email": "t@x.io", "password": "wrong"})
+    body = r.get_data(as_text=True)
+    assert r.status_code == 401 and "data-retry=" in body and "data-retry-lock" in body
+    assert "pause the account for 1 minute" in body
+    left = db.session.get(User, u.id).lock_seconds_left
+    assert 55 <= left <= 60
+
+
+def test_rate_limit_page_shows_a_countdown(tmp_path, monkeypatch):
+    from config.config import TestConfig
+    from database.db import db
+    from src.app import create_app
+
+    class Limited(TestConfig):
+        RATELIMIT_ENABLED = True
+    monkeypatch.setattr(Limited, "UPLOAD_DIR", tmp_path / "uploads")
+    app = create_app(Limited)
+    with app.app_context():
+        db.create_all()
+        c = app.test_client()
+        codes = [c.post("/login", data={"email": f"n{i}@x.io", "password": "x"}).status_code for i in range(11)]
+        assert codes[:10] == [401] * 10 and codes[10] == 429
+        r = c.post("/login", data={"email": "n@x.io", "password": "x"})
+        assert r.status_code == 429 and b"data-retry=" in r.data
+        db.session.remove()
+        db.drop_all()

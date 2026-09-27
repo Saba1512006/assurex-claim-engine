@@ -135,7 +135,8 @@
     if (!el.willValidate) return true;
     const ok = el.checkValidity();
     el.setAttribute("aria-invalid", ok ? "false" : "true");
-    describe(el, ok ? "" : el.validationMessage);
+    const custom = el.dataset.invalidMsg && (el.validity.patternMismatch || el.validity.typeMismatch);
+    describe(el, ok ? "" : custom ? el.dataset.invalidMsg : el.validationMessage);
     return ok;
   };
   AX.check = check;
@@ -176,6 +177,7 @@
     words: [/[^\p{L}\s.,&'()\/-]/gu, "Letters only: numbers aren't allowed in this field."],
     phone: [/[^\d\s()+-]/g, "Digits only: a phone number can't contain letters."],
     decimal: [/[^\d.,]/g, "Numbers only, for example 1250.50."],
+    email: [/[^A-Za-z0-9._%+@-]/g, "An email can't contain spaces or symbols like , ; ( ) #."],
   };
   const refuse = (el, msg) => {
     if (!el.getAttribute("aria-describedby") && el.id) {             // a bare field gets a hint line to speak through
@@ -192,12 +194,14 @@
     const el = e.target, rule = el.dataset && ALLOW[el.dataset.allow];
     if (!rule) return;
     const v = el.value, stripped = v.replace(rule[0], "");
-    const clean = /^(name|words)$/.test(el.dataset.allow) ? stripped.replace(/ {2,}/g, " ") : stripped;
+    let clean = /^(name|words)$/.test(el.dataset.allow) ? stripped.replace(/ {2,}/g, " ") : stripped;
+    if (el.dataset.allow === "email") { const i = clean.indexOf("@"); if (i > -1) clean = clean.slice(0, i + 1) + clean.slice(i + 1).replace(/@/g, ""); }
     if (clean === v) return;
     const at = Math.max(0, (el.selectionStart ?? clean.length) - (v.length - clean.length));
     el.value = clean;
     try { el.setSelectionRange(at, at); } catch { /* not a text input */ }
     if (stripped !== v) refuse(el, rule[1]);
+    else if (el.dataset.allow === "email") refuse(el, "An email has only one @.");
   });
   document.addEventListener("keydown", (e) => {
     const el = e.target;
@@ -206,6 +210,28 @@
     if (/\d/.test(e.key) || (decimals && e.key === ".") || (negative && e.key === "-")) return;
     e.preventDefault();
     refuse(el, decimals ? "Numbers only, for example 0.85." : "Whole numbers only.");
+  });
+
+  /* retry countdown (lockout, rate limit): drain the ring, keep [data-retry-lock] buttons disabled and
+     [data-retry-show] hidden until zero, then say so. Wall-clock based, so a background tab stays accurate. */
+  $$("[data-retry]").forEach((box) => {
+    const total = Math.max(1, Number(box.dataset.retry) || 0), end = Date.now() + total * 1000;
+    const clock = $("[data-retry-clock]", box), msg = $("[data-retry-msg]", box), locks = $$("[data-retry-lock]");
+    locks.forEach((b) => { b.disabled = true; });
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      clock.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+      box.style.setProperty("--p", (left / total).toFixed(4));
+      if (left > 0) { setTimeout(tick, 250); return; }
+      box.classList.add("ready");
+      box.style.setProperty("--p", "1");
+      const head = $(".retry-text b", box);
+      if (head) head.textContent = "Ready";
+      msg.textContent = "You can try again now.";
+      locks.forEach((b) => { b.disabled = false; });
+      $$("[data-retry-show]").forEach((el) => { el.hidden = false; });
+    };
+    tick();
   });
 
   /* character counters: <textarea data-counter="20:1000"> + <span data-counter-for="id"> */

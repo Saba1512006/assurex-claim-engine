@@ -24,6 +24,18 @@
 </div>
 {%- endmacro %}
 
+{% macro retry_timer(seconds, title='Too many attempts') -%}
+{# Countdown until a lockout or rate limit ends: a draining ring with m:ss inside. Buttons marked data-retry-lock stay
+   disabled and elements marked data-retry-show stay hidden until it reaches zero (static/js/app.js). #}
+<div class="retry" data-retry="{{ seconds }}">
+  <span class="retry-dial" aria-hidden="true">
+    <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/><circle class="retry-arc" cx="22" cy="22" r="19" pathLength="100"/></svg>
+    <span class="retry-clock" data-retry-clock>{{ '%d:%02d' % (seconds // 60, seconds % 60) }}</span>
+  </span>
+  <span class="retry-text"><b>{{ title }}</b><span data-retry-msg role="status">You can try again when the timer reaches zero.</span></span>
+</div>
+{%- endmacro %}
+
 {% macro tag(text, kind='', mono=False) -%}
 {# Serial-plate tag: bordered, dot plus word. kind = valid | invalid | review | teal | gtm | ink | ''. #}
 <span class="tag {{ kind }}{{ ' mono' if mono }}"><span class="dot" aria-hidden="true"></span>{{ text }}</span>

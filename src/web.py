@@ -133,6 +133,7 @@ def register_template_helpers(app) -> None:
 
     # globals (not a context processor) so imported macros can use them too
     app.jinja_env.globals.update(
+        email_pattern=r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,24}",   # HTML twin of EMAIL_RE
         tone=tone, tag_kind=tag_kind, url_with=url_with, unread_notifications=unread_notifications, asset=asset,
         decision_kind=lambda d: DECISION_KIND.get(d, "none"), decision_icon=lambda k: DECISION_ICON.get(k, "bi-dash"),
         model_versions=model_versions, warranty_life=warranty_life, medium_url=app.config.get("MEDIUM_URL"), github_url=app.config.get("GITHUB_URL"),

@@ -76,7 +76,7 @@ def anomalies(hours: int = 72) -> list:
         worst = max(per_ip.values())
         out.append(("Repeated sign-in failures", "critical" if worst >= 5 else "warning", len(fails),
                     f"{len(fails)} failed sign-in(s) from {len(per_ip)} address(es); busiest address {worst}.",
-                    "Accounts lock for 15 minutes after 5 failures. Force a sign-out if an account looks compromised."))
+                    "Accounts lock for a minute after 5 failures. Force a sign-out if an account looks compromised."))
     reused = db.session.query(ClaimDocument.file_hash_sha256).group_by(ClaimDocument.file_hash_sha256) \
         .having(func.count(func.distinct(ClaimDocument.product_id)) > 1).count()
     if reused:

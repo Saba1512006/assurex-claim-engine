@@ -23,7 +23,8 @@
         {{ field('full_name', 'Full name', form.get('full_name', ''), required=True, error=errors.full_name,
                  attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100', 'data-allow': 'name'}) }}
         {{ field('email', 'Email', form.get('email', ''), type='email', required=True, error=errors.email,
-                 attrs={'autocomplete': 'email', 'maxlength': '120'}) }}
+                 attrs={'autocomplete': 'email', 'maxlength': '120', 'data-allow': 'email', 'pattern': email_pattern,
+                        'data-invalid-msg': 'Enter a valid email address, like name@example.com.'}) }}
         <div class="field">
           <label for="f-password">Password <span class="req">(required)</span></label>
           <div class="pw">

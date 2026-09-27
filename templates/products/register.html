@@ -49,7 +49,8 @@
             {% if staff %}
             <div class="full">{{ field('customer_email', "Customer's email", form.get('customer_email', ''), type='email', required=True,
                 hint="The product is registered to this customer's account and linked to " ~ (current_user.service_center.name if current_user.service_center else 'your service center') ~ '.',
-                attrs={'autocomplete': 'off'}) }}</div>
+                attrs={'autocomplete': 'off', 'maxlength': '120', 'data-allow': 'email', 'pattern': email_pattern,
+                       'data-invalid-msg': 'Enter a valid email address, like name@example.com.'}) }}</div>
             {% endif %}
             <div class="full">{{ field('product_name', 'Product name', form.get('product_name', ''), required=True, attrs={'maxlength': '120', 'data-fill': 'product_name'}) }}</div>
             <div class="field">

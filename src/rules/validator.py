@@ -23,6 +23,9 @@ MAX_TEXT = {"product_name": 120, "brand": 60, "model_number": 60, "serial_number
 PERSON_NAME_RE = re.compile(r"^[^\W\d_]+(?:[ .'-]+[^\W\d_]+)*\.?$")
 WORDS_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ .,&'()/-])*$")
 PHONE_RE = re.compile(r"^\+?[\d\s()-]+$")
+# An email: a local part of letters, digits and . _ % + - (no leading, trailing or doubled dot), one @, then domain
+# labels of letters, digits and inner hyphens, ending in a letters-only top-level domain.
+EMAIL_RE = re.compile(r"^(?!\.)(?!.*\.\.)[A-Za-z0-9._%+-]{1,64}(?<!\.)@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24}$")
 WORD_FIELDS = {"brand": "Brand", "retailer": "Retailer", "warranty_provider": "Warranty provider"}
 
 
@@ -32,6 +35,15 @@ def person_name_problem(name: str, label: str = "Full name") -> str | None:
         return f"Enter the {label.lower()} (2 to 100 characters)."
     if not PERSON_NAME_RE.match(name):
         return f"{label} can only use letters, spaces, dots, apostrophes and hyphens; no numbers."
+    return None
+
+
+def email_problem(email: str) -> str | None:
+    """None for a well-formed address of at most 120 characters (compare it lower-cased)."""
+    if not email:
+        return "Enter your email address."
+    if len(email) > 120 or not EMAIL_RE.match(email):
+        return "Enter a valid email address, like name@example.com."
     return None
 
 

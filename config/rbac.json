@@ -60,5 +60,5 @@
     "Closed": []
   },
   "editable_claim_statuses": ["Draft", "Additional Information Required"],
-  "login": {"max_failed_attempts": 5, "lockout_minutes": 15, "session_idle_minutes": 30}
+  "login": {"max_failed_attempts": 5, "lockout_minutes": 1, "session_idle_minutes": 30}
 }

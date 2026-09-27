@@ -1,7 +1,7 @@
 {% extends "components/base.html" %}
 {# Sign in: the form on the workspace (left), a scanned test-split Claim Summary Card on the bench (right).
    Errors show inline above the fields; evaluator accounts are one-click ID badges when enabled. #}
-{% from "components/ui.html" import csrf, field, icon %}
+{% from "components/ui.html" import csrf, field, icon, retry_timer %}
 {% from "auth/_scanner.html" import scanner %}
 {% set inline_alerts = true %}
 {% block title %}Sign in{% endblock %}
@@ -11,26 +11,28 @@
 {% set alerts = get_flashed_messages(with_categories=true, category_filter=['danger', 'error', 'warning']) %}
 <div class="auth-split">
   <section class="auth-side" aria-labelledby="signin-h">
-    <div class="auth-col{{ " has-alert" if alerts }}" data-login>
+    <div class="auth-col{{ " has-alert" if alerts or retry_in }}" data-login>
       <span class="auth-mark" aria-hidden="true"><img src="{{ asset('img/brand/mark-light.svg') }}" alt="" width="46" height="38"></span>
       <h1 id="signin-h">Sign in</h1>
       <p class="auth-lede">Use the email you registered with.</p>
       {% for cat, msg in alerts %}
         <div class="form-alert" role="alert">{{ icon('circle-alert') }}<span>{{ msg }}</span></div>
       {% endfor %}
+      {% if retry_in %}{{ retry_timer(retry_in, 'Too many attempts. This account is paused.') }}{% endif %}
       <form method="post" class="auth-form-fields{{ ' shake' if alerts }}">
         {{ csrf() }}
         {{ field('email', 'Email', email or request.args.get('email', ''), type='email', required=True,
-                 attrs={'autocomplete': 'username', 'autofocus': True}) }}
+                 attrs={'autocomplete': 'username', 'autofocus': True, 'maxlength': '120', 'data-allow': 'email',
+                         'pattern': email_pattern, 'data-invalid-msg': 'Enter a valid email address, like name@example.com.'}) }}
         <div class="field">
           <label for="f-password">Password <span class="req">(required)</span></label>
           <div class="pw">
             <input class="input" id="f-password" type="password" name="password" autocomplete="current-password" required aria-describedby="f-password-d">
             <button class="btn ghost sm reveal" type="button" data-reveal aria-controls="f-password" aria-pressed="false">Show</button>
           </div>
-          <span class="help lock-hint" id="f-password-d">{{ icon('lock', 'sm') }}Five wrong attempts lock the account for 15 minutes.</span>
+          <span class="help lock-hint" id="f-password-d">{{ icon('lock', 'sm') }}Five wrong attempts pause the account for {{ lock.lockout_minutes }} minute{{ 's' if lock.lockout_minutes != 1 }}.</span>
         </div>
-        <button class="btn lg block" type="submit">Sign in</button>
+        <button class="btn lg block" type="submit" data-retry-lock>Sign in</button>
       </form>
       <div class="auth-links">
         <p>New customer? <a href="{{ url_for('auth.register') }}">Create an account</a>.</p>

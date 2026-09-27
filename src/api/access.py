@@ -1,5 +1,4 @@
 """Administrator > Access control: users, invitations, roles, sessions, permission matrix."""
-import re
 import secrets
 
 from flask import Blueprint, flash, g, redirect, render_template, request, url_for
@@ -7,13 +6,12 @@ from sqlalchemy import func
 
 from database.db import db
 from src.models.entities import AuditLog, ServiceCenter, User
-from src.rules.validator import person_name_problem, phone_problem, words_problem
+from src.rules.validator import email_problem, person_name_problem, phone_problem, words_problem
 from src.security import rbac
 from src.security.guards import invalidate_sessions, require
 from src.services.audit import audit
 
 access_bp = Blueprint("access", __name__, url_prefix="/admin/access")
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
 
 def _active_admins() -> int:
@@ -54,7 +52,7 @@ def invite():
     if (problem := person_name_problem(name)):
         flash(problem, "warning")
         return redirect(url_for(".index"))
-    if role not in rbac.roles() or not EMAIL_RE.match(email):
+    if role not in rbac.roles() or email_problem(email):
         flash("Enter a name, a valid email and a role.", "warning")
         return redirect(url_for(".index"))
     if User.query.filter_by(email=email).first():

@@ -10,14 +10,13 @@ from database.db import db
 from src.app_security import limiter
 from src.models.entities import AuditLog, Claim, Notification, Product, User
 from src.security import rbac
-from src.security.guards import (LOCKED_MESSAGE, invalidate_sessions, login_user, registration_role, require,
+from src.security.guards import (invalidate_sessions, login_user, registration_role, require,
                                  safe_next)
-from src.rules.validator import person_name_problem, phone_problem
+from src.rules.validator import email_problem, person_name_problem, phone_problem
 from src.services.audit import audit
 from src.services.demo_bench import card_reading
 
 auth_bp = Blueprint("auth", __name__)
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 HOME = {Config.ROLE_ADMIN: "admin.dashboard", Config.ROLE_REVIEWER: "reviewer.queue",
         Config.ROLE_STAFF: "claims.dashboard", Config.ROLE_CUSTOMER: "claims.dashboard"}
 
@@ -33,12 +32,16 @@ def password_problem(password: str, confirm: str | None = None) -> str | None:
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("5/minute;60/hour", methods=["POST"])
+@limiter.limit("10/minute;60/hour", methods=["POST"])
 def login():
     if g.get("user"):
         return redirect(url_for("auth.home"))
     email = request.form.get("email", "").strip().lower()
+    retry_in = 0
     if request.method == "POST":
+        if (problem := email_problem(email)):
+            flash(problem, "danger")
+            return _login_page(email, retry_in, 400)
         user = User.query.filter_by(email=email).first()
         was_locked = bool(user and user.is_locked)
         ok, message = login_user(user, request.form.get("password", ""))
@@ -47,14 +50,22 @@ def login():
             db.session.commit()
             flash(f"Welcome back, {user.first_name}.", "success")
             return redirect(safe_next(request.args.get("next"), url_for("auth.home")))
-        reason = "locked" if message == LOCKED_MESSAGE else ("unknown_email" if user is None else
-                                                             "disabled" if not user.is_active else "bad_password")
-        audit("LOGIN_LOCKED" if user and user.is_locked and not was_locked else "LOGIN_FAILED", "User",
+        now_locked = bool(user and user.is_locked)
+        reason = "locked" if was_locked else ("unknown_email" if user is None else
+                                              "disabled" if not user.is_active else "bad_password")
+        audit("LOGIN_LOCKED" if now_locked and not was_locked else "LOGIN_FAILED", "User",
               user.user_id if user else None, user=None, email=email, reason=reason)
         db.session.commit()
-        flash(message, "danger")
-    return render_template("auth/login.html", email=email, card=Config.LOGIN_CARD,
-                           reading=card_reading(Config.LOGIN_CARD)), (401 if request.method == "POST" else 200)
+        if now_locked:                                    # the page shows a countdown instead of a flashed line
+            retry_in = user.lock_seconds_left
+        else:
+            flash(message, "danger")
+    return _login_page(email, retry_in, 401 if request.method == "POST" else 200)
+
+
+def _login_page(email: str, retry_in: int, status: int):
+    return render_template("auth/login.html", email=email, card=Config.LOGIN_CARD, retry_in=retry_in,
+                           lock=rbac.policy()["login"], reading=card_reading(Config.LOGIN_CARD)), status
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -69,7 +80,7 @@ def register():
         password = form.get("password", "")
         errors = {k: v for k, v in {
             "full_name": person_name_problem(name),
-            "email": None if EMAIL_RE.match(email) else "Enter a valid email address, like name@example.com.",
+            "email": email_problem(email),
             "password": password_problem(password),
             "confirm_password": None if password == form.get("confirm_password", "") else "The two passwords don't match.",
             "phone": phone_problem(form.get("phone", "")),

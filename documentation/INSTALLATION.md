@@ -94,4 +94,4 @@ Everything needed is in the repository. Created at runtime: `data/uploads/` (doc
 | Receipt photo: “no text found” | Install Tesseract or upload a PDF; you can also enter the details by hand |
 | `sqlite3.OperationalError: no such column` after pulling | The schema changed: `python database/seed.py` (demo) or migrate your data (see `src/security/MIGRATION.md`) |
 | “This form expired” | The CSRF token is tied to your session — reload the page and submit again |
-| Too many attempts / account locked | Wait 15 minutes, or an admin uses *Sign out* on the Access page to clear the lock |
+| Too many attempts / account locked | Wait 1 minute (the sign-in page shows a countdown), or an admin uses *Sign out* on the Access page to clear the lock |
