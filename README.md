@@ -88,7 +88,8 @@ Public sign-up creates **customer** accounts only. Other roles are invited by an
 `python database/seed.py` creates one real claim for each case, submitted through the live pipeline:
 valid, invalid (excluded damage), manual review (unknown cause), expired warranty, missing receipt,
 duplicate (reused receipt and invoice), contradictory dates, serial mismatch, unauthorised repair,
-boundary date (inside the grace period) and a borderline claim for model disagreement. The same cases
+boundary date (inside the grace period) and a model disagreement (*KitchenPro Oven 45L*: the image model
+says Valid, the Python model Invalid, so the claim goes to a reviewer). The same cases
 exist as feature records in [`sample_claims/`](sample_claims/README.md) and are pinned by
 `tests/test_demonstration_cases.py`.
 
@@ -207,6 +208,7 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 ## Links
 
 * Live deployment: https://assurexai.pythonanywhere.com (redeploy and re-seed after pulling this version)
+* Demonstration video (.mp4): *to be added* — recording script in [`documentation/DEMO_VIDEO_SCRIPT.md`](documentation/DEMO_VIDEO_SCRIPT.md)
 * Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
 * Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)

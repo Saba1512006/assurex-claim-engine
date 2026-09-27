@@ -250,13 +250,15 @@ def seed(reset: bool = True) -> None:
                             retailer="MegaMart Online", months=12, invoice="INV-2025-90126")
         make_claim(pods, hira, fault="Speaker malfunction", damage="Manufacturing Defect", days_ago_fault=6, conf=0.75,
                    description="Left speaker crackles at any volume; started a few days before the warranty end date.")
-        # 11 model-disagreement candidate: borderline evidence (outcome depends on the installed image model)
-        drill = make_product(kamran, name="TorqueMax HD Drill", category="Industrial Tools", brand="TorqueMax",
-                             model="TM-HD2", serial="SN-TOR-5528730", days_ago=640, price=560.0,
-                             retailer="Industrial Supply Direct", months=24, invoice="INV-2024-41876")
-        make_claim(drill, kamran, fault="Gearbox seizure", damage="Normal Wear and Tear", days_ago_fault=20, conf=0.55,
-                   docs=("damage_photo", "serial_photo"),
-                   description="Gearbox grinds and locks under load after heavy daily use on site.")
+        # 11 model disagreement: reported 35 days after the fault. Home Appliances allow 45 days, so the claim is
+        # covered; the Teachable Machine card shows "Reported in time" and says Valid, while the Python model -
+        # which mostly saw 30-day limits - says Invalid. Neither model decides alone: D04 sends it to a reviewer.
+        oven = make_product(kamran, name="KitchenPro Oven 45L", category="Home Appliances", brand="KitchenPro",
+                            model="KP-45X", serial="SN-KIT-6630195", days_ago=200, price=560.0,
+                            retailer="National Appliance Depot", months=24, invoice="INV-2026-41876")
+        make_claim(oven, kamran, fault="Thermostat failure", damage="Manufacturing Defect", days_ago_fault=35, conf=0.62,
+                   description="Oven overheats and the thermostat no longer cuts out; noticed after a family event "
+                               "and reported once the technician had inspected it.")
         # extras: a draft and a reviewed claim
         make_claim(make_product(usman, name="KitchenPro 30L", category="Home Appliances", brand="KitchenPro",
                                 model="KP-30C", serial="SN-KIT-2201984", days_ago=120, price=210.0,
