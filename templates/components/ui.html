@@ -1,0 +1,172 @@
+{# Inspection Bench UI macros. Every macro starts with a one-line comment saying what it renders. #}
+{% set CLASS_ORDER = ['Valid Claim', 'Invalid Claim', 'Manual Review'] %}
+{% set STAGES = ['Draft', 'Submitted', 'Under Evaluation', 'Additional Information Required', 'Manual Review', 'Approved', 'Rejected', 'Closed'] %}
+
+{% macro csrf() -%}
+{# Hidden CSRF token for every state-changing form. #}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{% macro button(label, kind='primary', type='submit', icon=None, attrs='', size='') -%}
+{# Button: primary (ink), quiet, ghost, danger, approve or reject; label says what happens. #}
+<button class="btn {{ '' if kind == 'primary' else kind }} {{ size }}" type="{{ type }}" {{ attrs }}>{% if icon %}<i class="bi {{ icon }}" aria-hidden="true"></i>{% endif %}{{ label }}</button>
+{%- endmacro %}
+
+{% macro field(name, label, value='', type='text', hint=None, error=None, required=False, attrs='', mono=False, id=None) -%}
+{# Labelled input with hint below; an error replaces the hint and is announced (role=alert). #}
+{% set fid = id or 'f-' ~ name %}
+<div class="field">
+  <label for="{{ fid }}">{{ label }}{% if required %} <span class="req">(required)</span>{% endif %}</label>
+  <input class="input{{ ' mono' if mono }}" id="{{ fid }}" type="{{ type }}" name="{{ name }}" value="{{ value if value is not none else '' }}"
+         {{ 'required' if required }} {% if error %}aria-invalid="true"{% endif %} aria-describedby="{{ fid }}-d" {{ attrs }}>
+  {% if error %}<span class="err" id="{{ fid }}-d" role="alert">{{ error }}</span>
+  {% else %}<span class="help" id="{{ fid }}-d">{{ hint or '' }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro tag(text, kind='', mono=False) -%}
+{# Serial-plate tag: bordered, dot plus word. kind = valid | invalid | review | teal | gtm | ink | ''. #}
+<span class="tag {{ kind }}{{ ' mono' if mono }}"><span class="dot" aria-hidden="true"></span>{{ text }}</span>
+{%- endmacro %}
+
+{% macro status_tag(s) -%}
+{# Claim status as a tag; colour only for approved, rejected and states that need attention. #}
+{{ tag(s, tag_kind('status', s)) }}
+{%- endmacro %}
+
+{% macro class_tag(c) -%}
+{# Predicted class as a tag, or "Unavailable" when the model could not run. #}
+{% if c %}{{ tag(c, tag_kind('class', c)) }}{% else %}{{ tag('Unavailable', '') }}{% endif %}
+{%- endmacro %}
+
+{% macro consistency_tag(s) -%}
+{# Model-consistency status as a tag. #}
+{% if s %}{{ tag(s, tag_kind('consistency', s)) }}{% endif %}
+{%- endmacro %}
+
+{% macro risk_tag(r) -%}
+{# Risk level as a tag. #}
+{% if r %}{{ tag(r ~ ' risk', tag_kind('risk', r)) }}{% endif %}
+{%- endmacro %}
+
+{% macro verdict_chip(decision) -%}
+{# Final decision as word + colour + icon; "Not evaluated" when there is none yet. #}
+{% set k = decision_kind(decision) %}
+{% if decision %}<span class="verdict-chip {{ k }}"><i class="bi {{ decision_icon(k) }}" aria-hidden="true"></i>{{ decision }}</span>
+{% else %}<span class="verdict-chip none">Not evaluated</span>{% endif %}
+{%- endmacro %}
+
+{% macro life_bar(used_days, total_days, expiry_marker=True, grace_days=0, label=None) -%}
+{# Warranty life bar drawn like the Claim Summary Card: filled = days used, teal marker = expiry. #}
+{% set horizon = [total_days + grace_days, used_days, 1]|max %}
+{% set p = [used_days / horizon, 1]|min %}
+{% set m = total_days / horizon %}
+{% set cls = 'expired' if used_days > total_days else ('expiring' if total_days - used_days <= 30 else '') %}
+<div class="lifebar {{ cls }}" role="img" aria-label="{{ label or (used_days ~ ' of ' ~ total_days ~ ' warranty days used') }}" style="--p: {{ '%.4f'|format(p) }}; --m: {{ '%.4f'|format(m) }}">
+  <i></i>{% if expiry_marker %}<b></b>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro evidence_tiles(docs) -%}
+{# Five evidence tiles: filled = present, hatched outline = missing. docs = [(label, present), ...]. #}
+<div class="evtiles" role="list" aria-label="Evidence on file">
+  {% for label, present in docs %}
+    <span class="evtile {{ 'on' if present else 'off' }}" role="listitem">{{ label }}<span class="sr">{{ ': on file' if present else '' }}</span></span>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro integrity_dots(flags) -%}
+{# Integrity signals: filled dot = OK, hollow crossed dot = problem; flags = [(ok_text, problem_text, ok), ...]. #}
+<ul class="idots">
+  {% for ok_text, bad_text, ok in flags %}
+    <li class="{{ '' if ok else 'bad' }}"><span class="d" aria-hidden="true"></span>{{ ok_text if ok else bad_text }}</li>
+  {% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro prob_bars(scores, model='python') -%}
+{# Three probability bars in the fixed order Valid, Invalid, Manual Review; the predicted class is bold. #}
+{% set ns = namespace(top=None, best=-1) %}
+{% for c in CLASS_ORDER %}{% if (scores.get(c) or 0) > ns.best %}{% set ns.best = scores.get(c) or 0 %}{% set ns.top = c %}{% endif %}{% endfor %}
+<div class="pbars {{ 'gtm' if model == 'gtm' }}">
+  {% for c in CLASS_ORDER %}
+    {% set v = scores.get(c) or 0 %}
+    <div class="pbar {{ 'top' if c == ns.top }}">
+      <span class="n">{{ c|replace(' Claim', '') }}</span>
+      <span class="t" role="img" aria-label="{{ c }} {{ '%.2f'|format(v) }}"><i style="--p: {{ '%.4f'|format(v) }}"></i></span>
+      <span class="v">{{ '%.2f'|format(v) }}</span>
+    </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro stage_timeline(claim, compact=False) -%}
+{# The eight claim statuses; completed ones filled with time and actor role, current teal, future outlined. #}
+{% set reached = {} %}
+{% for h in claim.status_history %}{% set _ = reached.update({h.new_status: h}) %}{% endfor %}
+<ol class="stages {{ 'compact' if compact }}" aria-label="Claim progress: {{ claim.status }}">
+  {% for s in STAGES %}
+    {% set h = reached.get(s) %}
+    {% set state = 'now' if s == claim.status else ('done' if h else 'todo') %}
+    <li class="stage {{ state }}" {% if compact %}title="{{ s }}"{% endif %}>
+      <span class="n">{{ s|replace('Additional Information Required', 'More information needed') }}</span>
+      {% if not compact and h %}<span class="when">{{ h.created_at|date('%d %b %H:%M') }}</span>
+        <span class="sr">by {{ role_label(h.changed_by.role) if h.changed_by else 'the system' }}</span>{% endif %}
+      {% if compact %}<span class="sr">{{ s }}: {{ state }}</span>{% endif %}
+    </li>
+  {% endfor %}
+</ol>
+{%- endmacro %}
+
+{% macro empty_state(title, text='', action_url=None, action_label=None, icon='bi-inbox') -%}
+{# Empty list: says what is missing and what to do next, with one action. #}
+<div class="empty">
+  <i class="bi {{ icon }}" aria-hidden="true"></i>
+  <b>{{ title }}</b>
+  {% if text %}<p>{{ text }}</p>{% endif %}
+  {% if action_url %}<a class="btn sm quiet" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro panel(title=None, hint=None, id=None, body='panel-b', heading='h2') -%}
+{# Flat panel with an optional header; caller() is the body. #}
+<section class="panel" {% if id %}id="{{ id }}"{% endif %} {% if title %}aria-labelledby="{{ (id or title|lower|replace(' ', '-')) ~ '-h' }}"{% endif %}>
+  {% if title %}<div class="panel-h"><{{ heading }} id="{{ (id or title|lower|replace(' ', '-')) ~ '-h' }}">{{ title }}</{{ heading }}>{% if hint %}<span class="hint">{{ hint }}</span>{% endif %}</div>{% endif %}
+  <div class="{{ body }}">{{ caller() }}</div>
+</section>
+{%- endmacro %}
+
+{% macro doc_icon(kind) -%}
+{# Bootstrap-icon name for an evidence type. #}
+{{ {'receipt': 'bi-receipt', 'warranty_card': 'bi-card-heading', 'damage_photo': 'bi-image', 'serial_photo': 'bi-upc-scan',
+    'product_photo': 'bi-camera', 'fault_video': 'bi-camera-video', 'diagnostic_report': 'bi-clipboard2-pulse',
+    'other_evidence': 'bi-paperclip'}.get(kind, 'bi-file-earmark') }}
+{%- endmacro %}
+
+{% macro pager(page) -%}
+{# Server-side pagination footer for a list (page = sqlalchemy pagination object). #}
+{% if page and page.pages > 1 %}
+<nav class="pager" aria-label="Pages">
+  <span>Showing {{ (page.page - 1) * page.per_page + 1 }}–{{ [page.page * page.per_page, page.total]|min }} of {{ page.total }}</span>
+  <span class="row tight">
+    {% if page.has_prev %}<a class="btn sm quiet" href="{{ url_with(page=page.prev_num) }}">Previous</a>{% endif %}
+    <span>Page {{ page.page }} of {{ page.pages }}</span>
+    {% if page.has_next %}<a class="btn sm quiet" href="{{ url_with(page=page.next_num) }}">Next</a>{% endif %}
+  </span>
+</nav>
+{% endif %}
+{%- endmacro %}
+
+{% macro claim_row(c, show_customer=False) -%}
+{# One claim in a table: ID, product, stage bar and decision chip. #}
+<tr>
+  <td><a class="row-link" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}">
+    <span class="t-main">{{ c.product.product_name }}</span>
+    <span class="t-sub"><span class="id">{{ c.claim_id }}</span> {{ c.fault_category }}</span></a></td>
+  {% if show_customer %}<td><span class="t-main">{{ c.claimant.full_name }}</span><span class="t-sub">{{ c.product.category }}</span></td>{% endif %}
+  <td class="nowrap small">{{ c.claim_submission_date|date if c.claim_submission_date else 'Not filed' }}</td>
+  <td>{{ stage_timeline(c, compact=True) }}<span class="t-sub">{{ c.status }}</span></td>
+  <td>{{ verdict_chip(c.final_decision) }}</td>
+</tr>
+{%- endmacro %}

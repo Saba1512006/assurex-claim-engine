@@ -22,7 +22,7 @@ from sqlalchemy import and_, false, or_, select
 
 from src.security import rbac
 
-PUBLIC_ENDPOINTS = {"static", "public.index", "public.blog", "public.health",
+PUBLIC_ENDPOINTS = {"static", "public.index", "public.blog", "public.health", "public.model_card", "public.test_card",
                     "auth.login", "auth.register", "auth.logout"}
 PASSWORD_CHANGE_ALLOWED = {"auth.profile", "auth.logout", "static"}
 
@@ -69,8 +69,15 @@ def init_rbac(app, db, User, AuditLog) -> None:
     @app.errorhandler(403)
     def _forbidden(_e):
         code = g.get("rbac_code", "NO_PERMISSION")
-        return render_template("components/forbidden.html", code=code,
-                               message=rbac.MESSAGES.get(code, rbac.MESSAGES["NO_PERMISSION"])), 403
+        message = rbac.MESSAGES.get(code, rbac.MESSAGES["NO_PERMISSION"])
+        if request.path.startswith("/api/"):
+            from src.api.errors import ErrorCode, fail
+            return fail(ErrorCode.NOT_AUTHENTICATED if code == "NOT_AUTHENTICATED" else ErrorCode.NO_PERMISSION, message)
+        signed_in = g.get("user") is not None
+        return render_template("components/error.html", code=403, reason=code, title="You don't have access to this page",
+                               message=message + " This attempt was recorded in the audit trail.",
+                               action_url=None if signed_in else url_for("auth.login"),
+                               action_label=None if signed_in else "Sign in"), 403
 
 
 # ------------------------------------------------------------------ decorators

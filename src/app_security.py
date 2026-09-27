@@ -1,6 +1,8 @@
 """HTTP hardening: secret key, CSRF, rate limiting, cookies and security headers."""
 from __future__ import annotations
 
+import secrets
+
 from flask import request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -9,12 +11,17 @@ from flask_wtf.csrf import CSRFError, CSRFProtect
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address, default_limits=["600/hour"])
 
-# No inline or third-party scripts: all JavaScript is served from /static, so script-src is just 'self'.
+# All JavaScript, fonts and styles are served from /static. The only inline script is the two-line preloader
+# bootstrap in base.html, allowed by a per-request nonce. 'unsafe-inline' for styles covers the CSS custom
+# properties that templates set from data (style="--p: .88"); no stylesheet or font comes from a third party.
 CSP = ("default-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; "
-       "form-action 'self'; frame-ancestors 'none'; "
-       "script-src 'self'; "
-       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src 'self' data: https://fonts.gstatic.com")
+       "form-action 'self'; frame-ancestors 'none'; connect-src 'self'; "
+       "script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; font-src 'self'")
+
+
+def csp_nonce() -> str:
+    """One nonce per request (kept in the WSGI environ, which never outlives the request)."""
+    return request.environ.setdefault("assurex.csp_nonce", secrets.token_urlsafe(16))
 
 
 def harden(app) -> None:
@@ -25,6 +32,7 @@ def harden(app) -> None:
     app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_NAME="assurex_session")
     csrf.init_app(app)
     limiter.init_app(app)
+    app.jinja_env.globals["csp_nonce"] = csp_nonce
 
     @app.after_request
     def _headers(resp):
@@ -32,7 +40,7 @@ def harden(app) -> None:
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-        resp.headers.setdefault("Content-Security-Policy", CSP)
+        resp.headers.setdefault("Content-Security-Policy", CSP.format(nonce=csp_nonce()))
         if request.is_secure:
             resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         if resp.mimetype == "text/html":

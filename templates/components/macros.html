@@ -1,11 +1,13 @@
+{# Transitional aliases onto components/ui.html while pages move to the new macros. #}
+{% import "components/ui.html" as ui %}
 {% macro badge(text, kind=None, value=None, extra='') -%}
-  <span class="badge {{ tone(kind, value if value is not none else text) if kind else 'neutral' }} {{ extra }}">{{ text }}</span>
+  {{ ui.tag(text, tag_kind(kind, value if value is not none else text) if kind else '') }}
 {%- endmacro %}
 
-{% macro status(s) -%}{{ badge(s, 'status') }}{%- endmacro %}
-{% macro decision(d) -%}{% if d %}{{ badge(d, 'decision') }}{% else %}<span class="badge plain">Not evaluated</span>{% endif %}{%- endmacro %}
-{% macro klass(c) -%}{% if c %}{{ badge(c, 'class') }}{% else %}<span class="badge warn plain">Unavailable</span>{% endif %}{%- endmacro %}
-{% macro risk(r) -%}{% if r %}{{ badge(r ~ ' risk', 'risk', r) }}{% endif %}{%- endmacro %}
+{% macro status(s) -%}{{ ui.status_tag(s) }}{%- endmacro %}
+{% macro decision(d) -%}{{ ui.verdict_chip(d) }}{%- endmacro %}
+{% macro klass(c) -%}{{ ui.class_tag(c) }}{%- endmacro %}
+{% macro risk(r) -%}{{ ui.risk_tag(r) }}{%- endmacro %}
 
 {% macro csrf() -%}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{%- endmacro %}
 

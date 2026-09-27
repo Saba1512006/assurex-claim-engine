@@ -47,8 +47,36 @@ def _pct(value, digits=0):
     return "—" if value is None else f"{value * 100:.{digits}f}%"
 
 
+TAG_KIND = {"good": "valid", "bad": "invalid", "warn": "review", "info": "teal", "neutral": ""}
+DECISION_KIND = {"Likely Valid": "valid", "Likely Invalid": "invalid", "Manual Review Required": "review"}
+DECISION_ICON = {"valid": "bi-check-lg", "invalid": "bi-x-lg", "review": "bi-eye"}
+
+
+def _money(value):
+    return "—" if value is None else f"USD {value:,.2f}"
+
+
+_GTM_VERSION_CACHE: dict = {}
+
+
+def model_versions() -> dict:
+    """Short versions of the two installed models for the footer (GTM hash cached per file mtime)."""
+    from src.core.gtm_classifier_v2 import find_model_file, version_of
+    from src.core.python_classifier import model_card
+    card = model_card() or {}
+    gtm_file = find_model_file()
+    gtm = "not installed"
+    if gtm_file:
+        key = (str(gtm_file), gtm_file.stat().st_mtime)
+        if key not in _GTM_VERSION_CACHE:
+            _GTM_VERSION_CACHE.clear()
+            _GTM_VERSION_CACHE[key] = version_of(gtm_file.read_bytes())
+        gtm = _GTM_VERSION_CACHE[key]
+    return {"python": (card.get("version") or "not installed").split("+")[0], "gtm": gtm}
+
+
 def register_template_helpers(app) -> None:
-    app.jinja_env.filters.update(date=_date, ago=_ago, pct=_pct)
+    app.jinja_env.filters.update(date=_date, ago=_ago, pct=_pct, money=_money)
     app.jinja_env.trim_blocks = True
     app.jinja_env.lstrip_blocks = True
 
@@ -57,6 +85,10 @@ def register_template_helpers(app) -> None:
                  "consistency": CONSISTENCY_TONE, "warranty": WARRANTY_TONE, "risk": RISK_TONE,
                  "severity": SEVERITY_TONE}[kind]
         return table.get(value, "neutral")
+
+    def tag_kind(kind: str, value) -> str:
+        """Colour of a serial-plate tag: verdict colours only for decisions, classes, risk and statuses."""
+        return TAG_KIND[tone(kind, value)]
 
     def url_with(**changes):
         """Current URL with some query arguments replaced (filters, pagination)."""
@@ -84,7 +116,9 @@ def register_template_helpers(app) -> None:
 
     # globals (not a context processor) so imported macros can use them too
     app.jinja_env.globals.update(
-        tone=tone, url_with=url_with, unread_notifications=unread_notifications, asset=asset,
+        tone=tone, tag_kind=tag_kind, url_with=url_with, unread_notifications=unread_notifications, asset=asset,
+        decision_kind=lambda d: DECISION_KIND.get(d, "none"), decision_icon=lambda k: DECISION_ICON.get(k, "bi-dash"),
+        model_versions=model_versions, medium_url=app.config.get("MEDIUM_URL"), github_url=app.config.get("GITHUB_URL"),
         doc_label=lambda t: DOCUMENT_LABELS.get(t, t.replace("_", " ").title()),
         notif_icon=lambda kind: NOTIF_ICON.get(kind, "bi-bell"))
 

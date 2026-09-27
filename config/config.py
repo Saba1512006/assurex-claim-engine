@@ -54,6 +54,11 @@ class Config:
     ROLE_ADMIN = "administrator"
     ALL_ROLES = [ROLE_CUSTOMER, ROLE_STAFF, ROLE_REVIEWER, ROLE_ADMIN]
 
+    # Public links shown in the footer and on the blog page.
+    MEDIUM_URL = ("https://medium.com/@sabarajput672/"
+                  "building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c")
+    GITHUB_URL = "https://github.com/Saba1512006/assurex-claim-engine"
+
     # Default expiry-alert window; administrators change it at runtime (SystemSetting).
     WARRANTY_EXPIRY_ALERT_DAYS = int(os.environ.get("WARRANTY_EXPIRY_ALERT_DAYS", "30"))
 

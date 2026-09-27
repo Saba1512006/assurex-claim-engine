@@ -1,0 +1,18 @@
+{# Main links rendered from permissions, never from role names. Hiding a link is UX only; routes are guarded. #}
+{% set ep = request.endpoint or '' %}
+{% set links = [
+  ("admin.dashboard", "Overview", "admin.dashboard", ["admin.dashboard", "admin.models", "admin.what_if", "admin.batch"]),
+  ("claims.dashboard", "My claims", "claim.create", ["claims.dashboard", "claims.new_claim"]),
+  ("products.list_products", "Products", "product.create", ["products."]),
+  ("claims.search", "Claims", "claim.read", ["claims.search", "claims.view_claim", "claims.track_claim"]),
+  ("reviewer.queue", "Review queue", "review.queue", ["reviewer."]),
+  ("admin.analytics", "Analytics", "analytics.read", ["admin.analytics"]),
+  ("admin.policies", "Policies", "policy.manage", ["admin.policies"]),
+  ("access.index", "Access", "user.manage", ["access."]),
+  ("admin.audit_log", "Audit", "audit.read", ["admin.audit_log"]),
+] %}
+{% for endpoint, label, perm, prefixes in links if can(perm) %}
+  {% set ns = namespace(active=false) %}
+  {% for p in prefixes %}{% if ep.startswith(p) %}{% set ns.active = true %}{% endif %}{% endfor %}
+  <a href="{{ url_for(endpoint) }}" {% if ns.active %}aria-current="page"{% endif %}>{{ label }}</a>
+{% endfor %}

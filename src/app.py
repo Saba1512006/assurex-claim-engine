@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from flask import Flask, render_template  # noqa: E402
+from flask import Flask, render_template, request  # noqa: E402
 
 from config.config import Config  # noqa: E402
 from database.db import db, init_db  # noqa: E402
@@ -38,26 +38,38 @@ def create_app(config_class=Config) -> Flask:
 
     register_template_helpers(app)
 
+    from src.api.errors import ErrorCode, fail, reference
+
+    def _page(code, title, message, **extra):
+        if request.path.startswith("/api/"):
+            api_code = {404: ErrorCode.NOT_FOUND, 413: ErrorCode.TOO_LARGE, 429: ErrorCode.RATE_LIMITED}.get(code, ErrorCode.SERVER_ERROR)
+            return fail(api_code)
+        return render_template("components/error.html", code=code, title=title, message=message, **extra), code
+
     @app.errorhandler(404)
     def _not_found(_e):
-        return render_template("components/error.html", code=404, title="We couldn't find that page",
-                               message="The link may be old, or the record may not be visible to your account."), 404
+        return _page(404, "We couldn't find that page",
+                     "The link may be out of date, or the record isn't visible to your account.")
 
     @app.errorhandler(413)
     def _too_large(_e):
-        return render_template("components/error.html", code=413, title="Upload too large",
-                               message="Files can be at most 10 MB each (16 MB for a fault video)."), 413
+        return _page(413, "That upload is too large", "Each file can be at most 16 MB. Compress the file or upload a "
+                     "smaller photo, then try again.")
 
     @app.errorhandler(429)
-    def _rate_limited(_e):
-        return render_template("components/error.html", code=429, title="Slow down a little",
-                               message="Too many attempts in a short time. Wait a minute and try again."), 429
+    def _rate_limited(e):
+        return _page(429, "Too many attempts", f"You reached the limit of {getattr(e, 'description', 'requests')}. "
+                     "Wait a minute, then try again.")
 
     @app.errorhandler(500)
     def _server_error(_e):
         db.session.rollback()
+        ref = reference()
+        app.logger.exception("Unhandled error %s on %s", ref, request.path)
+        if request.path.startswith("/api/"):
+            return fail(ErrorCode.SERVER_ERROR)
         return render_template("components/error.html", code=500, title="Something went wrong on our side",
-                               message="Your data is safe. Please try again; if it keeps happening, contact support."), 500
+                               message="Your data is safe. Try again in a moment.", ref=ref), 500
 
     return app
 

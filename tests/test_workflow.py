@@ -237,8 +237,13 @@ def test_gtm_upload_rejects_non_tflite(app, client):
 def test_security_headers_and_csp(app, client):
     r = client.get("/login")
     assert r.headers["X-Frame-Options"] == "DENY" and r.headers["X-Content-Type-Options"] == "nosniff"
-    assert "script-src 'self';" in r.headers["Content-Security-Policy"]
-    assert "unsafe-inline" not in r.headers["Content-Security-Policy"].split("script-src")[1].split(";")[0]
+    csp = r.headers["Content-Security-Policy"]
+    script_src = csp.split("script-src")[1].split(";")[0]
+    assert "'self'" in script_src and "unsafe-inline" not in script_src and "unsafe-eval" not in script_src
+    nonce = script_src.split("'nonce-")[1].split("'")[0]
+    assert f'nonce="{nonce}"' in r.get_data(as_text=True)               # only the preloader bootstrap carries it
+    assert "https:" not in csp                                          # no third-party scripts, styles or fonts
+    assert client.get("/login").headers["Content-Security-Policy"] != csp  # a fresh nonce per response
     assert r.headers["Cache-Control"] == "no-store"
 
 

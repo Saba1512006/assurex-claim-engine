@@ -1,18 +1,20 @@
-"""Public pages: landing page, technical blog, health check."""
+"""Public pages: landing page, model card, technical blog, public test-card images, health check."""
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
 import markdown
-from flask import Blueprint, current_app, g, jsonify, redirect, render_template, url_for
+from flask import Blueprint, abort, current_app, g, jsonify, redirect, render_template, send_file, url_for
 
 from src.core.gtm_classifier_v2 import evaluation as gtm_evaluation, find_model_file
-from src.core.python_classifier import model_card
+from src.core.python_classifier import model_card as python_model_card
+from src.services import model_card_service
 
 public_bp = Blueprint("public", __name__)
-MEDIUM_URL = "https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c"
-BLOG = Path(__file__).resolve().parent.parent.parent / "documentation" / "TECHNICAL_BLOG.md"
+ROOT = Path(__file__).resolve().parent.parent.parent
+BLOG = ROOT / "documentation" / "TECHNICAL_BLOG.md"
+TEST_CARDS = ROOT / "data" / "summary_cards" / "test"
 
 DEMO_ACCOUNTS = [
     ("Customer", "customer@assurex.local", "CustomerPass123!", "Register products, file claims, track progress"),
@@ -24,7 +26,7 @@ DEMO_ACCOUNTS = [
 
 def measured_metrics() -> dict:
     """Numbers shown on the landing page come from the saved evaluation files, never literals."""
-    card = model_card()
+    card = python_model_card()
     test = card.get("test", {})
     gtm = gtm_evaluation().get("test", {})
     return {"python_accuracy": test.get("accuracy"), "python_f1": test.get("f1_macro"),
@@ -47,11 +49,25 @@ def blog():
                            extension_configs={"toc": {"toc_depth": "2"}})
     html = md.convert(text)
     words = len(re.findall(r"\w+", text))
-    return render_template("public/blog.html", html=html, toc=md.toc_tokens, words=words, medium_url=MEDIUM_URL,
+    return render_template("public/blog.html", html=html, toc=md.toc_tokens, words=words, medium_url=current_app.config["MEDIUM_URL"],
                            minutes=max(1, round(words / 220)))
+
+
+@public_bp.get("/model-card")
+def model_card():
+    return render_template("public/model_card.html", mc=model_card_service.build())
+
+
+@public_bp.get("/cards/test/<string:name>")
+def test_card(name):
+    """Canonical test-split cards (synthetic data, never used for training) for the model card and sign-in page."""
+    path = TEST_CARDS / name
+    if not name.endswith("_v0.jpg") or "/" in name or ".." in name or not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="image/jpeg", max_age=86400)
 
 
 @public_bp.get("/healthz")
 def health():
     """Liveness + model availability for uptime monitoring (SRS NFR availability)."""
-    return jsonify(status="ok", python_model=bool(model_card()), gtm_model=find_model_file() is not None)
+    return jsonify(status="ok", python_model=bool(python_model_card()), gtm_model=find_model_file() is not None)

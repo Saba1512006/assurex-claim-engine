@@ -1,0 +1,13 @@
+{# One quiet footer row: product, event, links and the running model versions. #}
+{% set mv = model_versions() %}
+<footer class="footer">
+  <div class="wrap">
+    <span>AssureX Claim Engine · Built for TechWiz 7 · NextWave AI and ML</span>
+    <nav aria-label="Footer">
+      <a href="{{ url_for('public.model_card') }}">Model card</a>
+      <a href="{{ medium_url }}" rel="noopener">Technical blog</a>
+      <a href="{{ github_url }}" rel="noopener">GitHub repository</a>
+    </nav>
+    <span class="versions" title="Installed model versions">py {{ mv.python }} · {{ mv.gtm }} · times in server time (UTC)</span>
+  </div>
+</footer>
