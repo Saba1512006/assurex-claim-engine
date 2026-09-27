@@ -294,52 +294,100 @@
     inviteRole.addEventListener("change", sync); sync();
   }
 
+  /* ---------------------------------------------------------------- KPI numbers count up once when first seen
+     (the final value is already in the HTML; reduced motion shows it as is) */
+  const countUp = (el) => {
+    const m = el.textContent.trim().match(/^(\d+(?:\.\d+)?)(.*)$/);
+    if (!m) return;
+    const to = parseFloat(m[1]), dec = (m[1].split(".")[1] || "").length, rest = m[2], t0 = performance.now(), dur = 700;
+    el.closest(".kpi")?.classList.add("is-counting");
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = `${(to * e).toFixed(dec)}${rest}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  const counters = $$("[data-countup]");
+  if (counters.length && !reduced() && "IntersectionObserver" in window) {
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { countUp(e.target); io.unobserve(e.target); } }), { threshold: 0.4 });
+    counters.forEach((c) => io.observe(c));
+  }
+
   /* ---------------------------------------------------------------- charts (Chart.js, themed from tokens) */
   const chartData = $("#chart-data");
   if (chartData) {
     const specs = JSON.parse(chartData.textContent);
+    /* chart marks use the validated --chart-* tokens (never the text colours); status hues stay reserved for decisions */
     const colour = {
-      "Likely Valid": "--valid", "Likely Invalid": "--invalid", "Manual Review Required": "--review-mark",
-      "Valid Claim": "--valid", "Invalid Claim": "--invalid", "Manual Review": "--review-mark",
-      "Python model": "--teal", "Teachable Machine": "--gtm",
-      "Strong Match": "--valid", "Acceptable Match": "--teal", "Weak Match": "--review-mark", "Model Disagreement": "--invalid",
-      "Uncertain Result": "--steel",
+      "Likely Valid": "--chart-valid", "Likely Invalid": "--chart-invalid", "Manual Review Required": "--chart-review",
+      "Valid Claim": "--chart-valid", "Invalid Claim": "--chart-invalid", "Manual Review": "--chart-review",
+      "Python model": "--chart-py", "Teachable Machine": "--chart-gtm",
+      "Strong Match": "--chart-valid", "Acceptable Match": "--chart-py", "Weak Match": "--chart-review", "Model Disagreement": "--chart-invalid",
+      "Uncertain Result": "--chart-neutral",
     };
     const build = () => {
       if (!window.Chart) return setTimeout(build, 50);
+      const paper = css("--paper"), ink = css("--ink"), ink2 = css("--ink-2"), steel = css("--steel");
       Chart.defaults.font.family = css("--font");
-      Chart.defaults.color = css("--ink-2");
+      Chart.defaults.font.size = 12;
+      Chart.defaults.color = ink2;
       $$("canvas[data-chart]").forEach((cv) => {
         const s = specs[cv.dataset.chart];
         if (!s) return;
         const horizontal = s.type === "hbar";
+        const line = s.type === "line";
         const fmt = (v) => (s.percent ? `${(v * 100).toFixed(1)}%` : (s.decimals ? Number(v).toFixed(s.decimals) : v));
         const series = s.series ? (Array.isArray(s.series) ? s.series : Object.entries(s.series)) : [[s.label || "Count", s.values]];
-        const datasets = series.map(([name, values], i) => ({
-          label: name, data: values, type: s.type === "line" ? "line" : "bar",
-          backgroundColor: series.length === 1 && s.labels.every((l) => colour[l])
+        const last = series.length - 1;
+        /* 4px rounded data end, square at the baseline; in a stack only the outermost segment is rounded,
+           and a 1px paper edge on each segment leaves a 2px gap between neighbours */
+        const radius = (i) => (ctx) => {
+          if (s.stacked && i !== last) return 0;
+          return horizontal ? { topRight: 4, bottomRight: 4 } : { topLeft: 4, topRight: 4 };
+        };
+        const datasets = series.map(([name, values], i) => {
+          const fill = series.length === 1 && s.labels.every((l) => colour[l])
             ? s.labels.map((l) => css(colour[l]))                          // one bar per category: colour by category
-            : css(colour[name] || (i === 0 ? "--ink" : i === 1 ? "--teal" : "--gtm")),
-          borderColor: css(colour[name] || (i === 0 ? "--ink" : "--teal")),
-          borderWidth: s.type === "line" ? 2 : 0, pointRadius: s.type === "line" ? 3 : 0, tension: 0,
-          borderRadius: 2, maxBarThickness: 32,
-        }));
-        const valueAxis = { beginAtZero: true, grid: { color: css("--rule") }, border: { display: false }, stacked: !!s.stacked,
-          title: { display: !!s.yTitle, text: s.yTitle }, ticks: { precision: s.decimals || s.percent ? undefined : 0, callback: (v) => fmt(v) } };
-        const catAxis = { grid: { display: false }, border: { color: css("--steel-line") }, stacked: !!s.stacked,
-          title: { display: !!s.xTitle, text: s.xTitle } };
+            : css(colour[name] || (i === 0 ? "--chart-count" : i === 1 ? "--chart-py" : "--chart-gtm"));
+          return {
+            label: name, data: values, type: line ? "line" : "bar",
+            backgroundColor: fill, hoverBackgroundColor: fill,
+            borderColor: line ? css(colour[name] || "--ink") : paper,
+            borderWidth: line ? 2 : (s.stacked ? 1 : 0), borderSkipped: "start",
+            borderRadius: radius(i), maxBarThickness: 28, categoryPercentage: 0.72, barPercentage: series.length > 1 && !s.stacked ? 0.86 : 0.9,
+            pointRadius: line ? 4 : 0, pointHoverRadius: line ? 6 : 0, pointBackgroundColor: css(colour[name] || "--ink"),
+            pointBorderColor: paper, pointBorderWidth: 2, tension: 0,
+          };
+        });
+        const grid = { color: "rgba(21, 32, 43, .07)", drawTicks: false, lineWidth: 1 };
+        const valueAxis = { beginAtZero: true, grid, border: { display: false }, stacked: !!s.stacked,
+          title: { display: !!s.yTitle, text: s.yTitle, color: steel },
+          ticks: { padding: 8, color: steel, precision: s.decimals || s.percent ? undefined : 0, callback: (v) => fmt(v) } };
+        const catAxis = { grid: { display: false }, border: { color: "rgba(21, 32, 43, .18)" }, stacked: !!s.stacked,
+          title: { display: !!s.xTitle, text: s.xTitle, color: steel }, ticks: { padding: 6, color: ink2 } };
         const annotations = s.marker !== undefined ? { id: "marker", afterDraw(c) {
           const x = c.scales.x.getPixelForValue(s.marker); const { top, bottom } = c.chartArea; const g = c.ctx;
           g.save(); g.setLineDash([4, 4]); g.strokeStyle = css("--steel-line"); g.beginPath(); g.moveTo(x, top); g.lineTo(x, bottom); g.stroke(); g.restore();
         } } : null;
         new Chart(cv, {
-          type: s.type === "line" ? "line" : "bar",
+          type: line ? "line" : "bar",
           data: { labels: s.labels, datasets },
           options: {
-            indexAxis: horizontal ? "y" : "x", maintainAspectRatio: false, animation: reduced() ? false : { duration: 150 },
+            indexAxis: horizontal ? "y" : "x", maintainAspectRatio: false,
+            animation: reduced() ? false : { duration: 600, easing: "easeOutQuart" },
             interaction: { mode: "index", intersect: false },
-            plugins: { legend: { display: datasets.length > 1, position: "top", align: "start", labels: { boxWidth: 10, boxHeight: 10 } },
-              tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+            layout: { padding: { top: 4, right: 8 } },
+            plugins: {
+              legend: { display: datasets.length > 1, position: "top", align: "start",
+                labels: { usePointStyle: true, pointStyle: "rectRounded", boxWidth: 8, boxHeight: 8, padding: 16, color: ink2,
+                  font: { size: 12, weight: "500" } } },
+              tooltip: {                                                   // the bench, as a floating readout
+                backgroundColor: css("--bench"), titleColor: css("--on-bench"), bodyColor: css("--on-bench-2"),
+                borderColor: "rgba(255, 255, 255, .08)", borderWidth: 1, padding: 12, cornerRadius: 10, caretSize: 6,
+                boxPadding: 6, usePointStyle: true, titleFont: { weight: "600", size: 12 }, bodyFont: { size: 12 },
+                callbacks: { label: (c) => ` ${c.dataset.label}: ${fmt(c.raw)}` } },
+            },
             scales: horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis },
           },
           plugins: annotations ? [annotations] : [],

@@ -1184,3 +1184,66 @@ a.plate:hover { transform: translateY(-3px); border-color: transparent;
 .menu-sep { margin: var(--s2) var(--s2); border: 0; border-top: 1px solid rgba(21, 32, 43, .08); }
 .menu-panel a .menu-hint { margin-left: auto; font-size: var(--fs-2xs); color: var(--steel); }
 .menu-panel a[aria-current="page"] { background: var(--teal-wash); box-shadow: inset 3px 0 0 var(--teal-mark); }
+
+/* ================================================================== dashboards
+   KPI cards: a label with an icon tile, a condensed headline number, an optional rate bar from the same number,
+   a comparison line; linked cards show an arrow and lift. Rows of cards share one height. */
+.stats.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s4); }
+.kpi { display: grid; gap: var(--s2); align-content: start; padding: var(--s5); padding-bottom: var(--s4); min-height: 142px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFD 100%); }
+.kpi .kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s3); }
+.kpi .l { margin: 0; font-size: var(--fs-sm); font-weight: 500; color: var(--ink-2); line-height: 1.3; }
+.kpi .kpi-ic { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 10px; color: var(--teal);
+  background: linear-gradient(160deg, #F2FAF9, var(--teal-wash));
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px color-mix(in srgb, var(--teal-mark) 18%, transparent), 0 6px 12px -8px color-mix(in srgb, var(--teal-mark) 60%, transparent); }
+.kpi:nth-child(3n+2) .kpi-ic { color: var(--gtm); background: linear-gradient(160deg, #F5F6FC, var(--gtm-wash));
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px color-mix(in srgb, var(--gtm) 18%, transparent), 0 6px 12px -8px color-mix(in srgb, var(--gtm) 60%, transparent); }
+.kpi:nth-child(3n) .kpi-ic { color: var(--ink); background: linear-gradient(160deg, #FFFFFF, #E9EDF1);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .1), 0 6px 12px -8px rgba(21, 32, 43, .5); }
+.kpi .kpi-ic .ic { width: 18px; height: 18px; }
+.kpi .v { font: 600 clamp(1.875rem, 2.4vw, 2.375rem)/1 var(--font-num); letter-spacing: -0.02em; color: var(--ink); margin-top: var(--s1); }
+.kpi .kpi-bar { display: block; height: 6px; border-radius: var(--r-dot); background: #E6EAEE; box-shadow: inset 0 1px 2px rgba(21, 32, 43, .1); overflow: hidden; }
+.kpi .kpi-bar > i { display: block; height: 100%; width: calc(var(--p, 0) * 100%); border-radius: var(--r-dot);
+  background: linear-gradient(90deg, var(--teal-mark), var(--gtm)); transform-origin: left; }
+.kpi .cmp { margin: 0; font-size: var(--fs-xs); color: var(--steel); }
+.kpi .kpi-go { position: absolute; right: var(--s4); bottom: var(--s4); color: var(--teal); opacity: 0; transform: translateX(-4px);
+  transition: opacity var(--t-fast), transform var(--t-fast); }
+a.kpi:hover .kpi-go, a.kpi:focus-visible .kpi-go { opacity: 1; transform: none; }
+a.kpi:focus-visible { box-shadow: var(--focus); }
+.kpi.is-counting .kpi-bar > i { animation: kpi-grow 700ms var(--ease) both; }
+@keyframes kpi-grow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .kpi.is-counting .kpi-bar > i { animation: none; } }
+
+/* charts: a quiet frame, the "View as table" toggle as a pill */
+.chart { height: 280px; }
+.panel .btn.ghost.sm[data-table-toggle] { min-height: 30px; border-radius: var(--r-dot); padding: 0 12px; background: var(--mist); color: var(--ink-2); }
+.panel .btn.ghost.sm[data-table-toggle]:hover { background: var(--teal-wash); color: var(--teal); }
+.panel .btn.ghost.sm[data-table-toggle][aria-expanded="true"] { background: var(--ink); color: var(--paper); }
+
+/* queue tabs: a segmented tray with count pills */
+.tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 4px; border: 0; border-radius: 14px; background: rgba(21, 32, 43, .05);
+  box-shadow: inset 0 1px 2px rgba(21, 32, 43, .08); }
+.tabs a { display: inline-flex; align-items: center; gap: var(--s2); min-height: 38px; padding: 0 var(--s4); border: 0; border-radius: 10px; margin: 0;
+  color: var(--ink-2); font-weight: 500; text-decoration: none; transition: background-color var(--t-fast), color var(--t-fast); }
+.tabs a:hover { color: var(--ink); background: rgba(255, 255, 255, .6); }
+.tabs a[aria-current="page"] { color: var(--ink); background: var(--paper);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 6px 14px -8px rgba(21, 32, 43, .4); }
+.tabs .count { min-width: 22px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: var(--r-dot);
+  font: 600 var(--fs-2xs)/1 var(--font-num); background: rgba(21, 32, 43, .08); color: var(--ink-2); }
+.tabs a[aria-current="page"] .count { background: var(--teal-mark); color: var(--paper); }
+.tabs button { min-height: 38px; padding: 0 var(--s4); border: 0; border-radius: 10px; margin: 0; background: none; transition: background-color var(--t-fast), color var(--t-fast); }
+.tabs button:hover { background: rgba(255, 255, 255, .6); }
+.tabs button[aria-selected="true"] { color: var(--ink); background: var(--paper);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 6px 14px -8px rgba(21, 32, 43, .4); }
+.tabs a:focus-visible, .tabs button:focus-visible { box-shadow: var(--focus); }
+/* KPI rows: never leave one card alone on a line */
+.stats.kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+@media (min-width: 768px) {
+  .stats.kpis:has(> :nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stats.kpis:has(> :nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stats.kpis:has(> :nth-child(5):last-child) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .stats.kpis:has(> :nth-child(4):last-child), .stats.kpis:has(> :nth-child(5):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.tabs { width: fit-content; max-width: 100%; }

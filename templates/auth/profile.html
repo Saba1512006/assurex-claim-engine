@@ -1,6 +1,7 @@
 {% extends "components/base.html" %}
 {# Profile: contact details, password change (signs out other devices), counts, recent activity, what the role allows. #}
-{% from "components/ui.html" import csrf, field, panel as ui_panel %}
+{% from "components/ui.html" import csrf, field, panel as ui_panel, kpi %}
+{# icons: package folder-open bell-ring #}
 {% block title %}Profile{% endblock %}
 {% block page_header %}
 <div class="page-head">
@@ -55,9 +56,9 @@
   </div>
   <aside class="stack" aria-label="Account summary">
     <section class="stats stats-3" aria-label="Your records">
-      <div class="stat"><div class="v mono">{{ stats.products }}</div><div class="l">Products</div></div>
-      <div class="stat"><div class="v mono">{{ stats.claims }}</div><div class="l">Claims</div></div>
-      <div class="stat"><div class="v mono">{{ stats.unread }}</div><div class="l">Unread</div></div>
+      {{ kpi(stats.products, 'Products', '', 'package') }}
+      {{ kpi(stats.claims, 'Claims', '', 'folder-open') }}
+      {{ kpi(stats.unread, 'Unread', '', 'bell-ring') }}
     </section>
     {% call ui_panel('Recent activity', body='') %}
       <ul class="list">

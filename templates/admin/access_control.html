@@ -1,7 +1,8 @@
 {% extends "components/base.html" %}
 {# Access control: people (role, status, sign-out), the permission matrix from config/rbac.json, invitations,
    blocked attempts and service centers. Role changes sign the person out everywhere. #}
-{% from "components/ui.html" import csrf, tag, empty_state, panel as ui_panel %}
+{% from "components/ui.html" import csrf, tag, empty_state, panel as ui_panel, kpi %}
+{# icons: users #}
 {% block title %}Access control{% endblock %}
 {% block page_header %}
 <div class="page-head">
@@ -15,7 +16,7 @@
 <div class="stack">
   <section class="stats kpis" aria-label="People per role">
     {% for r, spec in policy.roles.items() %}
-      <a class="stat" href="{{ url_for('access.index', role=r) }}"><div class="v mono">{{ counts.get(r, 0) }}</div><div class="l">{{ spec.label }}</div></a>
+      {{ kpi(counts.get(r, 0), spec.label, 'People with this role', 'users', url_for('access.index', role=r)) }}
     {% endfor %}
   </section>
 

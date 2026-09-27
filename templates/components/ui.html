@@ -221,3 +221,16 @@
 <div><span class="num-xl">{% if value is none %}—{% else %}{{ value }}<small>{{ unit }}</small>{% endif %}</span>
   <span class="l">{{ label if value is not none else 'Not evaluated yet' }}</span></div>
 {%- endmacro %}
+
+{% macro kpi(value, label, sub='', ic='', href=none, rate=none) -%}
+{# Dashboard KPI card: label with an icon tile, a condensed headline number (counts up on first view; the final value
+   is in the HTML), an optional rate bar drawn from the same number, and a short comparison line.
+   `ic` names a Lucide icon; templates that pass one list it in an "icons:" template comment so the sprite includes it. #}
+<{{ 'a' if href else 'div' }} class="stat kpi"{% if href %} href="{{ href }}"{% endif %}>
+  <div class="kpi-top"><span class="l">{{ label }}</span>{% if ic %}<span class="kpi-ic" aria-hidden="true">{{ icon(ic) }}</span>{% endif %}</div>
+  <div class="v" data-countup>{{ value }}</div>
+  {% if rate is not none %}<span class="kpi-bar" role="presentation"><i style="--p: {{ '%.3f'|format(rate) }}"></i></span>{% endif %}
+  {% if sub %}<div class="cmp">{{ sub }}</div>{% endif %}
+  {% if href %}<span class="kpi-go" aria-hidden="true">{{ icon('arrow-right', 'sm') }}</span>{% endif %}
+</{{ 'a' if href else 'div' }}>
+{%- endmacro %}

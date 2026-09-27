@@ -1,6 +1,7 @@
 {% extends "components/base.html" %}
 {# Customer / service-center desk: 1) what needs you now, 2) product plates with warranty life, 3) every claim, 20 per page. #}
-{% from "components/ui.html" import claim_row, empty_state, product_plate, tag, doc_icon, pager %}
+{% from "components/ui.html" import claim_row, empty_state, product_plate, tag, doc_icon, pager, kpi %}
+{# icons: package shield-check folder-open bell-ring #}
 {% block title %}Dashboard{% endblock %}
 {% block page_header %}
 {% set staff = current_user.role == 'service_center_staff' %}
@@ -19,6 +20,13 @@
 {% block content %}
 {% set staff = current_user.role == 'service_center_staff' %}
 <div class="stack">
+  {% set needs = attention|length + expiring|length %}
+  <section class="stats kpis" aria-label="At a glance">
+    {{ kpi(product_count, 'Products registered', (buckets.get('Expiring soon', 0) ~ ' ending soon · ' ~ buckets.get('Expired', 0) ~ ' expired'), 'package', url_for('products.list_products')) }}
+    {{ kpi(buckets.get('Active', 0), 'Under warranty now', 'Cover still running', 'shield-check', rate=(buckets.get('Active', 0) / product_count) if product_count else none) }}
+    {{ kpi(page.total, 'Claims', 'Filed and drafts', 'folder-open', url_for('claims.search')) }}
+    {{ kpi(needs, 'Need your attention', 'Nothing waiting on you' if not needs else ('Reviewer questions, drafts, ending cover'), 'bell-ring', '#att-h' if needs else none) }}
+  </section>
   <section class="panel" aria-labelledby="att-h">
     <div class="panel-h"><h2 id="att-h">Needs your attention</h2>
       <span class="hint">{{ attention|length + expiring|length }} item{{ '' if (attention|length + expiring|length) == 1 else 's' }}</span></div>

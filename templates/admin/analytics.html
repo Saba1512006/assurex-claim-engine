@@ -1,7 +1,8 @@
 {% extends "components/base.html" %}
 {# Analytics: claim outcomes, rejection and review reasons, faults, categories, expirations, the models in production and
    how the Python model was chosen. Every chart has a table view. Test-set metrics live on the public model card. #}
-{% from "components/ui.html" import chart_panel, tag, panel as ui_panel %}
+{% from "components/ui.html" import chart_panel, tag, panel as ui_panel, kpi %}
+{# icons: file-text inbox git-compare timer wrench #}
 {% set needs_charts = true %}
 {% block title %}Analytics{% endblock %}
 {% block page_header %}
@@ -30,11 +31,11 @@
   </form>
 
   <section class="stats kpis" aria-label="Key figures">
-    <div class="stat"><div class="v mono">{{ o.total }}</div><div class="l">Claims in view</div></div>
-    <div class="stat"><div class="v mono">{{ a.manual_review.rate|pct(0) }}</div><div class="l">Sent to a reviewer</div></div>
-    <div class="stat"><div class="v mono">{{ a.models.agreement_rate|pct(0) if a.models.agreement_rate is not none else '—' }}</div><div class="l">Models agree on the class</div></div>
-    <div class="stat"><div class="v mono">{{ a.models.avg_latency_ms or '—' }} ms</div><div class="l">Average evaluation time</div></div>
-    <div class="stat"><div class="v mono">{{ a.repairs.total }}</div><div class="l">Repairs on record</div><div class="cmp">{{ a.repairs.unauthorised }} unauthorised</div></div>
+    {{ kpi(o.total, 'Claims in view', '', 'file-text') }}
+    {{ kpi(a.manual_review.rate|pct(0), 'Sent to a reviewer', '', 'inbox', rate=a.manual_review.rate) }}
+    {{ kpi(a.models.agreement_rate|pct(0) if a.models.agreement_rate is not none else '—', 'Models agree on the class', '', 'git-compare', rate=a.models.agreement_rate) }}
+    {{ kpi((a.models.avg_latency_ms ~ ' ms') if a.models.avg_latency_ms else '—', 'Average evaluation time', '', 'timer') }}
+    {{ kpi(a.repairs.total, 'Repairs on record', (a.repairs.unauthorised ~ ' unauthorised'), 'wrench') }}
   </section>
 
   <h2 class="section-title">Claims</h2>

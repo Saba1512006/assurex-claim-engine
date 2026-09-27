@@ -1,6 +1,7 @@
 {% extends "components/base.html" %}
 {# Admin overview: filters, operations KPIs, six charts (each with a table view), model health, monitoring and activity. #}
-{% from "components/ui.html" import csrf, tag, chart_panel, panel as ui_panel %}
+{% from "components/ui.html" import csrf, tag, chart_panel, kpi, panel as ui_panel %}
+{# icons: file-text zap inbox git-compare user-check timer #}
 {% set needs_charts = true %}
 {% block title %}Overview{% endblock %}
 {% block page_header %}
@@ -29,12 +30,12 @@
   </form>
 
   <section class="stats kpis" aria-label="Key figures">
-    <a class="stat" href="{{ url_for('claims.search') }}"><div class="v mono">{{ o.total }}</div><div class="l">Claims filed</div><div class="cmp">{{ o.drafts }} drafts not filed</div></a>
-    <div class="stat"><div class="v mono">{{ x.automation_rate|pct(0) }}</div><div class="l">Decided without a person</div><div class="cmp">{{ o.likely_valid }} valid · {{ o.likely_invalid }} invalid</div></div>
-    <a class="stat" href="{{ url_for('reviewer.queue') }}"><div class="v mono">{{ o.in_queue }}</div><div class="l">In the review queue</div><div class="cmp">{{ o.pending }} not yet settled</div></a>
-    <div class="stat"><div class="v mono">{{ x.agreement_rate|pct(0) }}</div><div class="l">Models agree on the class</div><div class="cmp">{{ o.disagreements }} disagreements in {{ o.compared }}</div></div>
-    <div class="stat"><div class="v mono">{{ x.override_rate|pct(0) }}</div><div class="l">Reviewer overrides</div><div class="cmp">{{ x.overrides }} of {{ x.reviewed }} decisions</div></div>
-    <div class="stat"><div class="v mono">{{ ('%.2f s'|format(x.median_latency_ms / 1000)) if x.median_latency_ms is not none else '—' }}</div><div class="l">Median time to a decision</div><div class="cmp">{{ o.duplicates }} duplicate alerts</div></div>
+    {{ kpi(o.total, 'Claims filed', (o.drafts ~ ' drafts not filed'), 'file-text', url_for('claims.search')) }}
+    {{ kpi(x.automation_rate|pct(0), 'Decided without a person', (o.likely_valid ~ ' valid · ' ~ o.likely_invalid ~ ' invalid'), 'zap', rate=x.automation_rate) }}
+    {{ kpi(o.in_queue, 'In the review queue', (o.pending ~ ' not yet settled'), 'inbox', url_for('reviewer.queue')) }}
+    {{ kpi(x.agreement_rate|pct(0), 'Models agree on the class', (o.disagreements ~ ' disagreements in ' ~ o.compared), 'git-compare', rate=x.agreement_rate) }}
+    {{ kpi(x.override_rate|pct(0), 'Reviewer overrides', (x.overrides ~ ' of ' ~ x.reviewed ~ ' decisions'), 'user-check', rate=x.override_rate) }}
+    {{ kpi(('%.2f s'|format(x.median_latency_ms / 1000)) if x.median_latency_ms is not none else '—', 'Median time to a decision', (o.duplicates ~ ' duplicate alerts'), 'timer') }}
   </section>
 
   <div class="grid grid-2">

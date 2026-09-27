@@ -51,6 +51,10 @@
   --review: #8A5A10;
   --review-mark: #B7791F;
   --review-wash: #FBF1DF;
+  /* chart marks only (never text): validated for colour-vision deficiency on paper with the dataviz palette checker */
+  --chart-py: #0B8F86; --chart-gtm: #7456D8;
+  --chart-valid: #1B8A6B; --chart-invalid: #D2453A; --chart-review: #C99419; --chart-neutral: #8A96A3;
+  --chart-count: #3E5A73;         /* single-series counts: one quiet hue */
   --role-customer: #2F5D8A; --role-staff: #5B6B2E; --role-reviewer: #B7791F; --role-admin: #0E7C7B;
 
   /* ---- type */
