@@ -192,3 +192,21 @@
   <div class="meta"><span>{{ p.category }}</span>{% if claims_count is not none %}<span>{{ claims_count }} claim{{ '' if claims_count == 1 else 's' }}</span>{% endif %}</div>
 </a>
 {%- endmacro %}
+
+{% macro chart_panel(id, title, hint, labels, series, spec_note='') -%}
+{# Chart panel: canvas drawn from #chart-data[id], plus a "View as table" toggle with the same numbers (the accessible fallback). #}
+<section class="panel" aria-labelledby="{{ id }}-h">
+  <div class="panel-h"><h2 id="{{ id }}-h">{{ title }}</h2>
+    <button class="btn ghost sm" type="button" data-table-toggle aria-controls="{{ id }}-t" aria-expanded="false">View as table</button></div>
+  <div class="panel-b">
+    {% if hint %}<p class="tiny muted mb-2">{{ hint }}</p>{% endif %}
+    <div class="chart"><canvas data-chart="{{ id }}" role="img" aria-label="{{ title }}. The same numbers are in the table view."></canvas></div>
+    <div class="table-wrap mt-2" id="{{ id }}-t" hidden>
+      <table class="table compact small"><caption class="sr">{{ title }}</caption>
+        <thead><tr><th scope="col"></th>{% for name, values in series %}<th scope="col" class="num">{{ name }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for l in labels %}{% set i = loop.index0 %}<tr><th scope="row">{{ l }}</th>{% for name, values in series %}<td class="num mono">{{ values[i] }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{%- endmacro %}

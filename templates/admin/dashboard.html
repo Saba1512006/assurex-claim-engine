@@ -1,97 +1,90 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import csrf %}
+{# Admin overview: filters, operations KPIs, six charts (each with a table view), model health, monitoring and activity. #}
+{% from "components/ui.html" import csrf, tag, chart_panel, panel as ui_panel %}
+{% set needs_charts = true %}
 {% block title %}Overview{% endblock %}
-{% block content %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="eyebrow">Administrator</div>
     <h1>Operations overview</h1>
-    <p class="lede">Claims, decisions, model health and monitoring alerts. Filters apply to every number on this page.</p>
+    <p class="lede">Claims, decisions, model health and monitoring. The filters apply to every number on this page.</p>
   </div>
-  <div class="row">
-    <form method="post" action="{{ url_for('admin.dispatch_alerts') }}">{{ csrf() }}<button class="btn quiet" type="submit"><i class="bi bi-send"></i>Send due alerts</button></form>
-    <a class="btn quiet" href="{{ url_for('admin.export', kind='claims', **filters) }}"><i class="bi bi-filetype-csv"></i>Export claims</a>
-    <a class="btn quiet" href="{{ url_for('admin.export', kind='claims', format='xlsx', **filters) }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
+  <div class="row tight">
+    <a class="btn quiet" href="{{ url_for('admin.what_if') }}">What-if simulator</a>
+    <a class="btn quiet" href="{{ url_for('admin.batch') }}">Batch evaluation</a>
+    <form method="post" action="{{ url_for('admin.dispatch_alerts') }}">{{ csrf() }}<button class="btn quiet" type="submit">Send due alerts</button></form>
   </div>
 </div>
+{% endblock %}
+{% block content %}
+<div class="stack">
+  <form class="filters" method="get" aria-label="Filter the overview">
+    <div class="field"><label for="f-cat">Category</label><select class="select" id="f-cat" name="category" data-autosubmit><option value="">All categories</option>{% for c in categories %}<option {{ 'selected' if filters.get('category') == c }}>{{ c }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="f-st">Status</label><select class="select" id="f-st" name="status" data-autosubmit><option value="">Any status</option>{% for s in statuses %}<option {{ 'selected' if filters.get('status') == s }}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="field narrow"><label for="f-from">Filed from</label><input class="input" id="f-from" type="date" name="start" value="{{ filters.get('start', '') }}"></div>
+    <div class="field narrow"><label for="f-to">to</label><input class="input" id="f-to" type="date" name="end" value="{{ filters.get('end', '') }}"></div>
+    <div class="row tight"><button class="btn quiet" type="submit">Apply</button>{% if filters %}<a class="btn ghost" href="{{ url_for('admin.dashboard') }}">Reset</a>{% endif %}
+      <a class="btn ghost" href="{{ url_for('admin.export', kind='claims', **filters) }}">Export CSV</a></div>
+  </form>
 
-<form class="card" method="get"><div class="card-b filters">
-  <label class="field"><span>Category</span><select class="select sm" name="category"><option value="">All categories</option>{% for c in categories %}<option {{ 'selected' if filters.get('category') == c }}>{{ c }}</option>{% endfor %}</select></label>
-  <label class="field"><span>Status</span><select class="select sm" name="status"><option value="">Any status</option>{% for s in statuses %}<option {{ 'selected' if filters.get('status') == s }}>{{ s }}</option>{% endfor %}</select></label>
-  <label class="field"><span>Submitted from</span><input class="input sm" type="date" name="start" value="{{ filters.get('start', '') }}"></label>
-  <label class="field"><span>to</span><input class="input sm" type="date" name="end" value="{{ filters.get('end', '') }}"></label>
-  <div class="row"><button class="btn sm" type="submit">Apply</button><a class="btn ghost sm" href="{{ url_for('admin.dashboard') }}">Reset</a></div>
-</div></form>
+  <section class="stats kpis" aria-label="Key figures">
+    <a class="stat" href="{{ url_for('claims.search') }}"><div class="v mono">{{ o.total }}</div><div class="l">Claims filed</div><div class="cmp">{{ o.drafts }} drafts not filed</div></a>
+    <div class="stat"><div class="v mono">{{ x.automation_rate|pct(0) }}</div><div class="l">Decided without a person</div><div class="cmp">{{ o.likely_valid }} valid · {{ o.likely_invalid }} invalid</div></div>
+    <a class="stat" href="{{ url_for('reviewer.queue') }}"><div class="v mono">{{ o.in_queue }}</div><div class="l">In the review queue</div><div class="cmp">{{ o.pending }} not yet settled</div></a>
+    <div class="stat"><div class="v mono">{{ x.agreement_rate|pct(0) }}</div><div class="l">Models agree on the class</div><div class="cmp">{{ o.disagreements }} disagreements in {{ o.compared }}</div></div>
+    <div class="stat"><div class="v mono">{{ x.override_rate|pct(0) }}</div><div class="l">Reviewer overrides</div><div class="cmp">{{ x.overrides }} of {{ x.reviewed }} decisions</div></div>
+    <div class="stat"><div class="v mono">{{ ('%.2f s'|format(x.median_latency_ms / 1000)) if x.median_latency_ms is not none else '—' }}</div><div class="l">Median time to a decision</div><div class="cmp">{{ o.duplicates }} duplicate alerts</div></div>
+  </section>
 
-<section class="stats mt-3">
-  <a class="stat" href="{{ url_for('claims.search') }}"><div class="v">{{ o.total }}</div><div class="l">Claims submitted</div></a>
-  <a class="stat good" href="{{ url_for('claims.search', decision='Likely Valid') }}"><div class="v">{{ o.likely_valid }}</div><div class="l">Likely valid</div></a>
-  <a class="stat bad" href="{{ url_for('claims.search', decision='Likely Invalid') }}"><div class="v">{{ o.likely_invalid }}</div><div class="l">Likely invalid</div></a>
-  <a class="stat warn" href="{{ url_for('claims.search', decision='Manual Review Required') }}"><div class="v">{{ o.manual_review }}</div><div class="l">Manual review</div></a>
-  <a class="stat info" href="{{ url_for('reviewer.queue') }}"><div class="v">{{ o.pending }}</div><div class="l">Pending ({{ o.in_queue }} in queue)</div></a>
-</section>
-<section class="stats mt-2">
-  <div class="stat"><div class="v">{{ o.duplicates }}</div><div class="l"><i class="bi bi-files"></i>Duplicate alerts</div></div>
-  <div class="stat"><div class="v">{{ o.disagreements }}<small>/ {{ o.compared }}</small></div><div class="l"><i class="bi bi-arrow-left-right"></i>Model disagreements</div></div>
-  <div class="stat"><div class="v">{{ o.avg_python_conf|pct(1) }}</div><div class="l">Avg Python confidence</div></div>
-  <div class="stat"><div class="v">{{ o.avg_gtm_conf|pct(1) }}</div><div class="l">Avg Teachable Machine confidence</div></div>
-  <div class="stat"><div class="v">{{ '%.3f'|format(o.avg_conf_diff) if o.avg_conf_diff is not none else '—' }}</div><div class="l">Avg |Δ confidence|</div></div>
-</section>
-
-<div class="split mt-3">
-  <div class="stack">
-    <section class="card">
-      <div class="card-h"><h2>Claim trend</h2><span class="hint">Recommendations per week, last 12 weeks</span></div>
-      <div class="card-b"><div class="chart"><canvas data-chart="trend" aria-label="Weekly claims by recommendation" role="img"></canvas></div></div>
-    </section>
-    <div class="grid grid-2">
-      <section class="card">
-        <div class="card-h"><h2>Status mix</h2></div>
-        <div class="card-b"><div class="chart sm"><canvas data-chart="status" role="img" aria-label="Claims by status"></canvas></div></div>
-      </section>
-      <section class="card">
-        <div class="card-h"><h2>Recommendations</h2></div>
-        <div class="card-b"><div class="chart sm"><canvas data-chart="decisions" role="img" aria-label="Claims by recommendation"></canvas></div></div>
-      </section>
-    </div>
-    <section class="card">
-      <div class="card-h"><h2>Recent activity</h2><a class="small" href="{{ url_for('admin.audit_log') }}">Audit trail →</a></div>
-      <div class="table-wrap"><table class="table compact small">
-        <tbody>{% for a in recent %}<tr><td class="nowrap muted">{{ a.timestamp|ago }}</td><td><b>{{ a.action|replace('_', ' ')|capitalize }}</b></td><td>{{ a.actor.full_name if a.actor else 'System' }}</td><td><span class="id">{{ a.entity_id or '—' }}</span></td></tr>{% endfor %}</tbody>
-      </table></div>
-    </section>
+  <div class="grid grid-2">
+    {{ chart_panel('trend', 'Claims per week', 'Recommendation at filing, last 12 weeks.', o.trend.labels, o.trend.series) }}
+    {{ chart_panel('decisions', 'Recommendations', '', o.decision_counts.keys()|list, [['Claims', o.decision_counts.values()|list]]) }}
+    {{ chart_panel('consistency', 'Model agreement', 'How the Python model and Teachable Machine compared on each evaluated claim.', x.consistency_counts.keys()|list, [['Claims', x.consistency_counts.values()|list]]) }}
+    {{ chart_panel('confidence', 'Top-class confidence', 'How sure each model was, in bins; the minimum confidence for agreement is 0.60 by default.', x.confidence_hist.labels, [['Python model', x.confidence_hist['Python model']], ['Teachable Machine', x.confidence_hist['Teachable Machine']]]) }}
+    {{ chart_panel('category', 'Recommendations by category', '', x.category_decisions.labels, x.category_decisions.series) }}
+    {{ chart_panel('status', 'Where claims are now', '', o.status_counts.keys()|list, [['Claims', o.status_counts.values()|list]]) }}
   </div>
-  <aside class="stack">
-    <section class="card">
-      <div class="card-h"><h2>Models</h2><a class="small" href="{{ url_for('admin.models') }}">Manage →</a></div>
+
+  <div class="grid grid-3">
+    {% call ui_panel('Models', body='') %}
       <ul class="list">
-        <li><span class="ico {{ 'good' if models.python.ok else 'bad' }}"><i class="bi bi-table"></i></span><div class="grow"><div class="ttl small">Python model</div>
-          <div class="sub">{% if models.python.ok %}<span class="mono">{{ models.python.version }}</span> · test accuracy {{ models.card.get('test', {}).get('accuracy')|pct(1) }}{% else %}{{ models.python.error }}{% endif %}</div></div></li>
-        <li><span class="ico {{ 'good' if models.gtm.ok else 'warn' }}"><i class="bi bi-image"></i></span><div class="grow"><div class="ttl small">Teachable Machine</div>
-          <div class="sub">{% if models.gtm.ok %}<span class="mono">{{ models.gtm.version }}</span>{% if models.gtm_eval %} · test accuracy {{ models.gtm_eval.get('test', {}).get('gtm_accuracy')|pct(1) }}{% endif %}{% else %}Not installed — every claim goes to manual review. <a href="{{ url_for('admin.models') }}">Install it</a>{% endif %}</div></div></li>
+        <li><span class="ico" aria-hidden="true"><i class="bi bi-table"></i></span><div class="grow"><div class="ttl small">Python model {{ tag('Running', 'valid') if models.python.ok else tag('Unavailable', 'invalid') }}</div>
+          <div class="sub">{% if models.python.ok %}<span class="mono">{{ models.python.version.split('+')[0] }}</span> · test accuracy {{ models.card.get('test', {}).get('accuracy')|pct(1) }}{% else %}{{ models.python.error }}{% endif %}</div></div></li>
+        <li><span class="ico" aria-hidden="true"><i class="bi bi-image"></i></span><div class="grow"><div class="ttl small">Teachable Machine {{ tag('Running', 'valid') if models.gtm.ok else tag('Not installed', 'review') }}</div>
+          <div class="sub">{% if models.gtm.ok %}<span class="mono">{{ models.gtm.version }}</span>{% if models.gtm_eval %} · test accuracy {{ models.gtm_eval.get('test', {}).get('gtm_accuracy')|pct(1) }}{% endif %}{% else %}Every claim goes to a reviewer until it is installed.{% endif %}</div></div></li>
       </ul>
-    </section>
-    <section class="card">
-      <div class="card-h"><h2>Monitoring</h2><span class="hint">last 72 hours</span></div>
+      <p class="panel-f small mb-0"><a href="{{ url_for('admin.models') }}">Manage models</a> · <a href="{{ url_for('public.model_card') }}">Model card</a></p>
+    {% endcall %}
+    {% call ui_panel('Monitoring', hint='Last 72 hours', body='') %}
       <ul class="list">
         {% for a in anomalies %}
-          <li><span class="ico {{ 'bad' if a.severity == 'critical' else 'warn' }}"><i class="bi {{ 'bi-exclamation-octagon' if a.severity == 'critical' else 'bi-exclamation-triangle' }}"></i></span>
-            <div class="grow"><div class="ttl small">{{ a.title }} <span class="badge plain {{ 'bad' if a.severity == 'critical' else 'warn' }}">{{ a.count }}</span></div><div class="sub">{{ a.description }}</div><div class="sub"><i>{{ a.recommendation }}</i></div></div></li>
-        {% else %}<li class="small muted"><i class="bi bi-check-circle" style="color:var(--good)"></i>&nbsp;No anomalies detected.</li>{% endfor %}
+          <li><span class="ico {{ 'review' }}" aria-hidden="true"><i class="bi {{ 'bi-exclamation-octagon' if a.severity == 'critical' else 'bi-exclamation-triangle' }}"></i></span>
+            <div class="grow"><div class="ttl small">{{ a.title }} {{ tag(a.count, 'invalid' if a.severity == 'critical' else 'review') }}</div><div class="sub">{{ a.description }} {{ a.recommendation }}</div></div></li>
+        {% else %}<li class="small muted">No anomalies detected.</li>{% endfor %}
       </ul>
-    </section>
-    <section class="card">
-      <div class="card-h"><h2>Warranties ending</h2><span class="hint">next {{ window }} days</span></div>
+    {% endcall %}
+    {% call ui_panel('Warranties ending', hint='Next ' ~ window ~ ' days', body='') %}
       <ul class="list">
-        {% for w in expiring %}<li><div class="grow"><div class="ttl small">{{ w.product.product_name }}</div><div class="sub">{{ w.product.owner.full_name }} · {{ w.expiry_date|date }}</div></div><span class="badge warn plain">{{ w.remaining_days() }} d</span></li>
+        {% for w in expiring %}<li><div class="grow"><div class="ttl small">{{ w.product.product_name }}</div><div class="sub">{{ w.product.owner.full_name }} · {{ w.expiry_date|date }}</div></div><span class="mono small">{{ w.remaining_days() }} d</span></li>
         {% else %}<li class="small muted">None in the alert window.</li>{% endfor %}
       </ul>
-    </section>
-  </aside>
+    {% endcall %}
+  </div>
+
+  {% call ui_panel('Recent activity', body='') %}
+    <div class="table-wrap"><table class="table compact small">
+      <thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Record</th></tr></thead>
+      <tbody>{% for a in recent %}<tr><td class="nowrap">{{ a.timestamp|ago }}</td><td>{{ a.action|replace('_', ' ')|capitalize }}</td><td>{{ a.actor.full_name if a.actor else 'System' }}</td><td><span class="id">{{ a.entity_id or '—' }}</span></td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="panel-f small mb-0"><a href="{{ url_for('admin.audit_log') }}">Full audit trail</a></p>
+  {% endcall %}
 </div>
 <script type="application/json" id="chart-data">{{ {
   'trend': {'type': 'bar', 'labels': o.trend.labels, 'stacked': True, 'series': o.trend.series},
-  'status': {'type': 'hbar', 'labels': o.status_counts.keys()|list, 'values': o.status_counts.values()|list},
-  'decisions': {'type': 'hbar', 'labels': o.decision_counts.keys()|list, 'values': o.decision_counts.values()|list, 'tones': ['good', 'bad', 'warn']}
+  'decisions': {'type': 'hbar', 'labels': o.decision_counts.keys()|list, 'series': [['Claims', o.decision_counts.values()|list]]},
+  'consistency': {'type': 'hbar', 'labels': x.consistency_counts.keys()|list, 'series': [['Claims', x.consistency_counts.values()|list]]},
+  'confidence': {'type': 'bar', 'labels': x.confidence_hist.labels, 'series': [['Python model', x.confidence_hist['Python model']], ['Teachable Machine', x.confidence_hist['Teachable Machine']]]},
+  'category': {'type': 'bar', 'labels': x.category_decisions.labels, 'stacked': True, 'series': x.category_decisions.series},
+  'status': {'type': 'hbar', 'labels': o.status_counts.keys()|list, 'series': [['Claims', o.status_counts.values()|list]]}
 }|tojson }}</script>
 {% endblock %}

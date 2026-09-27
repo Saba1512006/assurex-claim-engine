@@ -164,3 +164,34 @@ def expiring_list(product_query, days: int) -> list:
             .filter(Product.id.in_(product_query.with_entities(Product.id)),
                     ProductWarranty.expiry_date >= today, ProductWarranty.expiry_date <= today + timedelta(days=days))
             .order_by(ProductWarranty.expiry_date).all())
+
+
+CONF_BINS = [(0.0, 0.5), (0.5, 0.6), (0.6, 0.7), (0.7, 0.8), (0.8, 0.9), (0.9, 1.0001)]
+
+
+def dashboard_extras(claim_query) -> dict:
+    """Operations KPIs and the extra charts on the admin overview (same scoped, filtered query as overview())."""
+    submitted = [c for c in claim_query.all() if c.status != Config.STATUS_DRAFT]
+    evals = _evaluations(submitted)
+    decided_auto = [c for c in submitted if c.final_decision in ("Likely Valid", "Likely Invalid")]
+    actions = [a for c in submitted for a in c.reviewer_actions if a.reviewer_decision in ("Approved", "Rejected")]
+    overrides = [a for a in actions if a.is_override]
+    latencies = [e.latency_ms for e in evals if e.latency_ms is not None]
+    compared = [e for e in evals if e.is_class_match is not None]
+
+    def hist(values):
+        return [sum(1 for v in values if lo <= v < hi) for lo, hi in CONF_BINS]
+    by_cat = {cat: Counter(c.final_decision for c in submitted if c.product.category == cat and c.final_decision) for cat in CATEGORIES}
+    return {
+        "automation_rate": round(len(decided_auto) / len(submitted), 4) if submitted else None,
+        "agreement_rate": round(sum(1 for e in compared if e.is_class_match) / len(compared), 4) if compared else None,
+        "override_rate": round(len(overrides) / len(actions), 4) if actions else None,
+        "overrides": len(overrides), "reviewed": len(actions),
+        "median_latency_ms": sorted(latencies)[len(latencies) // 2] if latencies else None,
+        "consistency_counts": OrderedDict((s, sum(1 for e in evals if e.model_consistency_status == s)) for s in CONSISTENCY_STATUSES),
+        "confidence_hist": {"labels": [f"{lo:.1f}–{min(hi, 1):.1f}" for lo, hi in CONF_BINS],
+                            "Python model": hist([e.python_top for e in evals if e.python_top is not None]),
+                            "Teachable Machine": hist([e.gtm_top for e in evals if e.gtm_top is not None])},
+        "category_decisions": {"labels": list(CATEGORIES),
+                               "series": [[d, [by_cat[cat].get(d, 0) for cat in CATEGORIES]] for d in DECISIONS]},
+    }

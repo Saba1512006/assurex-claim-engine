@@ -252,6 +252,8 @@
       "Likely Valid": "--valid", "Likely Invalid": "--invalid", "Manual Review Required": "--review-mark",
       "Valid Claim": "--valid", "Invalid Claim": "--invalid", "Manual Review": "--review-mark",
       "Python model": "--teal", "Teachable Machine": "--gtm",
+      "Strong Match": "--valid", "Acceptable Match": "--teal", "Weak Match": "--review-mark", "Model Disagreement": "--invalid",
+      "Uncertain Result": "--steel",
     };
     const build = () => {
       if (!window.Chart) return setTimeout(build, 50);
@@ -265,7 +267,9 @@
         const series = s.series ? (Array.isArray(s.series) ? s.series : Object.entries(s.series)) : [[s.label || "Count", s.values]];
         const datasets = series.map(([name, values], i) => ({
           label: name, data: values, type: s.type === "line" ? "line" : "bar",
-          backgroundColor: css(colour[name] || (i === 0 ? "--ink" : i === 1 ? "--teal" : "--gtm")),
+          backgroundColor: series.length === 1 && s.labels.every((l) => colour[l])
+            ? s.labels.map((l) => css(colour[l]))                          // one bar per category: colour by category
+            : css(colour[name] || (i === 0 ? "--ink" : i === 1 ? "--teal" : "--gtm")),
           borderColor: css(colour[name] || (i === 0 ? "--ink" : "--teal")),
           borderWidth: s.type === "line" ? 2 : 0, pointRadius: s.type === "line" ? 3 : 0, tension: 0,
           borderRadius: 2, maxBarThickness: 32,

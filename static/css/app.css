@@ -756,3 +756,5 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .chg { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); font-size: var(--fs-sm); }
 .chg del { color: var(--invalid); text-decoration: line-through; } .chg ins { color: var(--valid); text-decoration: none; font-weight: 600; }
 .chg-history .chg { margin-top: var(--s1); }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.kpis .stat { border-bottom: 1px solid var(--rule); }

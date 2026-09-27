@@ -61,7 +61,8 @@ def model_status() -> dict:
 def dashboard():
     f = _filters()
     q = analytics_service.apply_filters(scoped_claims(Claim), **f)
-    return render_template("admin/dashboard.html", o=analytics_service.overview(q), filters=request.args,
+    return render_template("admin/dashboard.html", o=analytics_service.overview(q), x=analytics_service.dashboard_extras(q),
+                           filters=request.args,
                            categories=CATEGORIES, statuses=Config.ALL_CLAIM_STATUSES, anomalies=anomalies(),
                            models=model_status(), expiring=expiring_warranties()[:6], window=alert_days(),
                            users=User.query.count(),

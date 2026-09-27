@@ -14,7 +14,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/analytics.html', 'admin/audit.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
