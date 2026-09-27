@@ -60,7 +60,7 @@
               </select>
               <span class="help" id="f-category-d">Decides which warranty policy applies.</span>
             </div>
-            {{ field('brand', 'Brand', form.get('brand', ''), required=True, attrs={'maxlength': '60'}) }}
+            {{ field('brand', 'Brand', form.get('brand', ''), required=True, attrs={'maxlength': '60', 'data-allow': 'words'}) }}
             {{ field('model_number', 'Model number', form.get('model_number', ''), required=True, mono=True, attrs={'maxlength': '60', 'data-fill': 'model_number'}) }}
             {{ field('serial_number', 'Serial number', form.get('serial_number', ''), required=True, mono=True, hint='As printed on the product label.',
                      attrs={'minlength': '4', 'maxlength': '60', 'data-fill': 'serial_number'}) }}
@@ -71,8 +71,8 @@
           <div class="panel-h"><h2 id="pu-h">Purchase</h2></div>
           <div class="panel-b form-grid">
             {{ field('purchase_date', 'Purchase date', form.get('purchase_date', ''), type='date', required=True, attrs={'max': today.isoformat(), 'data-fill': 'purchase_date'}) }}
-            {{ field('purchase_price', 'Price paid', form.get('purchase_price', ''), required=True, mono=True, attrs={'inputmode': 'decimal', 'pattern': '[0-9]+([.,][0-9]{1,2})?', 'data-fill': 'purchase_amount'}) }}
-            {{ field('retailer', 'Retailer', form.get('retailer', ''), required=True, attrs={'maxlength': '120', 'data-fill': 'retailer'}) }}
+            {{ field('purchase_price', 'Price paid', form.get('purchase_price', ''), required=True, mono=True, attrs={'inputmode': 'decimal', 'pattern': '[0-9]+([.,][0-9]{1,2})?', 'data-fill': 'purchase_amount', 'data-allow': 'decimal'}) }}
+            {{ field('retailer', 'Retailer', form.get('retailer', ''), required=True, attrs={'maxlength': '100', 'data-fill': 'retailer', 'data-allow': 'words'}) }}
             {{ field('invoice_number', 'Invoice number', form.get('invoice_number', ''), mono=True, hint='Optional, but it lets us spot a receipt used twice.', attrs={'maxlength': '40', 'data-fill': 'invoice_number'}) }}
           </div>
         </section>
@@ -89,7 +89,7 @@
             </fieldset>
             {{ field('warranty_months', 'Length in months', form.get('warranty_months', ''), type='number', required=True, hint='Filled from the category when you choose one.',
                      attrs={'min': '1', 'max': '120', 'data-months': True, 'data-fill': 'warranty_duration_months'}) }}
-            {{ field('warranty_provider', 'Warranty provider', form.get('warranty_provider', ''), hint="Leave empty for the brand's manufacturer warranty.", attrs={'maxlength': '100'}) }}
+            {{ field('warranty_provider', 'Warranty provider', form.get('warranty_provider', ''), hint="Leave empty for the brand's manufacturer warranty.", attrs={'maxlength': '100', 'data-allow': 'words'}) }}
             {% if not staff %}
             <div class="field full">
               <label for="f-center">Preferred authorised service center</label>

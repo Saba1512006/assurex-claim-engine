@@ -106,10 +106,10 @@
       <details class="panel-f"><summary><i class="bi bi-plus-circle" aria-hidden="true"></i> Record a repair</summary>
         <form class="form-grid mt-2" method="post" action="{{ url_for('products.add_repair', product_id=product.product_id) }}">{{ csrf() }}
           {{ field('repair_date', 'Repair date', type='date', required=True, attrs={'max': today.isoformat()}) }}
-          {{ field('repair_center', 'Repair center', required=True, attrs={'maxlength': '120'}) }}
+          {{ field('repair_center', 'Repair center', required=True, attrs={'maxlength': '120', 'data-allow': 'words'}) }}
           {{ field('replaced_parts', 'Parts replaced', attrs={'maxlength': '255'}) }}
           <div class="field"><label for="f-outcome">Outcome</label><select class="select" id="f-outcome" name="outcome">{% for o in ['Repaired', 'Replaced', 'Not repairable', 'Pending'] %}<option>{{ o }}</option>{% endfor %}</select></div>
-          {{ field('repair_cost', 'Cost', '0', attrs={'inputmode': 'decimal', 'pattern': '[0-9]+([.][0-9]{1,2})?'}, hint='In the purchase currency.') }}
+          {{ field('repair_cost', 'Cost', '0', attrs={'inputmode': 'decimal', 'pattern': '[0-9]+([.][0-9]{1,2})?', 'data-allow': 'decimal'}, hint='In the purchase currency.') }}
           {{ field('serial_number_seen', 'Serial seen on the unit', mono=True, attrs={'placeholder': product.serial_number}) }}
           <label class="check full"><input type="checkbox" name="is_authorized_center" value="1" checked> Done by an authorised service center</label>
           <div class="full">{{ field('notes', 'Notes', attrs={'maxlength': '500'}) }}</div>
@@ -134,7 +134,7 @@
     {% call ui_panel('Correct details', hint='Locked once a claim is submitted') %}
       <form class="stack-sm" method="post" action="{{ url_for('products.update_product', product_id=product.product_id) }}">{{ csrf() }}
         {{ field('product_name', 'Product name', product.product_name, id='u-name', attrs={'maxlength': '120'}) }}
-        {{ field('retailer', 'Retailer', product.retailer, id='u-retailer', attrs={'maxlength': '120'}) }}
+        {{ field('retailer', 'Retailer', product.retailer, id='u-retailer', attrs={'maxlength': '100', 'data-allow': 'words'}) }}
         {{ field('invoice_number', 'Invoice number', product.invoice_number, id='u-invoice', mono=True, attrs={'maxlength': '40'}) }}
         {{ field('purchase_date', 'Purchase date', product.purchase_date.isoformat(), type='date', id='u-date', attrs={'max': today.isoformat()}) }}
         {{ field('warranty_months', 'Warranty months', w.duration_months if w else '', type='number', id='u-months', attrs={'min': '1', 'max': '120'}) }}

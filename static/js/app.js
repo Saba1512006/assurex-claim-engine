@@ -168,6 +168,46 @@
   }));
   $$("[data-autosubmit]").forEach((el) => el.addEventListener("change", () => (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())));
 
+  /* typing filters: <input data-allow="name | words | phone | decimal"> drops the characters that field can't hold as they
+     are typed or pasted and says why under it for a moment; number inputs refuse letters (and e, + or -) the same way.
+     The server applies the same rules, so this is convenience, not the check. */
+  const ALLOW = {
+    name: [/[^\p{L}\s.'-]/gu, "Letters only: a name can't contain numbers or symbols."],
+    words: [/[^\p{L}\s.,&'()\/-]/gu, "Letters only: numbers aren't allowed in this field."],
+    phone: [/[^\d\s()+-]/g, "Digits only: a phone number can't contain letters."],
+    decimal: [/[^\d.,]/g, "Numbers only, for example 1250.50."],
+  };
+  const refuse = (el, msg) => {
+    if (!el.getAttribute("aria-describedby") && el.id) {             // a bare field gets a hint line to speak through
+      const hint = document.createElement("span");
+      hint.className = "help"; hint.id = `${el.id}-d`;
+      el.after(hint); el.setAttribute("aria-describedby", hint.id);
+    }
+    describe(el, msg);
+    el.setAttribute("aria-invalid", "true");
+    clearTimeout(el.axRefuse);
+    el.axRefuse = setTimeout(() => { el.removeAttribute("aria-invalid"); describe(el, ""); }, 2400);
+  };
+  document.addEventListener("input", (e) => {
+    const el = e.target, rule = el.dataset && ALLOW[el.dataset.allow];
+    if (!rule) return;
+    const v = el.value, stripped = v.replace(rule[0], "");
+    const clean = /^(name|words)$/.test(el.dataset.allow) ? stripped.replace(/ {2,}/g, " ") : stripped;
+    if (clean === v) return;
+    const at = Math.max(0, (el.selectionStart ?? clean.length) - (v.length - clean.length));
+    el.value = clean;
+    try { el.setSelectionRange(at, at); } catch { /* not a text input */ }
+    if (stripped !== v) refuse(el, rule[1]);
+  });
+  document.addEventListener("keydown", (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== "number" || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+    const decimals = /\./.test(el.step || ""), negative = el.min === "" || Number(el.min) < 0;
+    if (/\d/.test(e.key) || (decimals && e.key === ".") || (negative && e.key === "-")) return;
+    e.preventDefault();
+    refuse(el, decimals ? "Numbers only, for example 0.85." : "Whole numbers only.");
+  });
+
   /* character counters: <textarea data-counter="20:1000"> + <span data-counter-for="id"> */
   $$("[data-counter]").forEach((el) => {
     const [min, max] = el.dataset.counter.split(":").map(Number);

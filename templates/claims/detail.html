@@ -71,7 +71,7 @@
                       {% for key, label in [('invoice_number', 'Invoice number'), ('purchase_date', 'Purchase date'), ('serial_number', 'Serial number'), ('model_number', 'Model'), ('retailer', 'Retailer'), ('purchase_amount', 'Amount')] %}
                         {% set mism = (key == 'serial_number' and ocr.get(key) and ocr.get(key)|replace('-', '')|upper != p.serial_number|replace('-', '')|upper) %}
                         <div class="field"><label for="o-{{ d.document_id }}-{{ key }}">{{ label }}</label>
-                          <input class="input sm{{ ' mono' if key in ['invoice_number', 'serial_number', 'model_number'] }}{{ ' mismatch' if mism }}" id="o-{{ d.document_id }}-{{ key }}" name="{{ key }}" value="{{ ocr.get(key, '') }}" aria-describedby="o-{{ d.document_id }}-{{ key }}-d">
+                          <input class="input sm{{ ' mono' if key in ['invoice_number', 'serial_number', 'model_number'] }}{{ ' mismatch' if mism }}" id="o-{{ d.document_id }}-{{ key }}" name="{{ key }}" value="{{ ocr.get(key, '') }}" aria-describedby="o-{{ d.document_id }}-{{ key }}-d"{% if key == 'purchase_amount' %} inputmode="decimal" data-allow="decimal"{% elif key == 'retailer' %} data-allow="words"{% endif %}>
                           <span class="help" id="o-{{ d.document_id }}-{{ key }}-d">{% if mism %}Differs from the registered serial {{ p.serial_number }}.{% endif %}</span></div>
                       {% endfor %}
                       <div class="full row"><button class="btn quiet sm" type="submit">Save corrections</button><span class="tiny muted">Corrections are recorded in the audit trail.</span></div>

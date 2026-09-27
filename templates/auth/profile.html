@@ -27,9 +27,9 @@
     {% call ui_panel('Contact details', id='details') %}
       <form class="form-grid" method="post">
         {{ csrf() }}<input type="hidden" name="action" value="details">
-        <div class="full">{{ field('full_name', 'Full name', user.full_name, required=True, attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}</div>
+        <div class="full">{{ field('full_name', 'Full name', user.full_name, required=True, attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100', 'data-allow': 'name'}) }}</div>
         {{ field('email_ro', 'Email', user.email, hint='Ask an administrator to change your sign-in email.', attrs={'disabled': True}) }}
-        {{ field('phone', 'Phone', user.phone_number, type='tel', hint='Optional. 7 to 15 digits.', attrs={'autocomplete': 'tel'}) }}
+        {{ field('phone', 'Phone', user.phone_number, type='tel', hint='Optional. 7 to 15 digits.', attrs={'autocomplete': 'tel', 'data-allow': 'phone', 'inputmode': 'tel'}) }}
         <div class="full">{{ field('address', 'Address', user.address, hint='Optional.', attrs={'autocomplete': 'street-address', 'maxlength': '200'}) }}</div>
         <div class="full"><button class="btn" type="submit">Save details</button></div>
       </form>

@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from database.db import db
 from src.models.entities import AuditLog, ServiceCenter, User
+from src.rules.validator import person_name_problem, phone_problem, words_problem
 from src.security import rbac
 from src.security.guards import invalidate_sessions, require
 from src.services.audit import audit
@@ -50,7 +51,10 @@ def invite():
     name = request.form.get("full_name", "").strip()
     role = request.form.get("role", "")
     center = _center(request.form.get("service_center_id"))
-    if role not in rbac.roles() or not EMAIL_RE.match(email) or not 2 <= len(name) <= 100:
+    if (problem := person_name_problem(name)):
+        flash(problem, "warning")
+        return redirect(url_for(".index"))
+    if role not in rbac.roles() or not EMAIL_RE.match(email):
         flash("Enter a name, a valid email and a role.", "warning")
         return redirect(url_for(".index"))
     if User.query.filter_by(email=email).first():
@@ -137,12 +141,16 @@ def force_sign_out(user_code):
 @require("user.manage")
 def add_center():
     name, city = request.form.get("name", "").strip(), request.form.get("city", "").strip()
+    phone = request.form.get("phone", "").strip()
+    problem = words_problem(name, "Service center name") or words_problem(city, "City") or phone_problem(phone)
     if not 3 <= len(name) <= 120 or not 2 <= len(city) <= 80:
         flash("Enter the service center's name and city.", "warning")
+    elif problem:
+        flash(problem, "warning")
     elif ServiceCenter.query.filter(func.lower(ServiceCenter.name) == name.lower()).first():
         flash("A service center with that name already exists.", "warning")
     else:
-        c = ServiceCenter(name=name, city=city, phone=request.form.get("phone", "").strip() or None)
+        c = ServiceCenter(name=name, city=city, phone=phone or None)
         db.session.add(c)
         db.session.flush()
         audit("SERVICE_CENTER_CREATED", "ServiceCenter", c.center_id, name=name)

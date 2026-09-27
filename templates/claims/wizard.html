@@ -125,7 +125,7 @@
                   {% for key, label in [('invoice_number', 'Invoice number'), ('purchase_date', 'Purchase date'), ('serial_number', 'Serial number'), ('model_number', 'Model'), ('retailer', 'Retailer'), ('purchase_amount', 'Amount')] %}
                     <div class="field">
                       <label for="v-{{ key }}">{{ label }}</label>
-                      <input class="input{{ ' mono' if key in ('invoice_number', 'serial_number', 'model_number', 'purchase_amount') }}" id="v-{{ key }}" name="verified_{{ key }}" data-ocr-field="{{ key }}" aria-describedby="v-{{ key }}-d" maxlength="120">
+                      <input class="input{{ ' mono' if key in ('invoice_number', 'serial_number', 'model_number', 'purchase_amount') }}" id="v-{{ key }}" name="verified_{{ key }}" data-ocr-field="{{ key }}" aria-describedby="v-{{ key }}-d" maxlength="120"{% if key == 'purchase_amount' %} inputmode="decimal" data-allow="decimal"{% elif key == 'retailer' %} data-allow="words"{% endif %}>
                       <span class="help" id="v-{{ key }}-d" data-ocr-note="{{ key }}"></span>
                     </div>
                   {% endfor %}

@@ -21,7 +21,7 @@
       <form method="post" class="auth-form-fields form-2{{ ' shake' if alerts }}">
         {{ csrf() }}
         {{ field('full_name', 'Full name', form.get('full_name', ''), required=True, error=errors.full_name,
-                 attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100'}) }}
+                 attrs={'autocomplete': 'name', 'minlength': '2', 'maxlength': '100', 'data-allow': 'name'}) }}
         {{ field('email', 'Email', form.get('email', ''), type='email', required=True, error=errors.email,
                  attrs={'autocomplete': 'email', 'maxlength': '120'}) }}
         <div class="field">
@@ -46,7 +46,7 @@
           {% else %}<span class="help match-hint" id="f-confirm_password-d" data-match-label aria-live="polite"></span>{% endif %}
         </div>
         {{ field('phone', 'Phone', form.get('phone', ''), type='tel', hint='Optional. 7 to 15 digits.', error=errors.phone,
-                 attrs={'autocomplete': 'tel', 'placeholder': '+92 300 1234567'}) }}
+                 attrs={'autocomplete': 'tel', 'placeholder': '+92 300 1234567', 'data-allow': 'phone', 'inputmode': 'tel'}) }}
         {{ field('address', 'City or address', form.get('address', ''), hint='Optional.', attrs={'autocomplete': 'street-address', 'maxlength': '200'}) }}
         <div class="full"><button class="btn lg block" type="submit">Create account</button></div>
       </form>

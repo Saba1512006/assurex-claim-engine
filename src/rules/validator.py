@@ -5,6 +5,7 @@ warnings are shown but do not block. Messages are written for the user.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 
 from src.core.vocab import (CATEGORIES, DAMAGE_TYPES, DEFAULT_DIAGNOSTIC_CONFIDENCE, DOCUMENT_LABELS, FAULTS,
@@ -16,12 +17,50 @@ MAX_TEXT = {"product_name": 120, "brand": 60, "model_number": 60, "serial_number
             "previous_replacement_details": 255}
 
 
+# What each kind of text field may hold. A person's name and the name of a shop, brand, city or service center are
+# words, so they take no digits; a phone number takes no letters. Codes (model, serial, invoice) and free text are
+# left open because real values mix both.
+PERSON_NAME_RE = re.compile(r"^[^\W\d_]+(?:[ .'-]+[^\W\d_]+)*\.?$")
+WORDS_RE = re.compile(r"^[^\W\d_](?:[^\W\d_]|[ .,&'()/-])*$")
+PHONE_RE = re.compile(r"^\+?[\d\s()-]+$")
+WORD_FIELDS = {"brand": "Brand", "retailer": "Retailer", "warranty_provider": "Warranty provider"}
+
+
+def person_name_problem(name: str, label: str = "Full name") -> str | None:
+    """None when the name is 2 to 100 characters of letters, spaces, dots, apostrophes and hyphens."""
+    if not 2 <= len(name) <= 100:
+        return f"Enter the {label.lower()} (2 to 100 characters)."
+    if not PERSON_NAME_RE.match(name):
+        return f"{label} can only use letters, spaces, dots, apostrophes and hyphens; no numbers."
+    return None
+
+
+def words_problem(value: str, label: str) -> str | None:
+    """None when an optional name of a place or organisation has no digits or symbols beyond . , & ' ( ) / -"""
+    if value and not WORDS_RE.match(value):
+        return f"{label} can only use letters, spaces and . , & ' ( ) / -; no numbers."
+    return None
+
+
+def phone_problem(phone: str) -> str | None:
+    """None for an empty phone, or 7 to 15 digits with an optional leading + and spaces, dashes or brackets."""
+    if not phone:
+        return None
+    if not PHONE_RE.match(phone):
+        return "Phone numbers can only use digits, spaces, dashes, brackets and a leading +; no letters."
+    if not 7 <= len(re.sub(r"\D", "", phone)) <= 15:
+        return "Phone numbers need between 7 and 15 digits."
+    return None
+
+
 def _text(form, key, label, errors, required=True, min_len=1):
     value = (form.get(key) or "").strip()
     if required and len(value) < min_len:
         errors.append(f"{label} is required." if min_len == 1 else f"{label} needs at least {min_len} characters.")
     if len(value) > MAX_TEXT.get(key, 255):
         errors.append(f"{label} can be at most {MAX_TEXT.get(key, 255)} characters.")
+    if key in WORD_FIELDS and (problem := words_problem(value, label)):
+        errors.append(problem)
     return value
 
 

@@ -12,6 +12,7 @@ from src.models.entities import AuditLog, Claim, Notification, Product, User
 from src.security import rbac
 from src.security.guards import (LOCKED_MESSAGE, invalidate_sessions, login_user, registration_role, require,
                                  safe_next)
+from src.rules.validator import person_name_problem, phone_problem
 from src.services.audit import audit
 from src.services.demo_bench import card_reading
 
@@ -28,13 +29,6 @@ def password_problem(password: str, confirm: str | None = None) -> str | None:
         return "Your password needs at least one letter and one number."
     if confirm is not None and password != confirm:
         return "The two passwords don't match."
-    return None
-
-
-def phone_problem(phone: str) -> str | None:
-    digits = re.sub(r"\D", "", phone or "")
-    if phone and not 7 <= len(digits) <= 15:
-        return "Phone numbers need between 7 and 15 digits."
     return None
 
 
@@ -74,7 +68,7 @@ def register():
         email = form.get("email", "").strip().lower()
         password = form.get("password", "")
         errors = {k: v for k, v in {
-            "full_name": None if 2 <= len(name) <= 100 else "Enter your full name (2 to 100 characters).",
+            "full_name": person_name_problem(name),
             "email": None if EMAIL_RE.match(email) else "Enter a valid email address, like name@example.com.",
             "password": password_problem(password),
             "confirm_password": None if password == form.get("confirm_password", "") else "The two passwords don't match.",
@@ -124,7 +118,7 @@ def profile():
         if action == "details":
             name = request.form.get("full_name", "").strip()
             phone = request.form.get("phone", "").strip()
-            problem = (None if 2 <= len(name) <= 100 else "Enter your full name.") or phone_problem(phone)
+            problem = person_name_problem(name) or phone_problem(phone)
             if problem:
                 flash(problem, "warning")
             else:

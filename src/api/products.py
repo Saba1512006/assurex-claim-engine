@@ -220,6 +220,8 @@ def add_repair(product_id):
         errors.append("Enter a repair date that is not in the future.")
     if not f.get("repair_center", "").strip():
         errors.append("Enter the repair center.")
+    elif (problem := validator.words_problem(f["repair_center"].strip(), "Repair center")):
+        errors.append(problem)
     try:
         cost = round(float(f.get("repair_cost") or 0), 2)
         if cost < 0:

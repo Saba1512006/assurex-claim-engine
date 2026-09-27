@@ -87,7 +87,7 @@
     <aside class="stack">
       {% call ui_panel('Invite someone', id='invite') %}
         <form class="stack-sm" method="post" action="{{ url_for('access.invite') }}">{{ csrf() }}
-          <div class="field"><label for="iv-name">Full name <span class="req">(required)</span></label><input class="input" id="iv-name" name="full_name" required minlength="2" maxlength="100" autocomplete="off"></div>
+          <div class="field"><label for="iv-name">Full name <span class="req">(required)</span></label><input class="input" id="iv-name" name="full_name" required minlength="2" maxlength="100" autocomplete="off" data-allow="name"></div>
           <div class="field"><label for="iv-email">Work email <span class="req">(required)</span></label><input class="input" id="iv-email" type="email" name="email" required maxlength="120" autocomplete="off"></div>
           <div class="field"><label for="iv-role">Role</label><select class="select" id="iv-role" name="role" data-invite-role required>{% for r, spec in policy.roles.items() %}<option value="{{ r }}">{{ spec.label }}</option>{% endfor %}</select></div>
           <div class="field" data-center-field hidden><label for="iv-center">Service center</label><select class="select" id="iv-center" name="service_center_id">{% for c in centers %}<option value="{{ c.id }}">{{ c.name }}, {{ c.city }}</option>{% endfor %}</select></div>
@@ -109,9 +109,9 @@
       {% call ui_panel('Service centers', id='centers', body='') %}
         <ul class="list">{% for c in centers %}<li><div class="grow"><div class="ttl small">{{ c.name }}</div><div class="sub">{{ c.city }}{% if c.phone %} · {{ c.phone }}{% endif %} · <span class="id">{{ c.center_id }}</span></div></div></li>{% endfor %}</ul>
         <form class="panel-f form-grid" method="post" action="{{ url_for('access.add_center') }}">{{ csrf() }}
-          <div class="field full"><label for="sc-name">Center name</label><input class="input" id="sc-name" name="name" required maxlength="120"></div>
-          <div class="field"><label for="sc-city">City</label><input class="input" id="sc-city" name="city" required maxlength="80"></div>
-          <div class="field"><label for="sc-phone">Phone</label><input class="input" id="sc-phone" name="phone" maxlength="30" type="tel"></div>
+          <div class="field full"><label for="sc-name">Center name</label><input class="input" id="sc-name" name="name" required minlength="3" maxlength="120" data-allow="words"></div>
+          <div class="field"><label for="sc-city">City</label><input class="input" id="sc-city" name="city" required minlength="2" maxlength="80" data-allow="words"></div>
+          <div class="field"><label for="sc-phone">Phone</label><input class="input" id="sc-phone" name="phone" maxlength="30" type="tel" inputmode="tel" data-allow="phone"></div>
           <div class="full"><button class="btn quiet sm" type="submit">Add the center</button></div>
         </form>
       {% endcall %}

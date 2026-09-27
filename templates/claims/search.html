@@ -36,8 +36,8 @@
           <div class="field"><label for="q-w">Warranty</label><select class="select" id="q-w" name="warranty"><option value="">Any</option>{% for s in ['Active', 'Expiring soon', 'Expired'] %}<option {{ 'selected' if args.get('warranty') == s }}>{{ s }}</option>{% endfor %}</select></div>
           <div class="field"><label for="q-risk">Risk</label><select class="select" id="q-risk" name="risk"><option value="">Any</option>{% for r in ['Low', 'Medium', 'High'] %}<option {{ 'selected' if args.get('risk') == r }}>{{ r }}</option>{% endfor %}</select></div>
           {% if details %}
-          <div class="field narrow"><label for="q-cmin">Python confidence from</label><input class="input mono" id="q-cmin" name="conf_min" value="{{ args.get('conf_min', '') }}" placeholder="0.00" inputmode="decimal"></div>
-          <div class="field narrow"><label for="q-cmax">to</label><input class="input mono" id="q-cmax" name="conf_max" value="{{ args.get('conf_max', '') }}" placeholder="1.00" inputmode="decimal"></div>
+          <div class="field narrow"><label for="q-cmin">Python confidence from</label><input class="input mono" id="q-cmin" name="conf_min" value="{{ args.get('conf_min', '') }}" placeholder="0.00" inputmode="decimal" data-allow="decimal"></div>
+          <div class="field narrow"><label for="q-cmax">to</label><input class="input mono" id="q-cmax" name="conf_max" value="{{ args.get('conf_max', '') }}" placeholder="1.00" inputmode="decimal" data-allow="decimal"></div>
           {% endif %}
           {% if current_user.role != 'customer' %}
           <div class="field"><label for="q-rev">Reviewer</label><select class="select" id="q-rev" name="reviewer"><option value="">Anyone</option><option value="unassigned" {{ 'selected' if args.get('reviewer') == 'unassigned' }}>Unassigned</option>{% for r in reviewers %}<option value="{{ r.user_id }}" {{ 'selected' if args.get('reviewer') == r.user_id }}>{{ r.full_name }}</option>{% endfor %}</select></div>
