@@ -199,6 +199,37 @@ def what_if_apply():
     return redirect(url_for("admin.what_if"))
 
 
+# ------------------------------------------------------------------ batch evaluation
+@admin_bp.get("/batch")
+@require("settings.manage")
+def batch():
+    from src.models.entities import BatchRun
+    from src.services import batch as batch_service
+    runs = BatchRun.query.order_by(BatchRun.id.desc()).limit(10).all()
+    return render_template("admin/batch.html", runs=[(r, batch_service.summary(r)) for r in runs],
+                           required=batch_service.REQUIRED, max_rows=batch_service.MAX_ROWS, chunk=batch_service.CHUNK)
+
+
+@admin_bp.get("/batch/example.csv")
+@require("settings.manage")
+def batch_example():
+    """The 225-claim test split: a ready-made file to try the batch evaluator with (labels included)."""
+    return send_file(ROOT / "data" / "splits" / "test.csv", mimetype="text/csv", as_attachment=True,
+                     download_name="assurex_test_split.csv")
+
+
+@admin_bp.get("/batch/<string:batch_id>.csv")
+@require("settings.manage")
+def batch_csv(batch_id):
+    from src.models.entities import BatchRun
+    from src.services import batch as batch_service
+    b = BatchRun.query.filter_by(batch_id=batch_id).first_or_404()
+    audit("DATA_EXPORTED", "BatchRun", b.batch_id, rows=b.processed, format="csv")
+    db.session.commit()
+    return Response(batch_service.to_csv(b), mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename=assurex_{b.batch_id}.csv"})
+
+
 # ------------------------------------------------------------------ models (SRS xviii-xxi, xlviii)
 @admin_bp.get("/models")
 @require("settings.manage")

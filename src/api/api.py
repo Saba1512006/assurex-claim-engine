@@ -97,3 +97,45 @@ def what_if():
         return ok(whatif.simulate(request.get_json(silent=True) or {}))
     except whatif.WhatIfError as exc:
         return fail(ErrorCode.VALIDATION_FAILED, str(exc))
+
+
+def _batch_payload(b):
+    from src.services import batch as batch_service
+    return {**batch_service.summary(b), "step_url": url_for("api.batch_step", batch_id=b.batch_id),
+            "csv_url": url_for("admin.batch_csv", batch_id=b.batch_id)}
+
+
+@api_bp.post("/admin/batch")
+@require("settings.manage")
+@limiter.limit("3/hour")
+def batch_create():
+    """Validate an uploaded CSV and queue it; the page then calls the step endpoint until it is done."""
+    from src.services import batch as batch_service
+    from src.services.audit import audit
+    try:
+        filename, rows = batch_service.parse(request.files.get("file"))
+    except batch_service.BatchError as exc:
+        return fail(ErrorCode.VALIDATION_FAILED, str(exc), fields={"file": str(exc), "rows": exc.rows})
+    b = batch_service.create(g.user, filename, rows)
+    audit("BATCH_CREATED", "BatchRun", b.batch_id, rows=len(rows), filename=filename)
+    db.session.commit()
+    return ok(_batch_payload(b), status=201)
+
+
+@api_bp.post("/admin/batch/<string:batch_id>/step")
+@require("settings.manage")
+@limiter.limit("120/minute")
+def batch_step(batch_id):
+    from src.models.entities import BatchRun
+    from src.services import batch as batch_service
+    from src.services.audit import audit
+    b = BatchRun.query.filter_by(batch_id=batch_id).first()
+    if b is None:
+        return fail(ErrorCode.NOT_FOUND)
+    was = b.status
+    batch_service.step(b)
+    if b.status != was and b.status in ("done", "failed"):
+        audit("BATCH_COMPLETED" if b.status == "done" else "BATCH_FAILED", "BatchRun", b.batch_id,
+              **{k: v for k, v in batch_service.summary(b).items() if k in ("processed", "decision_accuracy", "error")})
+    db.session.commit()
+    return ok(_batch_payload(b))

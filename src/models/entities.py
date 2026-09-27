@@ -562,3 +562,29 @@ class SystemSetting(db.Model):
             if description:
                 row.description = description
         return row
+
+
+class BatchRun(db.Model):
+    """Admin batch evaluation of an uploaded CSV. Processed a chunk per poll (no background worker needed);
+    nothing is written to claims; results are kept for download."""
+    __tablename__ = "batch_runs"
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.String(32), unique=True, nullable=False, default=lambda: generate_uuid("BAT"))
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    filename = db.Column(db.String(150), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="queued")      # queued | running | done | failed
+    total = db.Column(db.Integer, nullable=False, default=0)
+    processed = db.Column(db.Integer, nullable=False, default=0)
+    rows_json = db.Column(db.Text, nullable=False, default="[]")
+    results_json = db.Column(db.Text, nullable=False, default="[]")
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    created_by = db.relationship("User")
+
+    def rows(self) -> list:
+        return json.loads(self.rows_json or "[]")
+
+    def results(self) -> list:
+        return json.loads(self.results_json or "[]")

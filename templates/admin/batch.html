@@ -1,0 +1,63 @@
+{% extends "components/base.html" %}
+{# Batch evaluator: upload a CSV in the training-split schema; the page runs it {{ chunk }} rows at a time through the
+   production pipeline in chunks (no claims are created) and shows decisions and, when labels are present, accuracy. #}
+{% from "components/ui.html" import csrf, empty_state, tag, panel as ui_panel %}
+{% block title %}Batch evaluation{% endblock %}
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('admin.dashboard') }}">Overview</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span aria-current="page">Batch</span></nav>
+    <h1>Batch evaluation</h1>
+    <p class="lede">Run up to {{ max_rows }} claim records through both models, the warranty rules and the decision table. Nothing is saved as a claim; results are kept here for download.</p>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div class="split">
+  <div class="stack">
+    <form class="panel" method="post" enctype="multipart/form-data" data-batch-form data-url="{{ url_for('api.batch_create') }}" aria-labelledby="up-h">
+      {{ csrf() }}
+      <div class="panel-h"><h2 id="up-h">Upload</h2><span class="hint">CSV, UTF-8, at most 2 MB and {{ max_rows }} rows</span></div>
+      <div class="panel-b stack-sm">
+        <label class="dropzone" data-dropzone data-max="2" data-accept=".csv">
+          <span class="ico" aria-hidden="true"><i class="bi bi-filetype-csv"></i></span>
+          <span class="grow"><b class="small">Claim records</b><span class="meta" data-file-meta>Same columns as the training splits. A claim_class column adds accuracy.</span>
+            <input type="file" name="file" accept=".csv" required aria-describedby="up-d"></span>
+        </label>
+        <p class="help mb-0" id="up-d">No file to hand? <a href="{{ url_for('admin.batch_example') }}">Download the 225-claim test split</a> and upload it.</p>
+        <details><summary class="small linkish">Required columns ({{ required|length }})</summary>
+          <p class="mono tiny mt-2 mb-0 wrap-any">{{ required|join(', ') }}</p></details>
+        <div class="callout bad small hidden" data-batch-error role="alert"><b data-batch-error-msg></b><ul class="bullets mt-1 mb-0" data-batch-error-rows></ul></div>
+        <div><button class="btn" type="submit">Run the batch</button></div>
+      </div>
+    </form>
+
+    <section class="panel hidden" data-batch-progress aria-labelledby="pr-h">
+      <div class="panel-h"><h2 id="pr-h">Running <span class="id" data-batch-id></span></h2><span class="hint mono" data-batch-count aria-live="polite"></span></div>
+      <div class="panel-b stack-sm">
+        <div class="meter teal" data-batch-meter role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Batch progress"><i></i></div>
+        <div class="metric-grid" data-batch-summary></div>
+        <div class="row tight hidden" data-batch-done><a class="btn" data-batch-csv href="#"><i class="bi bi-download" aria-hidden="true"></i>Download results (CSV)</a>
+          <a class="btn quiet" href="{{ url_for('admin.batch') }}">Run another</a></div>
+      </div>
+    </section>
+  </div>
+
+  <aside class="stack" aria-label="Recent batches">
+    {% call ui_panel('Recent batches', body='') %}
+      {% if runs %}
+      <ul class="list">
+        {% for r, s in runs %}
+          <li><div class="grow"><div class="ttl small">{{ r.filename }}</div>
+              <div class="sub"><span class="id">{{ r.batch_id }}</span> · {{ r.processed }}/{{ r.total }} · {{ r.created_at|date('%d %b %H:%M') }}
+                {% if s.decision_accuracy is defined %} · decision accuracy <span class="mono">{{ '%.1f%%'|format(s.decision_accuracy * 100) }}</span>{% endif %}</div></div>
+            {% if r.status == 'done' %}<a class="btn quiet sm" href="{{ url_for('admin.batch_csv', batch_id=r.batch_id) }}">CSV<span class="sr"> for {{ r.batch_id }}</span></a>
+            {% else %}{{ tag(r.status|capitalize, 'invalid' if r.status == 'failed' else 'review') }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% else %}{{ empty_state('No batches yet', 'Upload a file to run the first one.', icon='bi-collection') }}{% endif %}
+    {% endcall %}
+  </aside>
+</div>
+{% endblock %}
+{% block page_js %}<script src="{{ asset('js/batch.js') }}" defer></script>{% endblock %}

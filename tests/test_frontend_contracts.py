@@ -266,3 +266,66 @@ def test_what_if_apply_saves_a_new_version_and_audits(app, client):
         assert "what-if" in log.details_json and "auto_accuracy" in log.details_json
     finally:
         decision_table.POLICY_PATH.write_text(before)
+
+
+def _csv_upload(rows: int = 3, mutate=None):
+    import io
+    lines = (ROOT / "data" / "splits" / "test.csv").read_text(encoding="utf-8").splitlines()
+    body = [lines[0]] + lines[1:1 + rows]
+    if mutate:
+        body = mutate(body)
+    return {"file": (io.BytesIO("\n".join(body).encode()), "batch.csv")}
+
+
+def test_batch_runs_in_chunks_writes_no_claims_and_exports(app, client):
+    from src.services import batch as batch_service
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    r = client.post("/api/admin/batch", data=_csv_upload(25), content_type="multipart/form-data")
+    body = r.get_json()
+    assert r.status_code == 201 and body["data"]["status"] == "queued" and body["data"]["total"] == 25
+    steps, data = 0, body["data"]
+    while data["status"] in ("queued", "running"):
+        data = client.post(data["step_url"], json={}).get_json()["data"]
+        steps += 1
+    assert data["status"] == "done" and steps == -(-25 // batch_service.CHUNK)      # one chunk per call
+    assert data["labelled"] == 25 and 0 <= data["python_accuracy"] <= 1 and sum(data["decisions"].values()) == 25
+    assert Claim.query.count() == 0
+    csv_text = client.get(data["csv_url"]).get_data(as_text=True)
+    assert csv_text.splitlines()[0].startswith("claim_id,actual_class") and len(csv_text.splitlines()) == 26
+
+
+def test_batch_rejects_bad_files_with_row_errors(app, client):
+    make_user("ad@x.io", "administrator")
+    make_user("rv@x.io", "claim_reviewer")
+    login(client, "rv@x.io")
+    assert client.post("/api/admin/batch", data=_csv_upload(), content_type="multipart/form-data").status_code == 403
+    client.post("/logout")
+    login(client, "ad@x.io")
+    drop = lambda b: [",".join(line.split(",")[1:]) for line in b]                          # noqa: E731  first column gone
+    r = client.post("/api/admin/batch", data=_csv_upload(mutate=drop), content_type="multipart/form-data")
+    assert r.status_code == 400 and "Missing columns" in r.get_json()["error"]["message"]
+    bad_cat = lambda b: [b[0]] + [line.replace("Consumer Electronics", "Toys").replace("Home Appliances", "Toys").replace("Industrial Tools", "Toys") for line in b[1:]]  # noqa: E731
+    r = client.post("/api/admin/batch", data=_csv_upload(mutate=bad_cat), content_type="multipart/form-data")
+    err = r.get_json()["error"]
+    assert r.status_code == 400 and len(err["fields"]["rows"]) == 3 and err["fields"]["rows"][0].startswith("Row 2")
+
+
+def test_batch_upload_is_rate_limited(tmp_path, monkeypatch):
+    from config.config import TestConfig
+    from database.db import db
+    from src.app import create_app
+
+    class Limited(TestConfig):
+        RATELIMIT_ENABLED = True
+    monkeypatch.setattr(Limited, "UPLOAD_DIR", tmp_path / "uploads")
+    app = create_app(Limited)
+    with app.app_context():
+        db.create_all()
+        make_user("ad@x.io", "administrator")
+        c = app.test_client()
+        login(c, "ad@x.io")
+        codes = [c.post("/api/admin/batch", data={}, content_type="multipart/form-data").status_code for _ in range(4)]
+        assert codes == [400, 400, 400, 429]
+        db.session.remove()
+        db.drop_all()
