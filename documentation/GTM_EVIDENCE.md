@@ -86,4 +86,4 @@ manual review — there is no fallback model.
 | Full evaluation | `model/teachable_machine/evaluation.json`; comparison with the Python model in `reports/model_comparison_report.md` (application decision accuracy 92.0%) |
 | Incorrectly classified samples | `reports/gtm_misclassified_test.csv` (written by the evaluation) |
 | Retraining details | Run 1 on v2 cards → 54.2% test (archived as `gtm-ec95b4aa49b5`). Cause found with `notebooks/tm_replica_check.py`; card redesigned (v3); run 2 on v3 cards → 93.8% |
-| Screenshots | `screenshots/20`–`22` (run 1: training, under the hood, evaluation) and `23`–`25` (run 2) |
+| Screenshots | Run 1: `screenshots/20_gtm_training.png`, `22_gtm_evaluation.png`. Run 2: `23_gtm_v3_training.png`, `24_gtm_v3_preview_test.png`, `25_gtm_v3_evaluation.png` |

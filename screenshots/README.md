@@ -22,7 +22,8 @@ so the image-model column shows "Model unavailable" and valid-looking claims wai
 | 16_access_control.jpg | Access control: people, roles, permission matrix, blocked attempts |
 | 17_audit_trail.jpg | Audit trail |
 | 18_mobile_dashboard.jpg / 19_mobile_claim.jpg | Phone layout |
-| 20_gtm_training.png / 21_gtm_under_the_hood.png | Teachable Machine run 1 (v2 cards): classes, training, accuracy/loss curves |
+| 20_gtm_training.png | Teachable Machine run 1 (v2 cards): 700 images per class, epochs 50 / batch 16 / lr 0.001, model trained |
 | 22_gtm_evaluation.png | Run 1 evaluated in the app: 54.2% test accuracy (below target → card redesigned) |
-| 23_gtm_v3_training.png / 24_gtm_v3_under_the_hood.png | Teachable Machine run 2 (v3 cards) |
-| 25_gtm_v3_evaluation.png | Run 2 evaluated in the app: 93.8% test accuracy, 97.3% validation |
+| 23_gtm_v3_training.png | Teachable Machine run 2 (v3 colour-tile cards), model trained |
+| 24_gtm_v3_preview_test.png | Run 2 preview on an unseen card: dates conflict + late reporting + excluded cause → Invalid Claim 99% |
+| 25_gtm_v3_evaluation.png | Run 2 evaluated in the app: 93.8% test accuracy, 97.3% validation, 92.9% agreement with Python |
