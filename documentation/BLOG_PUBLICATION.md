@@ -3,9 +3,10 @@
 | Field | Value |
 |---|---|
 | Title | Building AssureX: two models, one rulebook, and why our first 100% was a bug |
-| Current text | [`documentation/TECHNICAL_BLOG.md`](TECHNICAL_BLOG.md) — 2,700+ words; also served in the app at `/blog` |
+| Current text | [`documentation/TECHNICAL_BLOG.md`](TECHNICAL_BLOG.md) — about 3,000 words; also served in the app at `/blog` |
+| Medium-ready copy | [`documentation/medium/`](medium/README.md) — `medium_article.html` (paste into Medium) + 5 images + step-by-step guide |
 | Published (first version) | https://medium.com/@samikhan031027/building-assurex-a-dual-model-warranty-claim-evaluation-system-8a30d3684111 |
-| Action needed | **Republish** the current text (the Medium article describes version 1, including its 100% score that turned out to be label leakage) and replace the link above |
+| Action needed | **Republish** the current text using `documentation/medium/` (the Medium article describes version 1, including its 100% score that turned out to be label leakage) and replace the link above |
 
 ## SRS topic coverage (page 35–36)
 

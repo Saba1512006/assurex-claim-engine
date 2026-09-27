@@ -231,11 +231,19 @@ correctly. That is the point of combining a model with rules: the model generali
 ## Model disagreement cases
 
 Disagreement is information, not failure. When the two models disagree the claim goes to a reviewer, who
-sees both predictions, every rule result and the evidence on one page. As a design check we simulated an
-image model that always agrees with the Python model: the rules and decision table then map 93% of test
-claims to their labelled class, and two-thirds of the remaining differences are the noisy labels. The
-measured comparison with the real Teachable Machine model is produced by one script
-(`reports/generate_comparison_report.py`) as soon as the export is installed.
+sees both predictions, every rule result and the evidence on one page.
+
+On the 225 test claims the two models predict the same class for 92.9% of them. The comparison statuses
+are 117 Strong Match, 68 Acceptable Match, 15 Uncertain Result, 13 Weak Match and 12 Model Disagreement —
+40 claims that no single model is allowed to settle. The disagreements are instructive. In several
+late-reporting and excluded-damage claims the Python model hesitates between *Invalid* and *Manual Review*
+while the image model is confident the claim is invalid: the card puts the red "Reported late" or
+"excluded cause" tile right in front of it. Some disagreements point at the data rather than the models: in two
+claims whose labels were deliberately flipped to simulate reviewer disagreement, the image model follows the
+policy and the Python model follows the flipped label. Whatever the cause,
+a disagreement never becomes an automatic decision: the decision table sends the claim to a person, usually
+with a rule result already explaining the problem. Across the whole test split the application's final decision matches the labelled class
+for 92.0% of claims.
 
 ## Testing results
 

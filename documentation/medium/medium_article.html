@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building AssureX: two models, one rulebook, and why our first 100% was a bug — Medium copy</title>
+<style>
+  body { max-width: 720px; margin: 40px auto; padding: 0 16px; font: 19px/1.6 Georgia, serif; color: #242424; background: #fff; }
+  h1 { font: 700 38px/1.2 -apple-system, Segoe UI, sans-serif; margin-bottom: 6px; }
+  h2.sub { font: 400 22px/1.4 -apple-system, Segoe UI, sans-serif; color: #6b6b6b; margin-top: 0; }
+  h3 { font: 700 26px/1.3 -apple-system, Segoe UI, sans-serif; margin-top: 40px; }
+  code { font: 15px Menlo, Consolas, monospace; background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+  .ph { background: #fff5c2; border: 2px dashed #d4a800; padding: 12px 14px; border-radius: 8px; font-family: sans-serif; font-size: 16px; }
+  .note { font: 15px/1.5 sans-serif; background: #eef4ff; border-radius: 8px; padding: 12px 14px; }
+</style></head>
+<body>
+<p class="note">Copy from the title down to the last line (Ctrl+A, Ctrl+C) and paste into a new Medium story.
+Then replace each yellow box with its image from <code>documentation/medium/images/</code>. This note is not part
+of the article — delete it after pasting.</p>
+<h1>Building AssureX: two models, one rulebook, and why our first 100% was a bug</h1>
+<h2 class="sub">How we built a warranty-claim engine that combines a Python classifier, a Google Teachable Machine image model and a configurable rule engine — and what we learned when our first version scored suspiciously well.</h2>
+<h3>The business problem</h3>
+<p>A warranty claim looks simple: a customer says a product broke, the manufacturer pays for the repair.
+Behind that sentence is a checklist that service centers run by hand thousands of times a month. Was the
+product bought when the customer says? Is the warranty still active, or inside its grace period? Is the
+fault covered, or is it water damage the policy excludes? Does the serial number on the unit match the
+receipt? Has someone already claimed on this invoice? Was the product opened by an unauthorised repair
+shop?</p>
+<p>Every one of those checks is easy on its own. Together they are slow, and different people apply them
+differently. The same claim can be approved on Monday and rejected on Tuesday. Fraud slips through when a
+receipt is reused for a second unit. Honest customers wait days for a decision that could have taken
+seconds. AssureX automates the first pass, explains every recommendation, and sends a claim to a human
+whenever the evidence is not clear.</p>
+<h3>Background and why it matters</h3>
+<p>Warranty cost goes straight to a manufacturer's bottom line, and a badly handled claim costs a customer.
+Two properties matter more than raw accuracy: <strong>consistency</strong> (the same facts always get the same
+answer) and <strong>accountability</strong> (anyone can see why an answer was given, and who changed it). That pushed us
+towards a design where machine learning supports decisions but a readable policy stays in charge, and
+where nothing happens without leaving a record.</p>
+<h3>The proposed solution</h3>
+<p>A customer — or a service-center employee helping a walk-in customer — registers a product with its
+receipt, then files a claim in four steps: pick the product, describe what happened, attach evidence,
+review. While they type, a checklist tells them what is missing, whether the reporting deadline is close,
+and whether the cause they chose is excluded for that product category.</p>
+<p>On submission the claim is evaluated twice, independently:</p>
+<ul>
+<li>a <strong>Python classification model</strong> reads the structured claim record;</li>
+<li>a <strong>Google Teachable Machine</strong> image model reads a picture of the same claim — the <em>Claim Summary Card</em>.</li>
+</ul>
+<p>A <strong>rule engine</strong> checks the category's warranty policy, and detectors look for <strong>contradictions</strong> and
+<strong>duplicates</strong>. A <strong>decision table</strong> combines everything into one of three recommendations: <em>Likely Valid</em>,
+<em>Likely Invalid</em> or <em>Manual Review Required</em>. Reviewers work a queue of the uncertain claims; customers
+follow their claim through eight stages; administrators get dashboards, analytics, exports and an audit
+trail.</p>
+<h3>Application architecture</h3>
+<p>The application is Flask with SQLAlchemy. Requests pass through an access-control layer before they reach
+a blueprint (auth, products, claims, reviewer, admin). Blueprints call services — claim lifecycle,
+documents, notifications, alerts, analytics, exports, PDF reports — and the evaluation pipeline:</p>
+<ol>
+<li>document service (validate by magic bytes, store under a random name, SHA-256, OCR);</li>
+<li>contradiction and duplicate detectors;</li>
+<li>feature builder, producing exactly the columns the model was trained on;</li>
+<li>rule engine driven by <code>policies/&lt;category&gt;.json</code>;</li>
+<li>Python model → probabilities for all three classes;</li>
+<li>card renderer → Teachable Machine → probabilities for all three classes;</li>
+<li>consistency status and decision table driven by <code>config/decision_policy.json</code>.</li>
+</ol>
+<p>Every run writes a new, immutable evaluation row holding the inputs, both model versions (hashes of the
+model files), the card's hash, the thresholds and the decision trace. Updating a model never rewrites a
+past result.</p>
+<p class="ph"><b>[ IMAGE 1 — upload <code>images/01_architecture.png</code> here ]</b><br><i>Caption:</i> AssureX architecture: every request passes access control; every evaluation runs the same pipeline.</p>
+<h3>Dataset creation</h3>
+<p>The competition gives no dataset, so we generated one: 1,500 claims, 500 per class, across consumer
+electronics, home appliances and industrial tools, split 70/15/15 with stratification (1,050 / 225 / 225).</p>
+<p>Our first generator worked backwards: <em>pick a class, then invent a claim that looks like it</em>. That is the
+natural way to think about test data and it is exactly wrong for machine learning. The second generator
+works forwards, the way real claims arrive. It samples each claim's attributes from overlapping,
+realistic distributions — where in the warranty life the claim falls, how long the customer waited, what
+caused the damage, how sure the technician is, repair history, which documents were attached — with no
+knowledge of the class. Then it <strong>derives</strong> the label by applying the warranty policy, and flips 4% of
+labels to simulate two reviewers disagreeing. Claim IDs are assigned after shuffling.</p>
+<p>The scenarios that emerge cover what the brief asks for: normal covered defects, expired warranties,
+claims inside the grace period, excluded damage, missing documents, contradictory dates, serial
+mismatches, unauthorised repairs, repeat repairs, possible duplicates and late reporting.</p>
+<h3>Dataset challenges</h3>
+<p>Three problems taught us the most.</p>
+<p><strong>Label leakage.</strong> Version 1 had a column called <code>damage_type</code> whose values mapped one-to-one onto the
+class — "Hardware Defect" was always valid. Any model learned that single column and scored 100%. Worse,
+the claim IDs were ordered by class (1–500 valid), so even the ID leaked. We now run a <em>leakage audit</em>
+before training: a small decision tree is trained on each feature alone, and training stops if any single
+feature predicts the class above 90%. The best single feature today, days to expiry, reaches 53%.</p>
+<p><strong>Train/serve skew.</strong> The web form offered damage types that the training data had never seen, and an
+encoder configured to "ignore unknown values" silently turned them into zeros. The model then scored claims
+it had never seen anything like. Now one vocabulary module feeds the generator, the form, the policies and
+the encoder; unknown values raise an error; and a test renders the claim form and checks that its options
+equal the training values.</p>
+<p><strong>Rare scenarios.</strong> Late reporting is only 23 of 1,500 claims. The model sees few examples and misses some
+of them — which is fine, because the rule engine never misses them.</p>
+<h3>Python model development</h3>
+<p>Pre-processing turns a claim into 20 features: eight numeric (price, warranty length, product age, days to
+expiry, reporting delay, diagnostic confidence, repair count, missing-document count), ten binary
+(documents present, extended warranty, serial match, unauthorised repair, duplicate invoice, date
+conflict) and two categorical (category, damage cause). Numbers are standardised for the linear model;
+categories are one-hot encoded with a fixed vocabulary. The encoder and model are saved as <strong>one</strong> pipeline
+file, so they can never drift apart.</p>
+<h3>Algorithms compared</h3>
+<p>We compared three algorithms with stratified 5-fold cross-validation on the training set, then on the
+validation set:</p>
+<ul>
+<li><strong>Logistic regression</strong> — CV macro-F1: 0.739; Validation macro-F1: 0.726</li>
+<li><strong>Random forest</strong> — CV macro-F1: 0.922; Validation macro-F1: 0.942</li>
+<li><strong>HistGradientBoosting</strong> — CV macro-F1: 0.913; Validation macro-F1: <strong>0.947</strong></li>
+</ul>
+<p>The model is chosen on <strong>validation</strong>; the test set is touched exactly once at the end. (Version 1 picked
+the model by its test score, which quietly turns the test set into training data.) The winner is wrapped
+in sigmoid calibration so that "80% confident" means right about 80% of the time — essential, because the
+comparison between our two models is built on those confidence values.</p>
+<p>On 225 unseen test claims the calibrated model reaches <strong>89.3% accuracy</strong>, macro-F1 89.2%, ROC-AUC 0.948 and
+an expected calibration error of 0.082. The SRS asks for 85%. Given the 4% label noise, the practical
+ceiling is about 96%.</p>
+<h3>Google Teachable Machine training and the Claim Summary Card</h3>
+<p>The second model is an image classifier trained in the browser with Google Teachable Machine on pictures of
+claims. The card had to be redesigned before that could work.</p>
+<p>Version 1 cards were 640 × 420 landscape images full of 12-pixel text. Teachable Machine centre-crops every
+upload to a square, which cut off both side columns; and an image model cannot read small text anyway. The
+fonts also fell back to a bitmap font on the Linux server, so live cards looked different from training
+cards.</p>
+<p>Version 2 cards are 600 × 600 and use fonts bundled with the application. They drew every fact as a small
+grey shape in a fixed position: bars for warranty life, reporting delay and diagnostic confidence, hatched
+tiles for missing documents, pips for category and damage cause. It looked tidy and it failed: the real
+Teachable Machine model trained on those cards scored 54.2% on the test cards. Teachable Machine does not
+retrain the image network; it puts a small classifier on top of frozen ImageNet features, and at 224 × 224
+pixels thin grey bars look nearly the same whatever their length. We rebuilt Teachable Machine's trainer
+offline (<code>notebooks/tm_replica_check.py</code>) and it reproduced the failure (58–66%), which told us the card,
+not the training run, was the problem.</p>
+<p>Version 3 shows each fact against its policy limit as one of nine large tiles in a fixed 3 × 3 grid —
+coverage, reporting time, damage cause, receipt, supporting evidence, serial number, dates, invoice and
+repairs. A tile's colour and glyph change with the fact (within coverage, grace period or coverage ended;
+reported in time or late; covered or excluded cause), and a colour band shows the category. The same
+replica now scores 92.9–94.2% on the test cards, and the real Teachable Machine model trained on the
+version 3 cards scored 93.8% (validation 97.3%, macro F1 93.8%), agreeing with the Python model on 92.9% of
+the test claims. Text is still there, for humans. The card never shows a
+prediction, a confidence, a rule outcome or a decision.</p>
+<p>Each training claim is drawn twice with small, label-preserving variations — background tint, date format,
+a slight rotation, blur and JPEG quality — giving 2,100 training images. Validation and test cards are
+rendered once each and never uploaded to Teachable Machine. The exported TensorFlow Lite model runs inside
+the application; if it is missing, the system says so and sends the claim to a reviewer rather than
+deciding on one model.</p>
+<p class="ph"><b>[ IMAGE 2 — upload <code>images/02_card_v2_vs_v3.png</code> here ]</b><br><i>Caption:</i> The same claim drawn as a v2 card (54.2% image-model accuracy) and a v3 card (93.8%).</p>
+<h3>Python integration</h3>
+<p>The web application never retrains a model and never silently falls back to a different one. The Python
+model is loaded once per process from the pipeline file; its version string embeds the file's hash. The
+feature builder that feeds it lives in the application, and the training script imports the <em>same</em> feature
+lists. If the file is missing or was pickled by an incompatible library version, the claim is still
+evaluated by the rules, the model is marked unavailable, and the claim is routed to manual review with a
+clear message.</p>
+<h3>Model prediction comparison</h3>
+<p>For each claim the application shows both predicted classes side by side with all three probabilities,
+whether the classes match, and the Claim Summary Card that the image model saw. The comparison ends in one
+of five statuses. If either model's top confidence is below 0.60 the result is an <strong>Uncertain Result</strong>. If
+the classes differ it is a <strong>Model Disagreement</strong>. Otherwise the gap between the two top confidences decides:
+up to 0.10 is a <strong>Strong Match</strong>, up to 0.25 an <strong>Acceptable Match</strong>, anything larger a <strong>Weak Match</strong>.</p>
+<h3>Confidence-score comparison</h3>
+<p>The confidence difference is |Python top confidence − Teachable Machine top confidence|. The two models are
+trained on different representations and will never agree exactly, so the thresholds absorb normal
+variation. Disagreement, uncertainty and weak matches all send the claim to manual review. All three
+thresholds live in a configuration file that administrators edit in the app, and each evaluation stores the
+thresholds it used.</p>
+<p class="ph"><b>[ IMAGE 3 — upload <code>images/03_claim_page.jpg</code> here ]</b><br><i>Caption:</i> A claim page: both models&#x27; predictions, the consistency status, the card and the decision trace.</p>
+<h3>Warranty-rule design</h3>
+<p>Each product category has a JSON policy: coverage length, standard and extended terms, grace period,
+reporting deadline, covered faults, excluded damage causes, how sure a technician must be to confirm an
+exclusion, repeat-repair threshold, repair and replacement conditions, mandatory and supporting documents,
+and three lists of rules — hard-fail, manual-review and warning. The engine knows sixteen checks. Which
+list a check is in decides its severity; a check in no list is switched off.</p>
+<p>The final decision is a table read top to bottom, first match wins: a hard-fail rule makes a claim <em>Likely
+Invalid</em>; contradictions, duplicates, a missing mandatory document, model disagreement or uncertainty, or a
+manual-review rule make it <em>Manual Review Required</em>; only then do the two models decide — both Invalid gives
+<em>Likely Invalid</em>, both Valid gives <em>Likely Valid</em>; anything else goes to a reviewer. Changing the decision
+logic, adding an exclusion or moving a threshold is a configuration edit, not a code change — which is what
+the competition's "surprise modification" round asks for, and each of those modifications has a test.</p>
+<p class="ph"><b>[ IMAGE 4 — upload <code>images/05_decision_flow.png</code> here ]</b><br><i>Caption:</i> The decision table, read top to bottom: first matching row wins.</p>
+<h3>OCR and document processing</h3>
+<p>Receipts are read with pdfplumber (text PDFs) and Tesseract (photos and scans). We extract invoice number,
+purchase date, product name, model, serial number, retailer, amount and warranty length with labelled
+patterns only. The first version also compared text against hard-coded lists of known retailers and
+products — it worked beautifully on our demo receipts and would have failed on any hidden test receipt, so
+it is gone. Identifiers must contain a digit, so the word "Invoice" is never mistaken for an invoice
+number. Every extracted value is shown to the user, who confirms or corrects it; corrections are audited.
+Files are validated by their first bytes, not their extension: a text file renamed to <code>.png</code> is refused.</p>
+<h3>Difficulties encountered</h3>
+<ul>
+<li>Writing a generator that does <strong>not</strong> know the answer was harder than writing one that does.</li>
+<li>Making image-model inputs model-friendly meant designing a picture for a neural network, not a person.</li>
+<li>Keeping one vocabulary across form, dataset, model, policies and cards required a test that renders the
+  form.</li>
+<li>Access control for four roles needed record scope, not just role checks: a service-center employee must
+  see their own center's claims and nothing else, and a reviewer must not approve a claim they filed.</li>
+</ul>
+<h3>Model errors</h3>
+<p>On the test split the Python model's weakest spot is Invalid claims predicted as Manual Review (8 of 75).
+Of the 14 Invalid claims it misses, 5 are late-reporting cases (rare in training), 4 carry deliberately
+flipped labels, 3 are excluded-damage claims with a diagnosis right at the threshold, and 2 sit on the
+expiry boundary. Every one of those is a hard-fail rule in the policy, so the rule engine still rejects them
+correctly. That is the point of combining a model with rules: the model generalises, the rules guarantee.</p>
+<h3>Model disagreement cases</h3>
+<p>Disagreement is information, not failure. When the two models disagree the claim goes to a reviewer, who
+sees both predictions, every rule result and the evidence on one page.</p>
+<p>On the 225 test claims the two models predict the same class for 92.9% of them. The comparison statuses
+are 117 Strong Match, 68 Acceptable Match, 15 Uncertain Result, 13 Weak Match and 12 Model Disagreement —
+40 claims that no single model is allowed to settle. The disagreements are instructive. In several
+late-reporting and excluded-damage claims the Python model hesitates between <em>Invalid</em> and <em>Manual Review</em>
+while the image model is confident the claim is invalid: the card puts the red "Reported late" or
+"excluded cause" tile right in front of it. Some disagreements point at the data rather than the models: in two
+claims whose labels were deliberately flipped to simulate reviewer disagreement, the image model follows the
+policy and the Python model follows the flipped label. Whatever the cause,
+a disagreement never becomes an automatic decision: the decision table sends the claim to a person, usually
+with a rule result already explaining the problem. Across the whole test split the application's final decision matches the labelled class
+for 92.0% of claims.</p>
+<p class="ph"><b>[ IMAGE 5 — upload <code>images/04_model_evaluation.png</code> here ]</b><br><i>Caption:</i> Both models evaluated on 225 unseen test claims: Python 89.3%, Teachable Machine 93.8%.</p>
+<h3>Testing results</h3>
+<p>197 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
+period, the reporting deadline ±1 day, the exclusion threshold), contradiction and duplicate detection,
+OCR patterns, upload validation, both model runtimes, all five consistency statuses, the eleven
+demonstration cases from the competition brief, full HTTP journeys from registration to approval, and the
+security controls below. We also render every page for every role and take browser screenshots on desktop
+and phone widths.</p>
+<h3>Security considerations</h3>
+<p>Access is denied by default. Each role holds a list of permissions, each permission a scope — own records,
+own service center, the review queue, or everything — and each action passes business constraints:
+reviewers cannot decide claims they filed, claims move only along allowed transitions, overriding the
+automated recommendation needs a written reason, and administrators cannot demote themselves or the last
+administrator. A record outside your scope returns "not found", so identifiers cannot be probed. Users are
+reloaded from the database on every request; a role change or disabled account signs them out everywhere.
+Sign-in errors never reveal whether an email exists, five failures lock the account, forms carry CSRF
+tokens, and the Content-Security-Policy forbids inline and third-party scripts. Every sensitive action —
+including blocked access attempts — goes to an append-only audit log.</p>
+<h3>Limitations</h3>
+<p>The dataset is synthetic; real claims will need retraining and recalibration. The Teachable Machine model
+must be trained in the browser and re-exported whenever the card design changes. Image OCR depends on
+Tesseract being installed on the server. Duplicate text detection is lexical, not semantic. SQLite suits a
+single server; larger deployments should move to PostgreSQL.</p>
+<h3>Lessons learned</h3>
+<ul>
+<li><strong>Distrust a perfect score.</strong> 100% accuracy on generated data is almost always leakage.</li>
+<li><strong>Select on validation, report on test, once.</strong></li>
+<li><strong>Calibrate before you compare confidences</strong> between two models.</li>
+<li><strong>One vocabulary everywhere</strong>, enforced by tests, prevents the quietest bugs.</li>
+<li><strong>Rules and models are partners.</strong> Models generalise; rules guarantee the policy; the decision table makes
+  their relationship explicit and editable.</li>
+<li><strong>Record everything</strong>, including the model versions that produced each answer.</li>
+</ul>
+<h3>Future enhancements</h3>
+<p>Retraining on real claims with drift monitoring; learning from reviewer overrides; image-based damage
+detection on customer photos; semantic duplicate detection; email and SMS notifications; an API for
+service-center systems; and multi-manufacturer tenancy.</p>
+<hr />
+<p><em>The full source code, dataset, both trained models, evaluation reports and tests are on GitHub: <a href="https://github.com/Saba1512006/assurex-claim-engine">github.com/Saba1512006/assurex-claim-engine</a>.</em></p>
+</body></html>
