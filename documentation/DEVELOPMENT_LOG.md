@@ -57,5 +57,12 @@ Earlier days are in the Git history; team members should add their own entries b
 - Installing over the running model returned a 500 on Windows (memory-mapped .tflite could not be
   archived). Fixed by loading models from bytes; regression test added.
 
+**Accuracy guards**
+- Tests now re-score both saved models on every run: Teachable Machine on test cards rendered with the
+  current card code and policy files (must stay ≥ 85% and equal to the recorded 93.8%), the Python model on
+  the test split (≥ 85%, equal to 89.3%). A deliberate one-colour change to the card dropped the image model
+  to 77.8% and failed the test, as intended.
+- The policy editor warns when a limit drawn on the card is changed (the image model then needs retraining).
+
 **Open items**
 - Republish the blog; redeploy and re-seed the live site; complete the team rows in `AI_USAGE.md`.

@@ -29,6 +29,9 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 FONT_DIR = ROOT / "static" / "fonts"
 SIZE = 600
 CARD_VERSION = "v3"
+# Policy limits drawn on the card. Changing one changes the Teachable Machine input: retrain after changing it.
+CARD_POLICY_FIELDS = ("grace_period_days", "claim_reporting_period_days", "excluded_damage_types",
+                      "exclusion_min_diagnostic_confidence", "repeat_repair_review_threshold")
 BG, INK, MUTED, WHITE = (246, 247, 249), (21, 32, 43), (96, 108, 120), (255, 255, 255)
 # Tile states. Each state has its own colour AND its own glyph, so colour is never the only cue.
 STATE = {"ok": (34, 139, 84), "caution": (222, 146, 18), "fail": (196, 48, 48), "conflict": (112, 72, 190)}

@@ -312,3 +312,24 @@ def test_gtm_upload_replaces_and_archives_running_model(app, client, tmp_path, m
         assert set(loaded.predict(Image.new("RGB", (600, 600)))["confidence_scores"]) == set(CLASSES)
     assert (tmp_path / "versions" / versions[0] / "model_unquant.tflite").exists()
     assert gtm_mod.version_of((tmp_path / "model_unquant.tflite").read_bytes()) == versions[1]
+
+
+def test_changing_a_card_limit_warns_that_teachable_machine_needs_retraining(app, client, monkeypatch, tmp_path):
+    import shutil
+    from src.rules import policy_store
+    shutil.copytree(policy_store.POLICY_DIR, tmp_path / "p")
+    monkeypatch.setattr(policy_store, "POLICY_DIR", tmp_path / "p")
+    policy_store.reload()
+    make_user("ad@x.io", "administrator")
+    login(client, "ad@x.io")
+    pol = policy_store.get_policy("Home Appliances")
+    severity = {rid: sev.replace("_rules", "") for sev in policy_store.SEVERITY_LISTS for rid in pol[sev]}
+    form = {"category": "Home Appliances", **{k: str(pol[k]) for k in policy_store.EDITABLE},
+            "excluded_damage_types": pol["excluded_damage_types"],
+            **{f"rule_{r}": severity.get(r, "off") for r in policy_store.RULE_CATALOG}}
+    r = client.post("/admin/policies", data=form, follow_redirects=True)
+    assert b"retrain the model" not in r.data                       # nothing on the card changed
+    form["grace_period_days"] = str(pol["grace_period_days"] + 1)
+    r = client.post("/admin/policies", data=form, follow_redirects=True)
+    assert b"retrain the model" in r.data
+    policy_store.reload()

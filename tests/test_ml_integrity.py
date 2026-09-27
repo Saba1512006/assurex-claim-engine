@@ -80,6 +80,16 @@ def test_model_meets_srs_accuracy_and_is_not_suspiciously_perfect():
     assert max(card["leakage_audit"].values()) < 0.90
 
 
+def test_saved_python_model_still_scores_its_recorded_accuracy(splits):
+    """Re-scores the saved pipeline on the untouched test split: catches a retrain, a changed feature list or
+    a library upgrade that silently changes predictions."""
+    bundle = joblib.load(ROOT / "model" / "python_model" / "claim_classifier_v2.joblib")
+    card = json.loads((ROOT / "model" / "python_model" / "model_card_v2.json").read_text())
+    test = splits["test"]
+    accuracy = (bundle["pipeline"].predict(test[bundle["features"]]) == test["claim_class"]).mean()
+    assert accuracy >= 0.85 and abs(accuracy - card["test"]["accuracy"]) < 0.005
+
+
 # ---------- consistency + decision ----------
 @pytest.mark.parametrize("py,pc,gm,gc,expected", [
     ("Valid Claim", 0.92, "Valid Claim", 0.88, "Strong Match"),
@@ -125,3 +135,36 @@ def test_policy_file_is_valid():
 def test_all_configured_date_formats_parse(raw):
     assert str(parse_date(raw)) == "2026-09-26"
     assert len(DATE_FORMATS) >= 5
+
+
+# ---------- Teachable Machine accuracy guard ----------
+GTM_DIR = ROOT / "model" / "teachable_machine"
+
+
+def test_installed_teachable_machine_model_matches_its_evaluation():
+    from src.core.gtm_classifier_v2 import find_model_file, version_of
+    model = find_model_file(GTM_DIR)
+    ev = json.loads((GTM_DIR / "evaluation.json").read_text())
+    assert model is not None, "the team's Teachable Machine export must stay in model/teachable_machine/"
+    assert ev["test"]["model_version"] == version_of(model.read_bytes()), "evaluation.json is for another model"
+    assert ev["test"]["gtm_accuracy"] >= 0.85 and ev["val"]["gtm_accuracy"] >= 0.85
+
+
+def test_teachable_machine_keeps_its_accuracy_on_freshly_rendered_cards(splits):
+    """Renders every test card with the CURRENT card code and policy files and scores the installed model.
+    Fails if a change to src/core/card_v2.py or to a limit shown on the card (grace period, reporting period,
+    excluded causes, diagnosis threshold, repeat-repair threshold) would silently degrade the image model.
+    If it fails after an intended change: rebuild the cards, retrain Teachable Machine and reinstall."""
+    from src.core.card_v2 import render_card
+    from src.core.gtm_classifier_v2 import GTMUnavailable, TeachableMachineClassifier
+    try:
+        model = TeachableMachineClassifier(GTM_DIR)
+    except GTMUnavailable as exc:
+        pytest.skip(f"TensorFlow Lite runtime not available: {exc}")
+    df = splits["test"]
+    correct = sum(model.predict(render_card(r, 0))["predicted_class"] == r["claim_class"]
+                  for r in df.to_dict("records"))
+    accuracy = correct / len(df)
+    recorded = json.loads((GTM_DIR / "evaluation.json").read_text())["test"]["gtm_accuracy"]
+    assert accuracy >= 0.85, f"Teachable Machine test accuracy fell to {accuracy:.1%} (SRS target 85%)"
+    assert abs(accuracy - recorded) < 0.005, f"cards no longer match training: {accuracy:.1%} vs recorded {recorded:.1%}"

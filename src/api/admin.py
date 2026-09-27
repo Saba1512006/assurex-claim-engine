@@ -15,6 +15,7 @@ from sqlalchemy import or_
 from config.config import Config
 from database.db import db
 from src.core import decision_table, gtm_classifier_v2 as gtm_mod, python_classifier
+from src.core.card_v2 import CARD_POLICY_FIELDS
 from src.core.gtm_classifier_v2 import GTM_DIR, GTMUnavailable, find_model_file, parse_labels
 from src.core.offline_eval import evaluate_gtm_and_save
 from src.core.vocab import CATEGORIES, CLASSES, DAMAGE_TYPES, try_parse_date
@@ -98,11 +99,16 @@ def policies():
         except policy_store.PolicyError as exc:
             flash(str(exc), "danger")
             return redirect(url_for("admin.policies", category=category))
-        changed = {k: {"from": before.get(k), "to": after.get(k)} for k in after if before.get(k) != after.get(k)}
+        same = lambda a, b: sorted(a) == sorted(b) if isinstance(a, list) and isinstance(b, list) else a == b  # noqa: E731
+        changed = {k: {"from": before.get(k), "to": after.get(k)} for k in after if not same(before.get(k), after.get(k))}
         audit("POLICY_UPDATED", "Policy", category, changes=changed)
         db.session.commit()
         flash(f"{category} policy saved ({len(changed)} change{'s' if len(changed) != 1 else ''}). "
               "New claims use it immediately; past evaluations are unchanged.", "success")
+        if set(changed) & set(CARD_POLICY_FIELDS):
+            flash("This change alters what the Claim Summary Card shows, so the Teachable Machine model no longer "
+                  "matches its training cards. Rebuild the cards, retrain the model and reinstall it before relying "
+                  "on its predictions.", "warning")
         return redirect(url_for("admin.policies", category=category))
     selected = request.args.get("category") if request.args.get("category") in CATEGORIES else CATEGORIES[0]
     return render_template("admin/policies.html", policies=policy_store.all_policies(), selected=selected,

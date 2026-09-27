@@ -70,7 +70,7 @@ Without Tesseract, image receipts are still accepted and the user types the deta
 ```bash
 python src/app.py                     # development server: http://127.0.0.1:5000
 gunicorn wsgi:app --workers 2         # production (Linux/macOS)
-python -m pytest -q                   # 193 automated tests
+python -m pytest -q                   # 197 automated tests
 ```
 
 PythonAnywhere: point the WSGI file at the project and `from wsgi import application`; set `SECRET_KEY`

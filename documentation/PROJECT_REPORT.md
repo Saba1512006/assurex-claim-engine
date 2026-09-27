@@ -305,7 +305,7 @@ noisy labels — i.e. the combination is sound once the second model is in place
 
 ## 31. Testing strategy
 
-193 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
+197 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
 integration (full HTTP journeys through the real app, DB and file store), boundary, negative, security,
 database, model and demonstration cases; surprise-modification scenarios are tests too. Catalogue:
 `documentation/TEST_CASES.md`. Additionally every page is rendered for every role, and browser screenshots

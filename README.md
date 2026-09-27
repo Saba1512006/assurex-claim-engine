@@ -43,7 +43,7 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (193 tests).
+Run the tests: `python -m pytest -q` (197 tests).
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`
 from `wsgi.py`). Set `SECRET_KEY` in the environment — the app refuses to start without one.
 
