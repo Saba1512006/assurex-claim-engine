@@ -270,7 +270,7 @@ Admin › Models, validated, versioned, and evaluated on the 450 held-out cards.
 | Model | Accuracy | Macro precision | Macro recall | Macro F1 | ROC-AUC |
 |---|---|---|---|---|---|
 | Python (HistGradientBoosting, calibrated), test | 89.3% | 89.5% | 89.3% | 89.2% | 0.948 |
-| Teachable Machine (`gtm-514702678b8c`), test | 93.8% | see `evaluation.json` | see `evaluation.json` | 93.8% | — |
+| Teachable Machine (`gtm-514702678b8c`), test | 93.8% | 94.0% | 93.8% | 93.8% | — |
 
 ## 28. Confusion matrix (Python model, test)
 

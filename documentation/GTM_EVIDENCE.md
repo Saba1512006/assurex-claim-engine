@@ -50,6 +50,18 @@ way to test a card design before spending a browser training run.
    labels, the model loads and runs; the previous model is archived under `model/teachable_machine/versions/`).
 7. *Run evaluation* (or `python notebooks/evaluate_gtm.py`) and `python reports/generate_comparison_report.py`.
 
+## Confusion matrix (test, 225 cards; rows = actual, columns = predicted)
+
+| | Valid Claim | Invalid Claim | Manual Review |
+|---|---|---|---|
+| **Valid Claim** | 73 | 1 | 1 |
+| **Invalid Claim** | 5 | 68 | 2 |
+| **Manual Review** | 4 | 1 | 70 |
+
+Most errors predict *Valid Claim* for claims that are Invalid or need review (9 of 14); the decision table
+catches these because the rule engine and the Python model must also agree before a claim is marked
+*Likely Valid*. The 14 misclassified test cards are listed in `reports/gtm_misclassified_test.csv`.
+
 ## Runtime
 
 `src/core/gtm_classifier_v2.py` — TensorFlow Lite interpreter (`ai-edge-litert`), preprocessing identical to
@@ -69,7 +81,9 @@ manual review — there is no fallback model.
 | Validation accuracy (225 cards) | 97.3% |
 | Test accuracy (225 cards) · macro F1 | **93.8% · 93.8%** |
 | Agreement with the Python model (test) | 92.9% of claims |
-| Confusion matrix, per-class precision/recall | `model/teachable_machine/evaluation.json` (Admin › Models, *Run evaluation*) |
+| Macro precision / recall (test) | 94.0% / 93.8% |
+| Per class (test): precision / recall | Valid 89.0% / 97.3% · Invalid 97.1% / 90.7% · Manual Review 95.9% / 93.3% |
+| Full evaluation | `model/teachable_machine/evaluation.json`; comparison with the Python model in `reports/model_comparison_report.md` (application decision accuracy 92.0%) |
 | Incorrectly classified samples | `reports/gtm_misclassified_test.csv` (written by the evaluation) |
 | Retraining details | Run 1 on v2 cards → 54.2% test (archived as `gtm-ec95b4aa49b5`). Cause found with `notebooks/tm_replica_check.py`; card redesigned (v3); run 2 on v3 cards → 93.8% |
 | Screenshots | `screenshots/20`–`22` (run 1: training, under the hood, evaluation) and `23`–`25` (run 2) |
