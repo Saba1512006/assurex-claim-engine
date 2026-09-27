@@ -1,0 +1,5 @@
+/* Style guide page only. */
+.sg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--s7) var(--s6); }
+.sg-block { display: grid; gap: var(--s3); align-content: start; }
+.sg-hero-h { margin: 0; font: 600 var(--fs-h1-hero)/1.02 var(--font); letter-spacing: -0.035em; }
+.sg-instrument { padding: var(--s6); }

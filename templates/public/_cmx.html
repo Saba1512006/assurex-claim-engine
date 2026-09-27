@@ -1,4 +1,5 @@
-{# 3×3 confusion matrix as a CSS grid with real table semantics: rows = actual class, columns = predicted;
+{# 3×3 confusion matrix as a CSS grid with real table semantics: rows = actual class, columns = predicted; cells take one
+   of five teal steps by their share of the row (s0-s4);
    the row wrappers use display: contents so the grid stays flat. Diagonal outlined. #}
 {% macro cmx(matrix, label) -%}
 {% if matrix %}
@@ -7,7 +8,7 @@
   <div class="cmx-row" role="row"><span role="columnheader"><span class="sr">Actual</span></span>{% for c in matrix.labels %}<span class="h" role="columnheader">{{ c|replace(' Claim', '') }}</span>{% endfor %}</div>
   {% for row in matrix.rows %}{% set r = loop.index0 %}
     <div class="cmx-row" role="row"><span class="h" role="rowheader">{{ matrix.labels[r]|replace(' Claim', '') }}</span>
-      {% for n, w in row %}<span class="c {{ 'diag' if loop.index0 == r }} {{ 'dark' if w > 0.55 }}" role="cell" style="--w: {{ w }}">{{ n }}</span>{% endfor %}</div>
+      {% for n, w in row %}{% set step = 0 if w < 0.05 else (1 if w < 0.25 else (2 if w < 0.5 else (3 if w < 0.75 else 4))) %}<span class="c s{{ step }} {{ 'diag' if loop.index0 == r }}" role="cell">{{ n }}</span>{% endfor %}</div>
   {% endfor %}
 </div>
 {% else %}<p class="small muted">Not evaluated yet.</p>{% endif %}

@@ -210,3 +210,14 @@
   </div>
 </section>
 {%- endmacro %}
+
+{% macro icon(name, cls='') -%}
+{# Lucide icon from the sprite (static/img/icons.svg, built by scripts/build_icon_sprite.py). Decorative: text sits next to it. #}
+<svg class="ic {{ cls }}" aria-hidden="true" focusable="false"><use href="{{ asset('img/icons.svg') }}#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro metric(value, unit, label) -%}
+{# Headline metric: condensed numeral with a smaller unit, one-line label below. "—" when not evaluated yet. #}
+<div><span class="num-xl">{% if value is none %}—{% else %}{{ value }}<small>{{ unit }}</small>{% endif %}</span>
+  <span class="l">{{ label if value is not none else 'Not evaluated yet' }}</span></div>
+{%- endmacro %}

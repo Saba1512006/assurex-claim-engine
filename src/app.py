@@ -1,4 +1,5 @@
 """AssureX Claim Engine - application factory."""
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,9 @@ def create_app(config_class=Config) -> Flask:
     from src.api.reviewer import reviewer_bp
     for bp in (public_bp, auth_bp, product_bp, claim_bp, reviewer_bp, admin_bp, access_bp, api_bp):
         app.register_blueprint(bp)
+    if app.config.get("DEBUG") or os.environ.get("ASSUREX_STYLEGUIDE") == "1":   # style guide: development only
+        from src.api.dev import dev_bp
+        app.register_blueprint(dev_bp)
 
     register_template_helpers(app)
 

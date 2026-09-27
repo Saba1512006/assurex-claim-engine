@@ -1,0 +1,93 @@
+{% extends "components/base.html" %}
+{# Development-only style guide: every base component in every state, on the workspace (light) and the bench (dark).
+   Numbers are the real model-card values so type and spacing are judged on true content. #}
+{% from "components/ui.html" import icon, metric, tag, verdict_chip, csrf %}
+{% from "public/_cmx.html" import cmx %}
+{% block title %}Style guide{% endblock %}
+{% block main %}
+{% macro specimen(surface) %}
+<div class="sg-grid">
+  <section class="sg-block" aria-label="Type">
+    <span class="itag">Type</span>
+    <p class="sg-hero-h">Every warranty claim, checked twice.</p>
+    <h2 class="display">How a claim is decided</h2>
+    <h3>Panel heading, 1.25rem</h3>
+    <p class="lede">Lede in ink-2: two independent models and a policy engine agree, or a person decides.</p>
+    <p>Body text at 1rem with a line height of 1.6, and <a href="#">a link</a>. IDs in mono: <span class="id">CLM-7E4DCAE6A9</span>.</p>
+  </section>
+  <section class="sg-block" aria-label="Metrics">
+    <span class="itag gtm">Metrics</span>
+    <div class="metric-row">
+      {{ metric('%.1f'|format(mc.python.accuracy * 100), '%', 'Python test accuracy') }}
+      {{ metric('%.1f'|format(mc.gtm.accuracy * 100), '%', 'Teachable Machine test accuracy') }}
+      {{ metric(mc.dataset.total, '', 'Synthetic claims') }}
+    </div>
+  </section>
+  <section class="sg-block" aria-label="Buttons">
+    <span class="itag">Buttons</span>
+    <div class="row">
+      <button class="btn" type="button">{{ icon('check') }}Primary</button>
+      <button class="btn quiet" type="button">Secondary</button>
+      <button class="btn ghost" type="button">Ghost</button>
+      <button class="btn danger" type="button">Danger</button>
+      <button class="btn" type="button" disabled>Disabled</button>
+      <button class="btn busy" type="button"><span class="spin" aria-hidden="true"></span>Saving</button>
+    </div>
+  </section>
+  <section class="sg-block" aria-label="Chips and tags">
+    <span class="itag">Chips and tags</span>
+    <div class="row">{{ verdict_chip('Likely Valid') }}{{ verdict_chip('Likely Invalid') }}{{ verdict_chip('Manual Review Required') }}{{ verdict_chip(None) }}</div>
+    <div class="row mt-2"><span class="itag customer">Customer</span><span class="itag staff">Service-center staff</span><span class="itag reviewer">Claim reviewer</span><span class="itag admin">Administrator</span></div>
+    <div class="row mt-2"><span class="cls valid">Valid Claim</span><span class="cls invalid">Invalid Claim</span><span class="cls review">Manual Review</span></div>
+  </section>
+  <section class="sg-block" aria-label="Segmented control and choices">
+    <span class="itag">Choices</span>
+    <div class="segmented" role="radiogroup" aria-label="Sample claim ({{ surface }})">
+      {% for v, l in [('a', 'Clean fault'), ('b', 'Liquid damage'), ('c', 'Grace +4 d')] %}
+        <label><input type="radio" name="seg-{{ surface }}" value="{{ v }}" {{ 'checked' if loop.first }}><span>{{ l }}</span></label>
+      {% endfor %}
+    </div>
+    <div class="stack-sm mt-2">
+      {% for t, d in [('Clean hardware fault', 'Laptop motherboard failure, every document on file'), ('Liquid damage', 'Refrigerator control board, water ingress confirmed')] %}
+        <label class="choice"><input type="radio" name="choice-{{ surface }}" {{ 'checked' if loop.first }}><span class="t">{{ t }}</span>
+          <span class="ck" aria-hidden="true">{{ icon('check', 'sm') }}</span><span class="d">{{ d }}</span></label>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endmacro %}
+
+<section class="band paper-band"><div class="wrap stack">
+  <div><span class="itag">Style guide</span><h1 class="display mt-2">Workspace (light)</h1></div>
+  {{ specimen('light') }}
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="sg-form-h">
+      <div class="panel-h"><h2 id="sg-form-h">Inputs</h2><span class="hint">44px, focus ring in teal</span></div>
+      <div class="panel-b stack-sm">
+        <div class="field"><label for="sg-a">Serial number</label><input class="input mono" id="sg-a" value="SN-APX-4471823"></div>
+        <div class="field"><label for="sg-b">Invoice number</label><input class="input" id="sg-b" aria-invalid="true" aria-describedby="sg-b-d" value="INV-2025"><span class="err" id="sg-b-d">Use the full number printed on the receipt.</span></div>
+        <div class="field"><label for="sg-c">Category</label><select class="select" id="sg-c"><option>Consumer Electronics</option></select></div>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="sg-cmx-h">
+      <div class="panel-h"><h2 id="sg-cmx-h">Confusion matrix</h2><span class="id">{{ mc.gtm.version }}</span></div>
+      <div class="panel-b">{{ cmx(mc.gtm.matrix, 'Teachable Machine') }}</div>
+    </section>
+  </div>
+  <section class="panel" aria-labelledby="sg-t-h">
+    <div class="panel-h"><h2 id="sg-t-h">Table</h2></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th scope="col">Class</th><th scope="col" class="num">Precision</th><th scope="col" class="num">Recall</th><th scope="col" class="num">F1</th></tr></thead>
+      <tbody>{% for r in mc.python.per_class %}<tr><th scope="row"><span class="cls {{ {'Valid Claim': 'valid', 'Invalid Claim': 'invalid', 'Manual Review': 'review'}[r['class']] }}">{{ r['class'] }}</span></th>
+        <td class="num mono">{{ '%.3f'|format(r.precision) }}</td><td class="num mono">{{ '%.3f'|format(r.recall) }}</td><td class="num mono">{{ '%.3f'|format(r['f1-score']) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+</div></section>
+
+<section class="band bench grid-bg"><div class="wrap stack">
+  <div><span class="itag">Style guide</span><h2 class="display mt-2">Bench (dark)</h2></div>
+  {{ specimen('dark') }}
+  <div class="instrument sg-instrument"><p class="muted mb-0">The instrument surface: bench-2, radius 14px, elevation e3.</p></div>
+</div></section>
+{% endblock %}
+{% block page_css %}<link rel="stylesheet" href="{{ asset('css/pages/styleguide.css') }}">{% endblock %}
