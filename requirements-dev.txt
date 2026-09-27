@@ -1,0 +1,6 @@
+# Development and test tools (the app itself only needs requirements.txt).
+-r requirements.txt
+pytest>=8.0
+pyflakes>=3.2
+playwright>=1.45                 # end-to-end tests: python -m playwright install chromium
+axe-playwright-python>=0.1.8     # accessibility checks (axe-core, WCAG 2 A/AA) inside the e2e suite

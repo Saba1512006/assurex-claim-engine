@@ -32,6 +32,7 @@ class Config:
     WTF_CSRF_TIME_LIMIT = None                           # token lives as long as the session
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
+    RATELIMIT_ENABLED = os.environ.get("RATELIMIT_ENABLED", "1") == "1"   # only the end-to-end test server turns it off
     # Seeded evaluator accounts offered as one-click chips on the sign-in page (turn off for a real deployment).
     SHOW_DEMO_ACCOUNTS = os.environ.get("SHOW_DEMO_ACCOUNTS", "1") == "1"
     DEMO_ACCOUNTS = [("Customer", "customer@assurex.local", "CustomerPass123!"),

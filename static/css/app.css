@@ -554,7 +554,7 @@ a.plate:hover .name { text-decoration: underline; text-underline-offset: 3px; }
 
 /* confusion matrix grid */
 .cmx { display: grid; grid-template-columns: auto repeat(3, minmax(44px, 1fr)); gap: 2px; font-size: var(--fs-xs); max-width: 360px; }
-.cmx > span { padding: var(--s2) var(--s1); text-align: center; }
+.cmx > span, .cmx-row > span { padding: var(--s2) var(--s1); text-align: center; }
 .cmx .h { color: var(--ink-2); font-weight: 500; overflow-wrap: anywhere; }
 .cmx .c { font-family: var(--mono); background: rgba(21, 32, 43, calc(var(--w, 0) * .85)); color: var(--ink); border-radius: var(--r-bar); }
 .cmx .c.dark { color: var(--paper); }
@@ -765,3 +765,8 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .table .row.end { flex-wrap: nowrap; }
 .stack-cell { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }
 .blog-article .panel-b { padding: var(--s7) clamp(var(--s4), 4vw, var(--s7)); }
+.cmx-row { display: contents; }
+.cmx-axis { margin: 0 0 var(--s2); font-size: var(--fs-2xs); color: var(--steel); }
+/* toasts sit top-right under the navbar so they never cover a fixed bottom bar (workbench decision bar) */
+.toasts { top: calc(var(--nav-h) + var(--s3)); bottom: auto; }
+.seg input:checked + span .kbd { background: transparent; color: inherit; border-color: currentColor; }

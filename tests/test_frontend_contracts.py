@@ -382,3 +382,27 @@ def test_overrides_export_lists_reviewer_decisions_next_to_the_models(app, clien
     lines = text.lstrip("﻿").splitlines()
     assert lines[0].startswith("Claim ID,Category") and len(lines) == 2
     assert c.claim_id in lines[1] and ",Likely Invalid," in lines[1] and ",Approved,yes,Retailer confirmed" in lines[1]
+
+
+def test_icon_subset_contains_every_icon_the_app_uses():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("subset_icons", ROOT / "scripts" / "subset_icons.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    subset = mod.SUBSET.read_text(encoding="utf-8")
+    missing = sorted(n for n in mod.used_icons() if f".{n}::before" not in subset)
+    assert missing == [], f"run python scripts/subset_icons.py (missing {missing})"
+
+
+def test_text_responses_are_gzipped_only_when_accepted(app, client):
+    import gzip as gz
+    plain = client.get("/")
+    packed = client.get("/", headers={"Accept-Encoding": "gzip, br"})
+    assert "Content-Encoding" not in plain.headers
+    assert packed.headers["Content-Encoding"] == "gzip" and "Accept-Encoding" in packed.headers["Vary"]
+    same = lambda b: re.sub(rb'nonce="[^"]+"', b"", b)                   # noqa: E731  every response has its own nonce
+    assert same(gz.decompress(packed.get_data())) == same(plain.get_data()) and len(packed.get_data()) < len(plain.get_data()) / 2
+    css = client.get("/static/css/app.css", headers={"Accept-Encoding": "gzip"})
+    assert css.headers["Content-Encoding"] == "gzip" and css.headers.get("ETag", "W/").startswith("W/")
+    card = client.get("/cards/test/CLM-00850_v0.jpg", headers={"Accept-Encoding": "gzip"})
+    assert "Content-Encoding" not in card.headers                         # images are already compressed

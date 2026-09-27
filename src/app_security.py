@@ -1,6 +1,7 @@
 """HTTP hardening: secret key, CSRF, rate limiting, cookies and security headers."""
 from __future__ import annotations
 
+import gzip
 import secrets
 
 from flask import request
@@ -24,6 +25,29 @@ def csp_nonce() -> str:
     return request.environ.setdefault("assurex.csp_nonce", secrets.token_urlsafe(16))
 
 
+COMPRESSIBLE = {"text/html", "text/css", "application/javascript", "text/javascript", "application/json",
+                "image/svg+xml", "text/plain"}
+
+
+def _gzip(resp):
+    """Compress text responses for browsers that accept gzip (no extra dependency; about 75% smaller pages)."""
+    if (resp.mimetype not in COMPRESSIBLE or resp.status_code not in (200, 201) or "Content-Encoding" in resp.headers
+            or "gzip" not in request.headers.get("Accept-Encoding", "").lower()):
+        return resp
+    if resp.direct_passthrough:                                          # static files: read the (small) file once
+        resp.direct_passthrough = False
+    body = resp.get_data()
+    if len(body) < 1024:
+        return resp
+    resp.set_data(gzip.compress(body, compresslevel=6))
+    resp.headers["Content-Encoding"] = "gzip"
+    resp.vary.add("Accept-Encoding")
+    etag, weak = resp.get_etag()
+    if etag and not weak:
+        resp.set_etag(etag, weak=True)                                   # the bytes differ from the file's ETag
+    return resp
+
+
 def harden(app) -> None:
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY is not set. Run `python database/seed.py` once (it writes a .env with a "
@@ -45,7 +69,7 @@ def harden(app) -> None:
             resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         if resp.mimetype == "text/html":
             resp.headers["Cache-Control"] = "no-store"
-        return resp
+        return _gzip(resp)
 
     @app.errorhandler(CSRFError)
     def _csrf_error(_e):

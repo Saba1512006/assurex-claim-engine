@@ -17,18 +17,18 @@
   --paper: #FFFFFF;
   --ink: #15202B;
   --ink-2: #3D4A57;
-  --steel: #6B7785;          /* tertiary text; darkened from #8A96A3 so small text passes 4.5:1 on paper */
+  --steel: #5F6B78;          /* tertiary text: 4.5:1 or better on paper, mist and every wash (axe-checked) */
   --steel-line: #8A96A3;     /* axis lines, disabled borders (non-text, 3:1) */
   --rule: #D5DBE1;
-  --teal: #0E7C7B;
+  --teal: #0B6E6D;           /* links and accents: 5.1:1 or better on every surface */
   --teal-wash: #E3F2F1;
   --gtm: #4B5FA8;
   --gtm-wash: #E9ECF7;
-  --valid: #1F8A4C;
+  --valid: #1A7440;          /* text-safe on its wash (5.1:1) */
   --valid-wash: #E6F3EB;
-  --invalid: #C2412D;
+  --invalid: #B03A28;        /* text-safe on its wash (5.1:1) */
   --invalid-wash: #F9E8E5;
-  --review: #9A6412;         /* #B7791F darkened so review text passes 4.5:1 on paper and on its wash */
+  --review: #8A5A10;         /* review text: 5.3:1 on its wash; --review-mark stays for fills */
   --review-mark: #B7791F;    /* fills and borders */
   --review-wash: #FBF1DF;
 

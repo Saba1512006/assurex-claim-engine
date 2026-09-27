@@ -40,12 +40,12 @@
     <section class="panel" aria-labelledby="tr-h">
       <div class="panel-h"><h2 id="tr-h">Where decisions move</h2><span class="hint"><span data-wi-changed>{{ t.changed }}</span> of 225 test claims change</span></div>
       <div class="panel-b">
-        <div class="cmx cmx-3" role="table" aria-label="Test claims: current decision (rows) against proposed decision (columns)" data-wi-matrix>
-          <span class="axis" role="presentation">Rows: now · columns: with the proposed thresholds</span>
-          <span role="columnheader"></span>{% for d in ['Valid', 'Invalid', 'Review'] %}<span class="h" role="columnheader">{{ d }}</span>{% endfor %}
+        <p class="cmx-axis">Rows: now · columns: with the proposed thresholds</p>
+        <div class="cmx" role="table" aria-label="Test claims: current decision (rows) against proposed decision (columns)" data-wi-matrix>
+          <div class="cmx-row" role="row"><span role="columnheader"><span class="sr">Now</span></span>{% for d in ['Valid', 'Invalid', 'Review'] %}<span class="h" role="columnheader">{{ d }}</span>{% endfor %}</div>
           {% for row in t.transitions %}{% set r = loop.index0 %}
-            <span class="h" role="rowheader">{{ ['Valid', 'Invalid', 'Review'][r] }}</span>
-            {% for n in row %}<span class="c {{ 'diag' if loop.index0 == r }}" role="cell" data-cell="{{ r }}{{ loop.index0 }}">{{ n }}</span>{% endfor %}
+            <div class="cmx-row" role="row"><span class="h" role="rowheader">{{ ['Valid', 'Invalid', 'Review'][r] }}</span>
+              {% for n in row %}<span class="c {{ 'diag' if loop.index0 == r }}" role="cell" data-cell="{{ r }}{{ loop.index0 }}">{{ n }}</span>{% endfor %}</div>
           {% endfor %}
         </div>
       </div>
