@@ -31,7 +31,7 @@ hr { border: 0; border-top: 1px solid var(--rule); margin: var(--s5) 0; }
 /* ------------------------------------------------------------------ layout */
 .wrap { width: 100%; max-width: calc(var(--content) + 2 * var(--s5)); margin: 0 auto; padding: 0 var(--s5); }
 .wrap.wide { max-width: calc(var(--content-wide) + 2 * var(--s5)); }
-.page { padding: var(--s6) 0 var(--s8); }
+.page { padding-top: var(--s6); padding-bottom: var(--s8); }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s5); }
 .page-head > div { min-width: 0; }
 .lede { color: var(--ink-2); margin: var(--s2) 0 0; max-width: 72ch; }
@@ -734,3 +734,20 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .ocr-panel { box-shadow: none; }
 .checks i.bi { margin-top: 2px; }
 [data-wizard], [data-product-form] { scroll-margin-top: calc(var(--nav-h) + var(--s4)); }
+.wrap-cell { max-width: 320px; }
+/* workbench: the verdict sits in a narrow middle column, so the gauge goes on top and the two models share a row */
+.workbench .verdict-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s4); padding: var(--s4); }
+.workbench .verdict-main .gauge { grid-column: 1 / -1; order: -1; }
+.workbench .gauge svg { min-width: 0; }
+.workbench { padding-bottom: 280px; }
+.btn .kbd { background: transparent; color: inherit; border-color: currentColor; opacity: .75; }
+.seg .kbd { display: inline; padding: 0 var(--s1); margin-left: var(--s1); }
+.decision-seg { flex-wrap: wrap; }
+.decision-bar [data-decision-bar] { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--s3) var(--s4); align-items: end; }
+.decision-bar [data-decision-bar] > .row { flex-direction: column; align-items: flex-start; gap: var(--s1); }
+.decision-bar .textarea { min-height: 44px; }
+.decision-bar .field > .help { display: none; }
+.decision-bar .field > .err { display: block; }
+.workbench { padding-bottom: 200px; }
+@media (max-width: 991px) { .decision-bar [data-decision-bar] { grid-template-columns: minmax(0, 1fr); } }
+.decision-bar .fields { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }

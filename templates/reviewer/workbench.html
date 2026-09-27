@@ -1,0 +1,156 @@
+{% extends "components/base.html" %}
+{# Reviewer workbench: evidence | verdict | facts, with a fixed decision bar. Below 1280 px the columns become tabs.
+   Shortcuts (workbench.js): A approve, R reject, I request information, / comment, N next claim, ? help. #}
+{% from "components/ui.html" import csrf, status_tag, risk_tag, tag, doc_icon, life_bar, verdict_chip, stage_timeline, empty_state, panel as ui_panel %}
+{% from "components/verdict.html" import verdict, verdict_why, verdict_saw, pending %}
+{% block title %}Review {{ claim.claim_id }}{% endblock %}
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('reviewer.queue') }}">Review queue</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span class="id" aria-current="page">{{ claim.claim_id }}</span></nav>
+    <h1>{{ claim.product.product_name }} <span class="muted">· {{ claim.fault_category }}</span></h1>
+    <div class="row tight mt-1">{{ status_tag(claim.status) }}{{ risk_tag(claim.risk_level) }}
+      {{ tag('Reviewer: ' ~ claim.assigned_reviewer.full_name) if claim.assigned_reviewer else tag('Unassigned') }}
+      <span class="small muted">Filed {{ claim.claim_submission_date|date if claim.claim_submission_date else 'not yet' }}{% if claim.claim_submission_date %} · waiting {{ (today - claim.claim_submission_date).days }} d{% endif %}</span></div>
+  </div>
+  <div class="row tight">
+    <button class="btn ghost sm" type="button" data-help-open aria-haspopup="dialog">Shortcuts <kbd class="kbd">?</kbd></button>
+    <a class="btn quiet sm" href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}">Claim page</a>
+    {% if next_claim %}<a class="btn sm" href="{{ url_for('reviewer.workbench', claim_id=next_claim.claim_id) }}" data-next-claim>Next claim <kbd class="kbd">N</kbd></a>{% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+{% set p = claim.product %}{% set w = claim.warranty or p.warranty %}{% set life = warranty_life(w) %}
+{% set images = docs|selectattr('mime_type', 'in', ['image/png', 'image/jpeg'])|list %}
+<div class="wb-tabs tabs" role="tablist" aria-label="Workbench columns">
+  <button type="button" role="tab" data-col-tab="evidence" aria-selected="false">Evidence <kbd class="kbd">1</kbd></button>
+  <button type="button" role="tab" data-col-tab="verdict" aria-selected="true">Verdict <kbd class="kbd">2</kbd></button>
+  <button type="button" role="tab" data-col-tab="facts" aria-selected="false">Facts <kbd class="kbd">3</kbd></button>
+</div>
+<div class="workbench" data-workbench>
+  <div class="col" data-col="evidence" role="tabpanel" aria-label="Evidence">
+    <section class="panel" aria-labelledby="ev-h">
+      <div class="panel-h"><h2 id="ev-h">Evidence</h2><span class="hint">{{ docs|length }} file{{ '' if docs|length == 1 else 's' }}</span></div>
+      <div class="panel-b viewer" data-viewer>
+        <div class="frame" data-frame aria-live="polite">
+          {% if images %}<img src="{{ url_for('claims.open_document', doc_id=images[0].document_id) }}" alt="{{ doc_label(images[0].document_type) }}: {{ images[0].original_filename }}">
+          {% elif v and v.p.gtm.card_url %}<img src="{{ v.p.gtm.card_url }}" alt="Claim Summary Card for {{ claim.claim_id }}">
+          {% else %}<p class="small muted">No image evidence. Open the files below.</p>{% endif %}
+        </div>
+        <div class="thumbs" role="group" aria-label="Choose a file to view">
+          {% if v and v.p.gtm.card_url %}<button type="button" data-thumb data-src="{{ v.p.gtm.card_url }}" data-label="Claim Summary Card (what the image model saw)" aria-pressed="{{ 'false' if images else 'true' }}"><img src="{{ v.p.gtm.card_url }}" alt="Claim Summary Card"></button>{% endif %}
+          {% for d in images %}<button type="button" data-thumb data-src="{{ url_for('claims.open_document', doc_id=d.document_id) }}" data-label="{{ doc_label(d.document_type) }}: {{ d.original_filename }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><img src="{{ url_for('claims.open_document', doc_id=d.document_id) }}" alt="{{ doc_label(d.document_type) }}"></button>{% endfor %}
+        </div>
+        <p class="tiny muted mb-0" data-frame-label>{{ (doc_label(images[0].document_type) ~ ': ' ~ images[0].original_filename) if images else 'Claim Summary Card' }}</p>
+      </div>
+      <ul class="list">
+        {% for d in docs %}
+          {% set ocr = d.get_ocr_payload() %}
+          <li><span class="ico" aria-hidden="true"><i class="bi {{ doc_icon(d.document_type) }}"></i></span>
+            <div class="grow"><div class="ttl small">{{ doc_label(d.document_type) }}{% if d.claim_id is none %} <span class="chip">product file</span>{% endif %}</div>
+              <div class="sub wrap-any">{{ d.original_filename }} · <span class="mono">{{ d.file_hash_sha256[:12] }}</span></div>
+              {% if ocr %}<dl class="kv mt-1 tiny">{% for k in ['invoice_number', 'serial_number', 'purchase_date'] if ocr.get(k) %}
+                {% set mism = k == 'serial_number' and ocr.get(k)|replace('-', '')|upper != p.serial_number|replace('-', '')|upper %}
+                <dt>{{ k|replace('_', ' ')|capitalize }}</dt><dd class="mono{{ ' warn-text' if mism }}">{{ ocr.get(k) }}{% if mism %} ≠ {{ p.serial_number }}{% endif %}</dd>{% endfor %}</dl>{% endif %}
+            </div>
+            <a class="btn quiet sm" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener">Open<span class="sr"> {{ d.original_filename }}</span></a></li>
+        {% else %}<li class="small muted">No files uploaded.</li>{% endfor %}
+      </ul>
+    </section>
+  </div>
+
+  <div class="col active" data-col="verdict" role="tabpanel" aria-label="Verdict">
+    {% if v %}
+      {{ verdict(v, claim, details=True, compact=True) }}
+      <section class="panel"><div class="panel-b">{{ verdict_why(v.p, True) }}</div></section>
+      <section class="panel"><div class="panel-b">{{ verdict_saw(v.p, True) }}</div></section>
+    {% else %}
+      {{ pending(claim) if claim.status in ['Submitted', 'Under Evaluation'] else empty_state('Not evaluated yet', 'This claim has not been submitted for evaluation.') }}
+    {% endif %}
+  </div>
+
+  <div class="col" data-col="facts" role="tabpanel" aria-label="Facts">
+    {% call ui_panel('Warranty') %}
+      {% if life %}
+        <div class="stack-xs">
+          <b class="small">{% if life.over %}Ended {{ life.over }} days before today{{ ' (inside the ' ~ life.grace ~ '-day grace period)' if life.in_grace }}{% else %}{{ life.left }} days left today{% endif %}</b>
+          {{ life_bar(life.used, life.total, grace_days=life.grace) }}
+          <div class="lifebar-legend"><span>{{ w.start_date|date }}</span><span>ends {{ w.expiry_date|date }} + {{ life.grace }} d grace</span></div>
+        </div>
+      {% else %}<p class="small mb-0">No warranty on file.</p>{% endif %}
+      <dl class="kv mt-2">
+        <dt>Fault started</dt><dd>{{ claim.fault_occurrence_date|date }}</dd>
+        <dt>Reported</dt><dd>{{ claim.claim_submission_date|date if claim.claim_submission_date else '—' }}{% if claim.claim_submission_date %} <span class="muted">({{ (claim.claim_submission_date - claim.fault_occurrence_date).days }} d later; limit {{ policy.claim_reporting_period_days }})</span>{% endif %}</dd>
+        <dt>Cause given</dt><dd>{{ claim.damage_type }}{% if claim.damage_type in policy.excluded_damage_types %} {{ tag('excluded', 'invalid') }}{% endif %}</dd>
+        <dt>Diagnosis</dt><dd>{% if claim.diagnosis_source == 'Not assessed' %}Not assessed{% else %}<span class="mono">{{ '%.2f'|format(claim.diagnostic_confidence) }}</span> · {{ claim.diagnosis_source }}{% endif %}</dd>
+      </dl>
+    {% endcall %}
+    {% call ui_panel("Customer's account") %}
+      <dl class="kv">
+        <dt>Customer</dt><dd>{{ claim.claimant.full_name }}</dd>
+        <dt>Other claims</dt><dd class="mono">{{ customer_claims }}</dd>
+        <dt>Product</dt><dd><a href="{{ url_for('products.view_product', product_id=p.product_id) }}">{{ p.product_name }}</a> <span class="mono small">{{ p.serial_number }}</span></dd>
+        <dt>Repairs</dt><dd>{{ p.repair_records|length }}{% set unauth = p.repair_records|rejectattr('is_authorized_center')|list %}{% if unauth %} {{ tag(unauth|length ~ ' unauthorised', 'invalid') }}{% endif %}</dd>
+      </dl>
+      {% if same_product %}
+        <h3 class="h4 mt-3">Earlier claims on this product</h3>
+        <ul class="checks mt-1">{% for c in same_product %}<li><i class="bi bi-dot" aria-hidden="true"></i><span><a href="{{ url_for('reviewer.workbench', claim_id=c.claim_id) }}" class="id">{{ c.claim_id }}</a> {{ c.fault_category }} · {{ c.status }}</span></li>{% endfor %}</ul>
+      {% endif %}
+    {% endcall %}
+    {% call ui_panel("Customer's description") %}<p class="small pre mb-0">{{ claim.fault_description }}</p>{% endcall %}
+    {% call ui_panel('Progress') %}{{ stage_timeline(claim, compact=True) }}<p class="tiny muted mt-1 mb-0">{{ claim.status }}</p>{% endcall %}
+  </div>
+</div>
+
+{% set can_decide = can('review.decide', claim) %}
+<div class="decision-bar" role="region" aria-label="Decision">
+  <div class="wrap">
+    {% if can_decide and review_actions %}
+    <form class="stack-xs" method="post" action="{{ url_for('reviewer.decide', claim_id=claim.claim_id) }}" data-review-form data-decision-bar
+          data-recommendation="{{ claim.final_decision or '' }}" data-overrides="{{ override_pairs|tojson|forceescape }}"
+          data-targets="{{ action_targets|tojson|forceescape }}" data-min="{{ override_min }}">
+      {{ csrf() }}<input type="hidden" name="next" value="{{ url_for('reviewer.workbench', claim_id=claim.claim_id) }}">
+      {% set labels = {'approve': ('Approve', 'A'), 'reject': ('Reject', 'R'), 'request_info': ('Request information', 'I'), 'close': ('Close', ''), 'reopen_review': ('Return to review', '')} %}
+      <div class="row between">
+        <fieldset class="seg decision-seg"><legend class="sr">Decision</legend>
+          {% for a in review_actions %}<label><input type="radio" name="action" value="{{ a }}" required data-key="{{ labels[a][1]|lower }}"><span>{{ labels[a][0] }}{% if labels[a][1] %} <kbd class="kbd">{{ labels[a][1] }}</kbd>{% endif %}</span></label>{% endfor %}
+        </fieldset>
+        <span class="small muted">Recommendation: {{ verdict_chip(claim.final_decision) }}</span>
+      </div>
+      <div class="fields">
+        <div class="field"><label for="db-comments">Comment (shown to the customer, kept in the audit trail) <kbd class="kbd">/</kbd></label>
+          <textarea class="textarea" id="db-comments" name="comments" rows="1" minlength="5" required aria-describedby="db-comments-d"></textarea>
+          <span class="help" id="db-comments-d">What you checked and why.</span></div>
+        <div class="field" data-override-field hidden><label for="db-override">Override reason (at least {{ override_min }} characters)</label>
+          <textarea class="textarea" id="db-override" name="override_reason" rows="1" data-counter="{{ override_min }}:1000" aria-describedby="db-override-d"></textarea>
+          <span class="counter" data-counter-for="db-override"></span>
+          <span class="help" id="db-override-d">Your decision differs from the recommendation; both stay on record.</span></div>
+      </div>
+      <div class="actions"><button class="btn" type="submit" data-review-submit>Record decision</button></div>
+    </form>
+    {% else %}
+      <p class="small mb-0">{% if claim.status in ['Approved', 'Rejected', 'Closed'] %}Decided: {{ claim.status }}.{% else %}You can't decide this claim: it is assigned to someone else, or you filed it.{% endif %}</p>
+    {% endif %}
+    {% if claim.assigned_reviewer_id is none and can_decide %}
+      <form method="post" action="{{ url_for('reviewer.take', claim_id=claim.claim_id) }}">{{ csrf() }}<input type="hidden" name="next" value="{{ url_for('reviewer.workbench', claim_id=claim.claim_id) }}">
+        <button class="btn quiet" type="submit">Take this claim</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<dialog data-help aria-labelledby="help-h">
+  <div class="panel-h"><h2 id="help-h">Keyboard shortcuts</h2><button class="icon-btn" type="button" data-help-close aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
+  <div class="panel-b">
+    <dl class="kv">
+      <dt><kbd class="kbd">A</kbd> <kbd class="kbd">R</kbd> <kbd class="kbd">I</kbd></dt><dd>Choose approve, reject or request information</dd>
+      <dt><kbd class="kbd">/</kbd></dt><dd>Write the comment</dd>
+      <dt><kbd class="kbd">N</kbd></dt><dd>Open the next claim</dd>
+      <dt><kbd class="kbd">1</kbd> <kbd class="kbd">2</kbd> <kbd class="kbd">3</kbd></dt><dd>Evidence, verdict, facts (narrow screens)</dd>
+      <dt><kbd class="kbd">Esc</kbd></dt><dd>Leave a text box or close this list</dd>
+    </dl>
+    <p class="tiny muted mb-0">Shortcuts are off while you type in a text box.</p>
+  </div>
+</dialog>
+{% endblock %}
+{% block page_js %}<script src="{{ asset('js/verdict.js') }}" defer></script><script src="{{ asset('js/review.js') }}" defer></script><script src="{{ asset('js/workbench.js') }}" defer></script>{% endblock %}

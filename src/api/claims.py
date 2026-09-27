@@ -312,20 +312,24 @@ def ocr_extract():
 @require("claim.read")
 def view_claim(claim_id):
     claim = _load(claim_id, "claim.read")
+    return render_template("claims/detail.html", **claim_context(claim, fresh=request.args.get("fresh") == "1"))
+
+
+def claim_context(claim, fresh: bool = False) -> dict:
+    """Everything the claim page and the reviewer workbench show about one claim."""
     docs = list(claim.documents) + [d for d in claim.product.documents if d.claim_id is None]
     reviewers = User.query.filter_by(role=Config.ROLE_REVIEWER, is_active=True).order_by(User.full_name).all()
-    present = present_document_types(claim)
-    return render_template(
-        "claims/detail.html", claim=claim, ev=claim.model_evaluation, log=claim.rule_validation, docs=docs,
+    return dict(
+        claim=claim, ev=claim.model_evaluation, log=claim.rule_validation, docs=docs,
         summary=summarise(claim), explanation=explain(claim), missing=missing_mandatory(claim),
-        missing_supporting=missing_supporting(claim), present=present,
+        missing_supporting=missing_supporting(claim), present=present_document_types(claim),
         doc_types=CLAIM_DOC_TYPES, can_upload=claim.status in UPLOAD_STATUSES, reviewers=reviewers,
         policy=get_policy(claim.product.category), faults=FAULTS, damage_types=DAMAGE_TYPES,
         review_actions=[a for a, target in claim_service.REVIEW_ACTIONS.items()
                         if target in rbac.policy()["review_transitions"].get(claim.status, [])],
         override_pairs=[[d, s] for d, s in claim_service.OVERRIDES], action_targets=claim_service.REVIEW_ACTIONS,
         override_min=rbac.policy()["separation_of_duties"]["override_reason_min_chars"],
-        v=verdict.view(claim, fresh=request.args.get("fresh") == "1"), details=verdict.show_model_details(g.user))
+        v=verdict.view(claim, fresh=fresh), details=verdict.show_model_details(g.user))
 
 
 @claim_bp.get("/<string:claim_id>/track")

@@ -80,6 +80,15 @@
   </div></div>
   {% if not compact %}
   <div class="verdict-why">
+    {{ verdict_why(p, details) }}
+    {{ verdict_saw(p, details) }}
+  </div>
+  {% endif %}
+</section>
+{%- endmacro %}
+
+{% macro verdict_why(p, details=True) -%}
+{# Why this decision: rule outcomes, contradictions, duplicates, evidence needed, Python contributions. #}
     <section aria-labelledby="why-h">
       <h3 id="why-h" class="mb-2">Why this decision</h3>
       <p class="small">{{ p.decision.reason }}.{% if details %} Rule <span class="mono">{{ p.decision.rule_id }}</span> matched{% set before = p.decision.trace|rejectattr('matched')|map(attribute='id')|list %}{% if before %} ({{ before|first }}–{{ before|last }} did not){% endif %}.{% endif %}</p>
@@ -108,6 +117,10 @@
         </div>
       {% endif %}
     </section>
+{%- endmacro %}
+
+{% macro verdict_saw(p, details=True) -%}
+{# The Claim Summary Card with the tile occlusion overlay and stage timings. #}
     <section aria-labelledby="saw-h">
       <h3 id="saw-h" class="mb-2">What the image model saw</h3>
       {% if p.gtm.card_url %}
@@ -132,9 +145,6 @@
       {% endif %}
       {% if p.stages %}<p class="timings mt-2">Pipeline timings (ms): {% for s in p.stages %}{{ s.name }} {{ s.ms }}{{ ' · ' if not loop.last }}{% endfor %} · total {{ p.total_ms }}</p>{% endif %}
     </section>
-  </div>
-  {% endif %}
-</section>
 {%- endmacro %}
 
 {% macro pending(claim) -%}

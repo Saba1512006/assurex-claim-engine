@@ -11,8 +11,9 @@ from src.core.features import FeatureError
 from src.core.vocab import CATEGORIES, CONSISTENCY_STATUSES
 from src.models.entities import Claim, Product, ReviewerAction, User
 from src.security import rbac
-from src.security.guards import authorize_object, check, require, scoped_claims
+from src.security.guards import authorize_object, check, require, safe_next, scoped_claims
 from src.services import claim_service
+from src.services.paging import ListPage
 
 reviewer_bp = Blueprint("reviewer", __name__, url_prefix="/reviewer")
 RISK_ORDER = {"High": 0, "Medium": 1, "Low": 2, None: 3}
@@ -62,7 +63,8 @@ def queue():
         "waiting": base.filter(Claim.status == Config.STATUS_ADDITIONAL_INFO).count(),
     }
     reviewers = User.query.filter_by(role=Config.ROLE_REVIEWER, is_active=True).order_by(User.full_name).all()
-    return render_template("reviewer/queue.html", claims=claims, tab=tab, counts=counts, categories=CATEGORIES,
+    page = ListPage(claims, request.args.get("page", 1, type=int), per_page=20)
+    return render_template("reviewer/queue.html", page=page, tab=tab, counts=counts, categories=CATEGORIES,
                            consistency_statuses=CONSISTENCY_STATUSES, reviewers=reviewers, today=date.today())
 
 
@@ -76,7 +78,7 @@ def take(claim_id):
         claim_service.assign(claim, g.user, g.user)
         db.session.commit()
         flash(f"{claim.claim_id} is assigned to you.", "success")
-    return redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="decision"))
+    return redirect(safe_next(request.form.get("next"), url_for("claims.view_claim", claim_id=claim_id, _anchor="decision")))
 
 
 @reviewer_bp.post("/claims/<string:claim_id>/decide")
@@ -85,7 +87,7 @@ def decide(claim_id):
     action = request.form.get("action", "")
     comments = request.form.get("comments", "").strip()
     reason = request.form.get("override_reason", "").strip() or None
-    back = redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="decision"))
+    back = redirect(safe_next(request.form.get("next"), url_for("claims.view_claim", claim_id=claim_id, _anchor="decision")))
     if action not in claim_service.REVIEW_ACTIONS:
         flash("Choose a decision.", "warning")
         return back
@@ -137,3 +139,42 @@ def reevaluate(claim_id):
         flash(f"Re-evaluated: {outcome.decision['decision']} (rule {outcome.decision['rule_id']}). "
               "The status is unchanged until you decide.", "info")
     return redirect(url_for("claims.view_claim", claim_id=claim_id, _anchor="models"))
+
+
+OPEN = (Config.STATUS_MANUAL_REVIEW, Config.STATUS_UNDER_EVALUATION)
+
+
+def next_claim(current: Claim | None = None) -> Claim | None:
+    """The claim to open after this one: mine first, then unassigned; highest risk, then oldest."""
+    q = scoped_claims(Claim).filter(Claim.status.in_(OPEN),
+                                    (Claim.assigned_reviewer_id == g.user.id) | Claim.assigned_reviewer_id.is_(None))
+    if current is not None:
+        q = q.filter(Claim.id != current.id)
+    rows = [c for c in q.all() if check("review.decide", c)]
+    rows.sort(key=lambda c: (c.assigned_reviewer_id is None, RISK_ORDER.get(c.risk_level, 3),
+                             c.claim_submission_date or date.today()))
+    return rows[0] if rows else None
+
+
+@reviewer_bp.get("/claim/<string:claim_id>")
+@require("review.queue")
+def workbench(claim_id):
+    """Three columns (evidence, verdict, facts) and a fixed decision bar; keyboard shortcuts in workbench.js."""
+    from src.api.claims import claim_context
+    claim = _claim(claim_id, "claim.read")
+    ctx = claim_context(claim)
+    same_product = [c for c in claim.product.claims if c.id != claim.id]
+    customer_claims = Claim.query.filter(Claim.user_id == claim.user_id, Claim.id != claim.id).count()
+    nxt = next_claim(claim)
+    return render_template("reviewer/workbench.html", **ctx, same_product=same_product,
+                           customer_claims=customer_claims, next_claim=nxt, today=date.today())
+
+
+@reviewer_bp.get("/next")
+@require("review.queue")
+def open_next():
+    nxt = next_claim()
+    if nxt is None:
+        flash("Nothing is waiting for you. The queue is empty.", "info")
+        return redirect(url_for("reviewer.queue"))
+    return redirect(url_for("reviewer.workbench", claim_id=nxt.claim_id))

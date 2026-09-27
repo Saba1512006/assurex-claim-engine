@@ -1,65 +1,68 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import status, decision, klass, risk, empty, csrf %}
+{# Review queue: four tabs, filters kept in the URL, highest risk and oldest first, 20 per page; rows open the workbench. #}
+{% from "components/ui.html" import csrf, status_tag, risk_tag, class_tag, consistency_tag, empty_state, pager %}
 {% block title %}Review queue{% endblock %}
-{% block content %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <h1>Manual review</h1>
-    <p class="lede">Claims the automated pipeline could not decide on its own: low confidence, model disagreement, missing evidence, duplicates, contradictions or policy review rules. Highest risk and oldest first.</p>
+    <h1>Review queue</h1>
+    <p class="lede">Claims the automated checks could not settle: low confidence, model disagreement, missing evidence, duplicates, contradictions or a policy review rule.</p>
   </div>
+  {% if can('review.decide') %}<a class="btn" href="{{ url_for('reviewer.open_next') }}"><i class="bi bi-play-fill" aria-hidden="true"></i>Start reviewing</a>{% endif %}
 </div>
+{% endblock %}
+{% block content %}
+<div class="stack">
+  <nav class="tabs" aria-label="Queues">
+    <a href="{{ url_with(tab='queue', page=None) }}" {% if tab == 'queue' %}aria-current="page"{% endif %}>Unassigned <span class="count">{{ counts.queue }}</span></a>
+    <a href="{{ url_with(tab='mine', page=None) }}" {% if tab == 'mine' %}aria-current="page"{% endif %}>{{ 'Assigned' if current_user.role == 'administrator' else 'Assigned to me' }} <span class="count">{{ counts.mine }}</span></a>
+    <a href="{{ url_with(tab='waiting', page=None) }}" {% if tab == 'waiting' %}aria-current="page"{% endif %}>Waiting on the customer <span class="count">{{ counts.waiting }}</span></a>
+    <a href="{{ url_with(tab='decided', page=None) }}" {% if tab == 'decided' %}aria-current="page"{% endif %}>Decided</a>
+  </nav>
 
-<nav class="tabs" aria-label="Queues">
-  <a href="{{ url_with(tab='queue') }}" {% if tab == 'queue' %}aria-current="page"{% endif %}><i class="bi bi-inboxes"></i>Unassigned <span class="count">{{ counts.queue }}</span></a>
-  <a href="{{ url_with(tab='mine') }}" {% if tab == 'mine' %}aria-current="page"{% endif %}><i class="bi bi-person-check"></i>{{ 'Assigned' if current_user.role == 'administrator' else 'Assigned to me' }} <span class="count">{{ counts.mine }}</span></a>
-  <a href="{{ url_with(tab='waiting') }}" {% if tab == 'waiting' %}aria-current="page"{% endif %}><i class="bi bi-hourglass"></i>Waiting on customer <span class="count">{{ counts.waiting }}</span></a>
-  <a href="{{ url_with(tab='decided') }}" {% if tab == 'decided' %}aria-current="page"{% endif %}><i class="bi bi-check2-all"></i>Decided</a>
-</nav>
+  <form class="filters" method="get" aria-label="Filter the queue">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <div class="field"><label for="qf-cat">Category</label><select class="select" id="qf-cat" name="category" data-autosubmit><option value="">All categories</option>{% for c in categories %}<option {{ 'selected' if request.args.get('category') == c }}>{{ c }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="qf-risk">Risk</label><select class="select" id="qf-risk" name="risk" data-autosubmit><option value="">Any risk</option>{% for r in ['High', 'Medium', 'Low'] %}<option {{ 'selected' if request.args.get('risk') == r }}>{{ r }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="qf-cons">Model agreement</label><select class="select" id="qf-cons" name="consistency" data-autosubmit><option value="">Any</option>{% for s in consistency_statuses %}<option {{ 'selected' if request.args.get('consistency') == s }}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="row tight"><noscript><button class="btn quiet" type="submit">Filter</button></noscript>
+      {% if request.args.get('category') or request.args.get('risk') or request.args.get('consistency') %}<a class="btn ghost" href="{{ url_for('reviewer.queue', tab=tab) }}">Clear filters</a>{% endif %}</div>
+  </form>
 
-<form class="filters" method="get" style="margin-bottom:16px">
-  <input type="hidden" name="tab" value="{{ tab }}">
-  <label class="field"><span>Category</span><select class="select sm" name="category" data-autosubmit><option value="">All</option>{% for c in categories %}<option {{ 'selected' if request.args.get('category') == c }}>{{ c }}</option>{% endfor %}</select></label>
-  <label class="field"><span>Risk</span><select class="select sm" name="risk" data-autosubmit><option value="">Any</option>{% for r in ['High', 'Medium', 'Low'] %}<option {{ 'selected' if request.args.get('risk') == r }}>{{ r }}</option>{% endfor %}</select></label>
-  <label class="field"><span>Model consistency</span><select class="select sm" name="consistency" data-autosubmit><option value="">Any</option>{% for s in consistency_statuses %}<option {{ 'selected' if request.args.get('consistency') == s }}>{{ s }}</option>{% endfor %}</select></label>
-  <noscript><button class="btn sm" type="submit">Filter</button></noscript>
-</form>
-
-<section class="card">
-  {% if claims %}
-  <div class="table-wrap"><table class="table">
-    <thead><tr><th>Claim</th><th>Why it's here</th><th>Python</th><th>Teachable Machine</th><th>Consistency</th><th>Waiting</th><th></th></tr></thead>
-    <tbody>
-    {% for c in claims %}{% set e = c.model_evaluation %}{% set log = c.rule_validation %}
-      <tr>
-        <td><a class="row-link" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}"><div class="t-main">{{ c.product.product_name }}</div>
-          <div class="t-sub"><span class="id">{{ c.claim_id }}</span> · {{ c.claimant.full_name }}</div></a>
-          <div class="row mt-1">{{ risk(c.risk_level) }}{% if tab != 'queue' %}{{ status(c.status) }}{% endif %}</div></td>
-        <td class="small" style="max-width:280px">
-          <b>{{ c.decision_rule_id }}</b> · {{ c.decision_reason }}
-          {% if log %}<div class="muted">
-            {% for r in log.of('manual_review') + log.of('hard_fail') %}{{ r.title }}{{ '; ' if not loop.last }}{% endfor %}
-            {% if log.contradictions %}{{ log.contradictions|length }} contradiction(s). {% endif %}
-            {% if log.duplicate_flags %}{{ log.duplicate_flags|length }} duplicate indicator(s). {% endif %}
-            {% if log.missing_documents %}Missing {{ log.missing_documents|map('replace', '_', ' ')|join(', ') }}.{% endif %}
-          </div>{% endif %}
-        </td>
-        <td class="small">{% if e and e.python_available %}{{ klass(e.python_predicted_class) }}<div class="muted">{{ e.python_top|pct }}</div>{% else %}—{% endif %}</td>
-        <td class="small">{% if e and e.gtm_available %}{{ klass(e.gtm_predicted_class) }}<div class="muted">{{ e.gtm_top|pct }}</div>{% else %}<span class="badge warn plain">unavailable</span>{% endif %}</td>
-        <td>{% if e %}<span class="badge {{ tone('consistency', e.model_consistency_status) }}">{{ e.model_consistency_status }}</span>{% endif %}</td>
-        <td class="small nowrap">{% if c.claim_submission_date %}{{ (today - c.claim_submission_date).days }} d{% endif %}</td>
-        <td class="right">
-          {% if tab == 'queue' and can('review.decide', c) %}
-            <form method="post" action="{{ url_for('reviewer.take', claim_id=c.claim_id) }}">{{ csrf() }}<button class="btn sm" type="submit">Take</button></form>
-          {% else %}
-            <a class="btn quiet sm" href="{{ url_for('claims.view_claim', claim_id=c.claim_id, _anchor='decision') }}">Open</a>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table></div>
-  {% else %}
-    {{ empty('bi-check2-circle', 'Nothing here', 'No claims match this view right now.') }}
-  {% endif %}
-</section>
+  <section class="panel" aria-labelledby="q-h">
+    <div class="panel-h"><h2 id="q-h" aria-live="polite">{{ page.total }} claim{{ '' if page.total == 1 else 's' }}</h2><span class="hint">Highest risk first, then oldest</span></div>
+    {% if page.items %}
+    <div class="table-wrap"><table class="table">
+      <caption class="sr">Claims in this queue</caption>
+      <thead><tr><th scope="col">Claim</th><th scope="col">Why it is here</th><th scope="col">Python</th><th scope="col">Teachable Machine</th><th scope="col">Agreement</th><th scope="col" class="num">Waiting</th><th scope="col"><span class="sr">Action</span></th></tr></thead>
+      <tbody>
+      {% for c in page.items %}{% set e = c.model_evaluation %}{% set log = c.rule_validation %}
+        <tr>
+          <td><a class="row-link" href="{{ url_for('reviewer.workbench', claim_id=c.claim_id) }}"><span class="t-main">{{ c.product.product_name }}</span> <span class="t-sub"><span class="id">{{ c.claim_id }}</span> {{ c.claimant.full_name }}</span></a>
+            <div class="row tight mt-1">{{ risk_tag(c.risk_level) }}{% if tab != 'queue' %}{{ status_tag(c.status) }}{% endif %}</div></td>
+          <td class="small wrap-cell"><span class="mono">{{ c.decision_rule_id }}</span> {{ c.decision_reason }}
+            {% if log %}{% set flags = (log.of('manual_review') + log.of('hard_fail'))|map(attribute='title')|list %}
+              <div class="muted">{{ flags|join('; ') }}{% if log.contradictions %}{{ '; ' if flags }}{{ log.contradictions|length }} contradiction{{ 's' if log.contradictions|length != 1 }}{% endif %}{% if log.duplicate_flags %}; possible duplicate{% endif %}{% if log.missing_documents %}; missing {{ log.missing_documents|map('replace', '_', ' ')|join(', ') }}{% endif %}</div>
+            {% endif %}</td>
+          <td class="small">{% if e and e.python_available %}{{ class_tag(e.python_predicted_class) }} <span class="mono">{{ '%.2f'|format(e.python_top) }}</span>{% else %}—{% endif %}</td>
+          <td class="small">{% if e and e.gtm_available %}{{ class_tag(e.gtm_predicted_class) }} <span class="mono">{{ '%.2f'|format(e.gtm_top) }}</span>{% else %}<span class="muted">Unavailable</span>{% endif %}</td>
+          <td>{% if e %}{{ consistency_tag(e.model_consistency_status) }}{% endif %}</td>
+          <td class="num mono small nowrap">{% if c.claim_submission_date %}{{ (today - c.claim_submission_date).days }} d{% endif %}</td>
+          <td class="right">
+            {% if tab == 'queue' and can('review.decide', c) %}
+              <form method="post" action="{{ url_for('reviewer.take', claim_id=c.claim_id) }}">{{ csrf() }}<input type="hidden" name="next" value="{{ url_for('reviewer.workbench', claim_id=c.claim_id) }}"><button class="btn sm" type="submit">Take<span class="sr"> {{ c.claim_id }}</span></button></form>
+            {% else %}
+              <a class="btn quiet sm" href="{{ url_for('reviewer.workbench', claim_id=c.claim_id) }}">Open<span class="sr"> {{ c.claim_id }}</span></a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {{ pager(page) }}
+    {% else %}
+      {{ empty_state('Nothing in this view', 'No claims match this tab and these filters right now.', icon='bi-check2-circle') }}
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

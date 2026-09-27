@@ -14,7 +14,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -202,3 +202,28 @@ def test_readiness_check_uses_the_envelope(app, client):
     login(client, "c@x.io")
     body = client.post("/claims/preparation-check", data={"product_id": p.product_id}).get_json()
     assert body["success"] and {"items", "score", "ready"} <= set(body["data"])
+
+
+def test_workbench_opens_for_reviewers_only_and_decisions_return_to_it(app, client):
+    from tests.conftest import make_claim
+    cust = make_user("c@x.io")
+    rv = make_user("rv@x.io", "claim_reviewer")
+    high = make_claim(make_product(cust), status="Manual Review", risk_level="High", claim_submission_date=date.today(),
+                      final_decision="Manual Review Required")
+    low = make_claim(make_product(cust, serial="SN-TST-3000003", invoice="INV-2025-33333"), status="Manual Review",
+                     risk_level="Low", claim_submission_date=date.today() - timedelta(days=5), final_decision="Manual Review Required")
+    login(client, "c@x.io")
+    assert client.get(f"/reviewer/claim/{high.claim_id}").status_code == 403
+    client.post("/logout")
+    login(client, "rv@x.io")
+    html = client.get(f"/reviewer/claim/{low.claim_id}").get_data(as_text=True)
+    assert "data-decision-bar" in html and "Keyboard shortcuts" in html
+    assert f'/reviewer/claim/{high.claim_id}' in html                     # next claim: the other open one
+    assert client.get("/reviewer/next").headers["Location"].endswith(f"/reviewer/claim/{high.claim_id}")   # high risk first
+    wb = f"/reviewer/claim/{high.claim_id}"
+    r = client.post(f"/reviewer/claims/{high.claim_id}/take", data={"next": wb})
+    assert r.headers["Location"].endswith(wb) and high.assigned_reviewer_id == rv.id
+    r = client.post(f"/reviewer/claims/{high.claim_id}/decide", data={"action": "approve", "comments": "Receipt and photos checked.", "next": wb})
+    assert r.headers["Location"].endswith(wb) and high.status == "Approved"
+    r = client.post(f"/reviewer/claims/{low.claim_id}/decide", data={"action": "approve", "comments": "Checked.", "next": "https://evil.example"})
+    assert "evil" not in r.headers["Location"]                            # open-redirect guard
