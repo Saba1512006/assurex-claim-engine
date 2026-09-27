@@ -5,7 +5,7 @@ import json
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import (Blueprint, Response, abort, after_this_request, flash, jsonify, redirect, render_template, request,
@@ -19,7 +19,7 @@ from src.core.card_v2 import CARD_POLICY_FIELDS
 from src.core.gtm_classifier_v2 import GTM_DIR, GTMUnavailable, find_model_file, parse_labels
 from src.core.offline_eval import evaluate_gtm_and_save
 from src.core.vocab import CATEGORIES, CLASSES, DAMAGE_TYPES, try_parse_date
-from src.models.entities import AuditLog, Claim, Product, User
+from src.models.entities import AuditLog, Claim, Product, ReviewerAction, User
 from src.rules import policy_store
 from src.security.guards import check, require, scoped_claims, scoped_products
 from src.services import analytics_service, export_service
@@ -78,7 +78,9 @@ def analytics():
     if request.args.get("format") == "json":
         return jsonify(data)
     stats = json.loads(DATASET_STATS.read_text()) if DATASET_STATS.exists() else {}
-    return render_template("admin/analytics.html", a=data, o=analytics_service.overview(claims_q), filters=request.args,
+    per_model = [["Python model", [data["models"]["python_classes"].get(c, 0) for c in CLASSES]],
+                 ["Teachable Machine", [data["models"]["gtm_classes"].get(c, 0) for c in CLASSES]]]
+    return render_template("admin/analytics.html", a=data, per_model=per_model, o=analytics_service.overview(claims_q), filters=request.args,
                            categories=CATEGORIES, statuses=Config.ALL_CLAIM_STATUSES, card=python_classifier.model_card(),
                            dataset=stats)
 
@@ -382,10 +384,21 @@ def audit_log():
     if request.args.get("q"):
         like = f"%{request.args['q'].strip()}%"
         q = q.filter(or_(AuditLog.entity_id.ilike(like), AuditLog.details_json.ilike(like)))
+    if request.args.get("role") in Config.ALL_ROLES:
+        q = q.filter(AuditLog.user_role == request.args["role"])
+    if request.args.get("actor"):
+        actor = User.query.filter(or_(User.user_id == request.args["actor"].strip(),
+                                      User.email == request.args["actor"].strip().lower())).first()
+        q = q.filter(AuditLog.user_id == (actor.id if actor else -1))
+    start, end = try_parse_date(request.args.get("start")), try_parse_date(request.args.get("end"))
+    if start:
+        q = q.filter(AuditLog.timestamp >= datetime.combine(start, datetime.min.time()))
+    if end:
+        q = q.filter(AuditLog.timestamp < datetime.combine(end, datetime.min.time()) + timedelta(days=1))
     page = max(1, request.args.get("page", 1, type=int))
     rows = q.order_by(AuditLog.id.desc()).paginate(page=page, per_page=40, error_out=False)
     actions = [a for (a,) in db.session.query(AuditLog.action).distinct().order_by(AuditLog.action)]
-    return render_template("admin/audit.html", rows=rows, actions=actions, args=request.args)
+    return render_template("admin/audit.html", rows=rows, actions=actions, args=request.args, roles=Config.ALL_ROLES)
 
 
 @admin_bp.get("/export/<string:kind>")
@@ -403,6 +416,11 @@ def export(kind):
         body = export_service.warranties_csv(products, fmt)
     elif kind == "analytics":
         body = export_service.analytics_csv(analytics_service.full(claims_q, scoped_products(Product, Claim)), fmt)
+    elif kind == "overrides":
+        ids = [c.id for c in claims_q.all()]
+        actions = (ReviewerAction.query.filter(ReviewerAction.claim_id.in_(ids)).order_by(ReviewerAction.id).all()
+                   if ids else [])
+        body = export_service.overrides_csv(actions, fmt)
     elif kind == "audit" and check("audit.read"):
         body = export_service.audit_csv(AuditLog.query.order_by(AuditLog.id).all(), fmt)
     else:

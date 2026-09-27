@@ -758,3 +758,9 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .chg-history .chg { margin-top: var(--s1); }
 .kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .kpis .stat { border-bottom: 1px solid var(--rule); }
+.table tr.selected th, .table tr.selected td { background: var(--teal-wash); }
+.details-cell { max-width: 420px; } .details-cell pre { white-space: pre-wrap; max-height: 260px; overflow: auto; background: var(--mist); padding: var(--s2); border-radius: var(--r-bar); }
+.row.end { justify-content: flex-end; }
+.stack-cell .t-main, .stack-cell .t-sub { display: block; }
+.table .row.end { flex-wrap: nowrap; }
+.stack-cell { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }

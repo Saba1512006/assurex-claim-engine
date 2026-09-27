@@ -12,7 +12,6 @@ from statistics import mean
 from config.config import Config
 from src.core.vocab import CATEGORIES, CONSISTENCY_STATUSES, DECISIONS
 from src.models.entities import Claim, Product, ProductWarranty, RepairHistory
-from src.rules.policy_store import RULE_CATALOG
 
 
 def apply_filters(query, *, category: str | None = None, start: date | None = None, end: date | None = None,
@@ -93,7 +92,7 @@ def full(claim_query, product_query) -> dict:
             continue
         if c.final_decision == "Likely Invalid":
             for r in log.of("hard_fail"):
-                rejected_reasons[RULE_CATALOG.get(r["rule_id"], r["rule_id"])] += 1
+                rejected_reasons[r["rule_id"].replace("_", " ").capitalize()] += 1
         if c.final_decision == "Manual Review Required":
             e = c.model_evaluation
             if log.contradictions:

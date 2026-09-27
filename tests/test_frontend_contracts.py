@@ -14,7 +14,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/analytics.html', 'admin/audit.html', 'admin/models.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -365,3 +365,20 @@ def test_customer_view_setting_hides_model_details_from_customers_only(app, clie
     client.post("/logout")
     login(client, "ad@x.io")
     assert 'aria-label="Python model:' in client.get(f"/claims/{c.claim_id}").get_data(as_text=True)
+
+
+def test_overrides_export_lists_reviewer_decisions_next_to_the_models(app, client):
+    from tests.conftest import make_claim
+    cust = make_user("c@x.io")
+    make_user("rv@x.io", "claim_reviewer")
+    make_user("ad@x.io", "administrator")
+    c = make_claim(make_product(cust), status="Manual Review", final_decision="Likely Invalid", claim_submission_date=date.today())
+    login(client, "rv@x.io")
+    client.post(f"/reviewer/claims/{c.claim_id}/decide", data={"action": "approve", "comments": "Receipt checked.",
+                "override_reason": "Retailer confirmed the purchase by phone."})
+    client.post("/logout")
+    login(client, "ad@x.io")
+    text = client.get("/admin/export/overrides").get_data(as_text=True)
+    lines = text.lstrip("﻿").splitlines()
+    assert lines[0].startswith("Claim ID,Category") and len(lines) == 2
+    assert c.claim_id in lines[1] and ",Likely Invalid," in lines[1] and ",Approved,yes,Retailer confirmed" in lines[1]

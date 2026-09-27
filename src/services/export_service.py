@@ -115,3 +115,19 @@ def audit_csv(logs, fmt: str = "csv"):
     header = ["Time (UTC)", "Action", "Actor", "Role", "Entity", "Entity ID", "IP", "Details"]
     return _out(fmt, header, ([l.timestamp, l.action, l.actor.email if l.actor else "system", l.user_role,
                             l.entity_type, l.entity_id, l.ip_address, l.details_json] for l in logs))
+
+
+def overrides_csv(actions, fmt: str = "csv"):
+    """Reviewer decisions next to what the models and the decision table said: feedback for the next retraining."""
+    header = ["Claim ID", "Category", "Decided at (UTC)", "Reviewer", "Automated recommendation", "Decision rule",
+              "Reviewer decision", "Override", "Override reason", "Comment", "Python class", "Python confidence",
+              "Teachable Machine class", "Teachable Machine confidence", "Agreement"]
+    rows = []
+    for a in actions:
+        c, e = a.claim, a.claim.model_evaluation
+        rows.append([c.claim_id, c.product.category, a.timestamp.strftime("%Y-%m-%d %H:%M"), a.reviewer.full_name,
+                     a.previous_recommendation or "", c.decision_rule_id or "", a.reviewer_decision,
+                     "yes" if a.is_override else "no", a.override_reason or "", a.comments,
+                     e.python_predicted_class if e else "", e.python_top if e else "",
+                     e.gtm_predicted_class if e else "", e.gtm_top if e else "", e.model_consistency_status if e else ""])
+    return _out(fmt, header, rows)

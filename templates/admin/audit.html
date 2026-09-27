@@ -1,38 +1,52 @@
 {% extends "components/base.html" %}
+{# Audit trail: append-only; filter by action, actor, role, date and free text; 40 per page.
+   Exports always contain the full log, because it is the compliance record. #}
+{% from "components/ui.html" import tag, pager, empty_state %}
 {% block title %}Audit trail{% endblock %}
-{% block content %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="eyebrow">Compliance</div>
     <h1>Audit trail</h1>
-    <p class="lede">Append-only record of sign-ins, registrations, uploads, OCR corrections, predictions, submissions, status changes, reviewer actions, configuration changes and blocked access attempts.</p>
+    <p class="lede">Every sign-in, upload, OCR correction, prediction, status change, reviewer decision, configuration change and blocked attempt. Nothing here can be edited or deleted.</p>
   </div>
-  <a class="btn quiet" href="{{ url_for('admin.export', kind='audit') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>
-  <a class="btn quiet" href="{{ url_for('admin.export', kind='audit', format='xlsx') }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>
+  <div class="row tight">
+    <a class="btn quiet" href="{{ url_for('admin.export', kind='audit') }}">Export CSV</a>
+    <a class="btn quiet" href="{{ url_for('admin.export', kind='audit', format='xlsx') }}">Export Excel</a>
+  </div>
 </div>
-<form class="card" method="get"><div class="card-b filters">
-  <label class="field"><span>Action</span><select class="select sm" name="action" data-autosubmit><option value="">All actions</option>{% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}</select></label>
-  <label class="field grow"><span>Search entity or details</span><input class="input sm" name="q" value="{{ args.get('q', '') }}" placeholder="CLM-…, USR-…, a file hash…"></label>
-  <div class="row"><button class="btn sm" type="submit">Search</button><a class="btn ghost sm" href="{{ url_for('admin.audit_log') }}">Clear</a></div>
-</div></form>
-<section class="card mt-3">
-  <div class="card-h"><h2>{{ rows.total }} event{{ 's' if rows.total != 1 }}</h2><span class="hint">page {{ rows.page }} of {{ rows.pages or 1 }}</span></div>
-  <div class="table-wrap"><table class="table compact small">
-    <thead><tr><th>Time (UTC)</th><th>Action</th><th>Actor</th><th>Entity</th><th>Details</th><th>IP</th></tr></thead>
-    <tbody>{% for a in rows.items %}
-      <tr><td class="nowrap">{{ a.timestamp|date('%d %b %Y %H:%M:%S') }}</td>
-        <td><span class="badge plain {{ 'bad' if a.action in ['ACCESS_DENIED', 'LOGIN_FAILED', 'LOGIN_LOCKED', 'UPLOAD_FAILED', 'MODEL_UNAVAILABLE'] else ('info' if 'MODEL' in a.action or 'DECISION' in a.action else '') }}">{{ a.action }}</span></td>
-        <td>{{ a.actor.full_name if a.actor else '—' }}{% if a.user_role %}<div class="t-sub">{{ role_label(a.user_role) }}</div>{% endif %}</td>
-        <td>{% if a.entity_type %}<div class="t-sub">{{ a.entity_type }}</div>{% endif %}<span class="id">{{ a.entity_id or '—' }}</span></td>
-        <td style="max-width:420px"><code class="tiny" style="white-space:pre-wrap; word-break:break-word">{{ a.details_json|truncate(260) if a.details_json else '' }}</code></td>
-        <td class="mono tiny">{{ a.ip_address or '' }}</td></tr>
-    {% endfor %}</tbody>
-  </table></div>
-  {% if rows.pages > 1 %}
-  <div class="card-f row between">
-    {% if rows.has_prev %}<a class="btn quiet sm" href="{{ url_with(page=rows.prev_num) }}">← Newer</a>{% else %}<span></span>{% endif %}
-    {% if rows.has_next %}<a class="btn quiet sm" href="{{ url_with(page=rows.next_num) }}">Older →</a>{% endif %}
-  </div>
-  {% endif %}
-</section>
+{% endblock %}
+{% block content %}
+{% set alarm = ['ACCESS_DENIED', 'LOGIN_FAILED', 'LOGIN_LOCKED', 'UPLOAD_FAILED', 'MODEL_UNAVAILABLE', 'BATCH_FAILED'] %}
+<div class="stack">
+  <form class="panel" method="get" role="search" aria-label="Filter the audit trail">
+    <div class="panel-b filters">
+      <div class="field"><label for="au-action">Action</label><select class="select" id="au-action" name="action" data-autosubmit><option value="">All actions</option>{% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="au-role">Role</label><select class="select" id="au-role" name="role" data-autosubmit><option value="">Any role</option>{% for r in roles %}<option value="{{ r }}" {{ 'selected' if args.get('role') == r }}>{{ role_label(r) }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="au-actor">Actor</label><input class="input mono" id="au-actor" name="actor" value="{{ args.get('actor', '') }}" placeholder="USR- or email" maxlength="120"></div>
+      <div class="field grow"><label for="au-q">Record or details</label><input class="input mono" id="au-q" name="q" value="{{ args.get('q', '') }}" placeholder="CLM-, a file hash, a rule ID" maxlength="120"></div>
+      <div class="field narrow"><label for="au-from">From</label><input class="input" id="au-from" type="date" name="start" value="{{ args.get('start', '') }}"></div>
+      <div class="field narrow"><label for="au-to">to</label><input class="input" id="au-to" type="date" name="end" value="{{ args.get('end', '') }}"></div>
+      <div class="row tight"><button class="btn quiet" type="submit">Search</button>{% if args %}<a class="btn ghost" href="{{ url_for('admin.audit_log') }}">Clear filters</a>{% endif %}</div>
+    </div>
+  </form>
+
+  <section class="panel" aria-labelledby="au-h">
+    <div class="panel-h"><h2 id="au-h" aria-live="polite">{{ rows.total }} event{{ '' if rows.total == 1 else 's' }}</h2><span class="hint">Newest first · times in UTC</span></div>
+    {% if rows.items %}
+    <div class="table-wrap"><table class="table compact small">
+      <caption class="sr">Audit events</caption>
+      <thead><tr><th scope="col">Time</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Record</th><th scope="col">Details</th><th scope="col">IP</th></tr></thead>
+      <tbody>{% for a in rows.items %}
+        <tr><td class="nowrap mono">{{ a.timestamp|date('%d %b %H:%M:%S') }}</td>
+          <td>{{ tag(a.action, 'invalid' if a.action in alarm else ('teal' if 'MODEL' in a.action or 'DECISION' in a.action or 'POLICY' in a.action else '')) }}</td>
+          <td>{{ a.actor.full_name if a.actor else 'System' }}{% if a.user_role %} <span class="t-sub">{{ role_label(a.user_role) }}</span>{% endif %}</td>
+          <td>{% if a.entity_type %}<span class="t-sub">{{ a.entity_type }}</span> {% endif %}<span class="id">{{ a.entity_id or '—' }}</span></td>
+          <td class="details-cell">{% if a.details_json %}<details><summary class="mono tiny">{{ a.details_json|truncate(70) }}</summary><pre class="mono tiny wrap-any mt-1 mb-0">{{ a.details|tojson(indent=2) }}</pre></details>{% endif %}</td>
+          <td class="mono tiny">{{ a.ip_address or '' }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {{ pager(rows) }}
+    {% else %}{{ empty_state('No events match', 'Clear a filter or widen the dates.', url_for('admin.audit_log'), 'Clear filters', 'bi-search') }}{% endif %}
+  </section>
+</div>
 {% endblock %}

@@ -24,7 +24,8 @@
     <div class="field narrow"><label for="f-from">Filed from</label><input class="input" id="f-from" type="date" name="start" value="{{ filters.get('start', '') }}"></div>
     <div class="field narrow"><label for="f-to">to</label><input class="input" id="f-to" type="date" name="end" value="{{ filters.get('end', '') }}"></div>
     <div class="row tight"><button class="btn quiet" type="submit">Apply</button>{% if filters %}<a class="btn ghost" href="{{ url_for('admin.dashboard') }}">Reset</a>{% endif %}
-      <a class="btn ghost" href="{{ url_for('admin.export', kind='claims', **filters) }}">Export CSV</a></div>
+      <a class="btn ghost" href="{{ url_for('admin.export', kind='claims', **filters) }}">Export claims</a>
+      <a class="btn ghost" href="{{ url_for('admin.export', kind='overrides', **filters) }}">Export reviewer decisions</a></div>
   </form>
 
   <section class="stats kpis" aria-label="Key figures">
