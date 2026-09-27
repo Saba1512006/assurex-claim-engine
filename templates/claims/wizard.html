@@ -1,157 +1,180 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import csrf, empty, doc_icon %}
-{% block title %}New claim{% endblock %}
-{% block content %}
-{% set staff = current_user.role == 'service_center_staff' %}
+{# Claim wizard: product, what happened, evidence (receipt read by OCR in a split view), review. A readiness panel
+   checks the claim as it is filled in; the draft is saved on the server once "What happened" is complete.
+   Without JavaScript all four steps show as one form and nothing is lost. #}
+{% from "components/ui.html" import csrf, field, empty_state, tag, life_bar, doc_icon %}
+{% block title %}File a claim{% endblock %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="crumbs"><a href="{{ url_for('claims.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i><span>New claim</span></div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('claims.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span aria-current="page">File a claim</span></nav>
     <h1>File a warranty claim</h1>
-    <p class="lede">Four short steps. We check your claim as you go and tell you what's missing before you submit.</p>
+    <p class="lede">Four steps. The panel on the right says what is still missing before you submit.</p>
   </div>
 </div>
-
+{% endblock %}
+{% block content %}
+{% set staff = current_user.role == 'service_center_staff' %}
 {% if not products %}
-  <div class="card">{{ empty('bi-box-seam', 'Register a product first', 'Claims are filed against a registered product with a warranty on file.', url_for('products.register_product'), 'Register product') }}</div>
+  <div class="panel">{{ empty_state('Register a product first', 'A claim is filed against a registered product that has a warranty on file.', url_for('products.register_product'), 'Register a product', 'bi-box-seam') }}</div>
 {% else %}
-<form id="wizard" method="post" enctype="multipart/form-data" data-wizard
-      data-prep-url="{{ url_for('claims.preparation_check') }}" data-ocr-url="{{ url_for('claims.ocr_extract') }}" novalidate>
+<form method="post" enctype="multipart/form-data" data-wizard
+      data-prep-url="{{ url_for('claims.preparation_check') }}" data-ocr-url="{{ url_for('claims.ocr_extract') }}"
+      data-draft-url="{{ url_for('api.autosave_draft') }}" data-start="{{ '1' if form or selected else '0' }}">
   {{ csrf() }}
-  <nav class="steps" aria-label="Claim steps">
-    <button type="button" data-step-btn="0" aria-current="step"><b>1</b>Product</button>
-    <button type="button" data-step-btn="1"><b>2</b>What happened</button>
-    <button type="button" data-step-btn="2"><b>3</b>Evidence</button>
-    <button type="button" data-step-btn="3"><b>4</b>Review &amp; submit</button>
-  </nav>
+  <input type="hidden" name="draft_id" value="{{ form.get('draft_id', '') }}" data-draft-id>
+  <ol class="steps wz-steps" aria-label="Claim steps">
+    {% for name in ['Product', 'What happened', 'Evidence', 'Review and submit'] %}
+      <li><button type="button" data-step-btn="{{ loop.index0 }}"><b>{{ loop.index }}</b>{{ name }}</button></li>
+    {% endfor %}
+  </ol>
 
   <div class="split mt-3">
-    <div>
-      <!-- 1 product -->
-      <section class="card wizard-step active" data-step="0">
-        <div class="card-h"><h2>Which product is it?</h2><span class="hint">Only products with a warranty on file are listed.</span></div>
-        <div class="card-b tiles" role="radiogroup" aria-label="Product">
-          {% for p in products %}
-            {% set w = p.warranty %}
-            <label class="tile" style="cursor:pointer">
-              <div class="row between">
-                <span class="row"><input type="radio" name="product_id" value="{{ p.product_id }}" required {{ 'checked' if (form.get('product_id') or selected) == p.product_id }}>
-                  <b>{{ p.product_name }}</b></span>
-                <span class="badge {{ tone('warranty', w.status) }}">{{ w.status }}</span>
-              </div>
-              <div class="small muted">{{ p.category }} · {{ p.brand }} · <span class="mono">{{ p.serial_number }}</span>{% if staff %} · {{ p.owner.full_name }}{% endif %}</div>
-              <div class="meter {{ tone('warranty', w.status) }}"><i style="width: {{ (w.life_used * 100)|round }}%"></i></div>
-              <div class="small muted">Bought {{ p.purchase_date|date }} · cover ends {{ w.expiry_date|date }}</div>
-            </label>
-          {% endfor %}
+    <div class="stack">
+      <section class="panel" data-step="0" aria-labelledby="s0-h">
+        <div class="panel-h"><h2 id="s0-h">Which product is it?</h2><span class="hint">Products with a warranty on file</span></div>
+        <div class="panel-b">
+          <fieldset class="picks">
+            <legend class="sr">Product</legend>
+            {% for p in products %}{% set life = warranty_life(p.warranty) %}
+              <label class="plate pick">
+                <span class="row between">
+                  <span class="row tight"><input type="radio" name="product_id" value="{{ p.product_id }}" required {{ 'checked' if (form.get('product_id') or selected) == p.product_id }}>
+                    <span class="name">{{ p.product_name }}</span></span>
+                  {{ tag(life.status, tag_kind('warranty', life.status)) }}
+                </span>
+                <span class="serial">{{ p.category }} · {{ p.serial_number }}{% if staff %} · {{ p.owner.full_name }}{% endif %}</span>
+                {{ life_bar(life.used, life.total, grace_days=life.grace, label=(life.left ~ ' warranty days left') if not life.over else ('Warranty ended ' ~ life.over ~ ' days ago')) }}
+                <span class="lifebar-legend"><span>Bought {{ p.purchase_date|date }}</span><span>{{ (life.left ~ ' days left') if not life.over else ('ended ' ~ life.over ~ ' days ago') }}</span></span>
+              </label>
+            {% endfor %}
+          </fieldset>
         </div>
-        <div class="card-f row between"><a class="small" href="{{ url_for('products.register_product') }}">Product not listed? Register it →</a><button class="btn" type="button" data-next>Continue</button></div>
+        <div class="panel-f row between"><a class="small" href="{{ url_for('products.register_product') }}">Product not listed? Register it</a>
+          <button class="btn wz-only" type="button" data-next>Continue</button></div>
       </section>
 
-      <!-- 2 fault -->
-      <section class="card wizard-step" data-step="1">
-        <div class="card-h"><h2>What happened?</h2></div>
-        <div class="card-b form-grid">
-          <label class="field"><span>Fault <span class="req">*</span></span>
-            <select class="select" name="fault_category" data-fault-select required>
-              <option value="">Choose the fault…</option>
+      <section class="panel" data-step="1" aria-labelledby="s1-h">
+        <div class="panel-h"><h2 id="s1-h">What happened?</h2><span class="hint" data-draft-status aria-live="polite"></span></div>
+        <div class="panel-b form-grid">
+          <div class="field">
+            <label for="f-fault">Fault <span class="req">(required)</span></label>
+            <select class="select" id="f-fault" name="fault_category" required data-fault-select aria-describedby="f-fault-d">
+              <option value="">Choose the fault</option>
+              {% for cat, list in faults.items() %}<optgroup label="{{ cat }}" data-cat="{{ cat }}">
+                {% for f in list %}<option value="{{ f }}" {{ 'selected' if form.get('fault_category') == f }}>{{ f }}</option>{% endfor %}</optgroup>{% endfor %}
             </select>
-            <span class="help">Faults listed are the ones covered for this product category.</span></label>
-          <label class="field"><span>What caused it? <span class="req">*</span></span>
-            <select class="select" name="damage_type" required>
-              <option value="">Choose a cause…</option>
+            <span class="help" id="f-fault-d">Only faults this product's warranty lists are shown.</span>
+          </div>
+          <div class="field">
+            <label for="f-damage">What caused it? <span class="req">(required)</span></label>
+            <select class="select" id="f-damage" name="damage_type" required aria-describedby="f-damage-d">
+              <option value="">Choose a cause</option>
               {% for d in damage_types %}<option value="{{ d }}" {{ 'selected' if form.get('damage_type') == d }}>{{ d }}</option>{% endfor %}
             </select>
-            <span class="help" data-exclusion-hint></span></label>
-          <label class="field"><span>When did it start? <span class="req">*</span></span>
-            <input class="input" type="date" name="fault_occurrence_date" value="{{ form.get('fault_occurrence_date', '') }}" max="{{ today.isoformat() }}" required>
-            <span class="help" data-deadline-hint></span></label>
-          <label class="field"><span>Diagnostic confidence {% if staff %}<span class="req">*</span>{% endif %}</span>
-            <input class="input" type="number" name="diagnostic_confidence" min="0" max="1" step="0.01" value="{{ form.get('diagnostic_confidence', '') }}" placeholder="{{ '0.00 – 1.00' if staff else 'Leave blank if no technician report' }}">
-            <span class="help">{% if staff %}Technician's confidence that the stated cause is correct.{% else %}Only if a service center gave you a diagnosis. Blank means “not assessed” (0.50).{% endif %}</span></label>
-          <label class="field full"><span>Describe the problem <span class="req">*</span></span>
-            <textarea class="textarea" name="fault_description" minlength="15" maxlength="2000" required placeholder="What stopped working, how often, anything that happened before it started…">{{ form.get('fault_description', '') }}</textarea></label>
-          <label class="field full"><span>Previously replaced?</span>
-            <input class="input" name="previous_replacement_details" value="{{ form.get('previous_replacement_details', '') }}" placeholder="e.g. Unit replaced under warranty in March 2025 (leave blank if not)"></label>
+            <span class="help" id="f-damage-d" data-exclusion-hint>If you are not sure, choose Unknown.</span>
+          </div>
+          <div class="field">
+            <label for="f-when">When did it start? <span class="req">(required)</span></label>
+            <input class="input" id="f-when" type="date" name="fault_occurrence_date" value="{{ form.get('fault_occurrence_date', '') }}" max="{{ today.isoformat() }}" required aria-describedby="f-when-d">
+            <span class="help" id="f-when-d" data-deadline-hint>The warranty sets a deadline for reporting a fault.</span>
+          </div>
+          {{ field('diagnostic_confidence', 'Diagnostic confidence', form.get('diagnostic_confidence', ''), type='number', required=staff, mono=True,
+                   hint=("The technician's confidence, from 0 to 1, that the stated cause is right." if staff else 'Only if a service center diagnosed it. Leave empty for "not assessed".'),
+                   attrs={'min': '0', 'max': '1', 'step': '0.01', 'placeholder': '0.00 to 1.00'}) }}
+          <div class="field full">
+            <label for="f-desc">Describe the problem <span class="req">(required)</span></label>
+            <textarea class="textarea" id="f-desc" name="fault_description" rows="5" minlength="20" maxlength="1000" required data-counter="20:1000"
+                      aria-describedby="f-desc-d f-desc-c" placeholder="What stopped working, how often, and anything that happened just before.">{{ form.get('fault_description', '') }}</textarea>
+            <span class="help" id="f-desc-d">20 to 1000 characters. Facts help more than adjectives.</span>
+            <span class="counter" id="f-desc-c" data-counter-for="f-desc"></span>
+          </div>
+          <div class="full">{{ field('previous_replacement_details', 'Was it replaced before?', form.get('previous_replacement_details', ''),
+                                      hint='For example: unit replaced under warranty in March 2025. Leave empty if not.', attrs={'maxlength': '255'}) }}</div>
         </div>
-        <div class="card-f row between"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Continue</button></div>
+        <div class="panel-f row between wz-only"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Continue</button></div>
       </section>
 
-      <!-- 3 evidence -->
-      <section class="card wizard-step" data-step="2">
-        <div class="card-h"><h2>Evidence</h2><span class="hint">PDF, JPG or PNG up to 10 MB · MP4 up to 16 MB for video</span></div>
-        <div class="card-b stack">
-          <div class="callout brand small"><i class="bi bi-info-circle"></i> A <b>purchase receipt</b> is required. The warranty card, a serial-number photo and a damage photo are strongly recommended — two or more missing sends the claim to manual review.
-            <span data-receipt-on-file class="hidden"><br><b>Good news:</b> a receipt for this product is already on file.</span></div>
-          {% set labels = {'receipt': ('Purchase receipt / invoice', 'Required'), 'warranty_card': ('Warranty card', 'Recommended'), 'serial_photo': ('Serial-number photo', 'Recommended'), 'damage_photo': ('Damage / fault photo', 'Recommended'), 'diagnostic_report': ('Diagnostic / repair report', 'Optional'), 'product_photo': ('Product photo', 'Optional'), 'fault_video': ('Fault video', 'Optional'), 'other_evidence': ('Other evidence', 'Optional')} %}
+      <section class="panel" data-step="2" aria-labelledby="s2-h">
+        <div class="panel-h"><h2 id="s2-h">Evidence</h2><span class="hint">PDF, JPG or PNG up to 10 MB; MP4 up to 16 MB</span></div>
+        <div class="panel-b stack">
+          <p class="callout teal small mb-0">The <b>purchase receipt</b> is required. The warranty card, a serial-number photo and a damage photo are
+            recommended: two or more missing sends the claim to a reviewer.
+            <span class="hidden" data-receipt-on-file><br>A receipt for this product is already on file, so you can skip it.</span></p>
+          {% set need = {'receipt': ('Required', 'invalid'), 'warranty_card': ('Recommended', 'review'), 'serial_photo': ('Recommended', 'review'), 'damage_photo': ('Recommended', 'review')} %}
           {% for kind in doc_types %}
-            <label class="dropzone" data-dropzone>
-              <span class="ico"><i class="bi {{ doc_icon(kind) }}"></i></span>
-              <span style="flex:1; min-width:0">
-                <b class="small">{{ labels[kind][0] }}</b> <span class="badge plain {{ 'bad' if labels[kind][1] == 'Required' else ('info' if labels[kind][1] == 'Recommended' else '') }}">{{ labels[kind][1] }}</span>
-                <input type="file" name="{{ kind }}" accept="{{ '.mp4' if kind == 'fault_video' else '.pdf,.jpg,.jpeg,.png' }}" {% if kind == 'receipt' %}data-ocr-input{% endif %} data-doc-input="{{ kind }}">
+            {% set video = kind == 'fault_video' %}
+            <label class="dropzone" data-dropzone data-max="{{ 16 if video else 10 }}" data-accept="{{ '.mp4' if video else '.pdf,.jpg,.jpeg,.png' }}">
+              <span class="ico" aria-hidden="true"><i class="bi {{ doc_icon(kind) }}"></i></span>
+              <span class="grow">
+                <span class="row tight"><b class="small">{{ doc_label(kind) }}</b>{{ tag(need[kind][0], need[kind][1]) if kind in need else tag('Optional') }}</span>
+                <span class="meta" data-file-meta></span>
+                <input type="file" name="{{ kind }}" accept="{{ '.mp4' if video else '.pdf,.jpg,.jpeg,.png' }}" data-doc-input="{{ kind }}" {% if kind == 'receipt' %}data-ocr-input{% endif %}>
               </span>
             </label>
             {% if kind == 'receipt' %}
-            <div class="card soft hidden" data-ocr-panel>
-              <div class="card-b stack-sm">
-                <div class="row between"><b class="small"><i class="bi bi-magic"></i> Details read from your receipt</b><span class="small muted" data-ocr-status></span></div>
-                <p class="small muted mb-0">Check each value and correct anything that's wrong — your corrections are saved with the claim.</p>
-                <div class="form-grid">
+            <section class="panel ocr-panel hidden" data-ocr-panel aria-labelledby="ocr-h">
+              <div class="panel-h"><h3 id="ocr-h">Details read from the receipt</h3><span class="hint" data-ocr-status aria-live="polite"></span></div>
+              <div class="panel-b ocr-split">
+                <div class="stack-xs">
+                  <span class="eyebrow">What the receipt says</span>
+                  <ol class="ocr-text" data-ocr-text aria-label="Text read from the receipt"></ol>
+                </div>
+                <div class="stack-sm">
+                  <span class="eyebrow">Check and correct</span>
                   {% for key, label in [('invoice_number', 'Invoice number'), ('purchase_date', 'Purchase date'), ('serial_number', 'Serial number'), ('model_number', 'Model'), ('retailer', 'Retailer'), ('purchase_amount', 'Amount')] %}
-                    <label class="field"><span>{{ label }}</span><input class="input sm" name="verified_{{ key }}" data-ocr-field="{{ key }}"></label>
+                    <div class="field">
+                      <label for="v-{{ key }}">{{ label }}</label>
+                      <input class="input{{ ' mono' if key in ('invoice_number', 'serial_number', 'model_number', 'purchase_amount') }}" id="v-{{ key }}" name="verified_{{ key }}" data-ocr-field="{{ key }}" aria-describedby="v-{{ key }}-d" maxlength="120">
+                      <span class="help" id="v-{{ key }}-d" data-ocr-note="{{ key }}"></span>
+                    </div>
                   {% endfor %}
+                  <p class="tiny muted mb-0">Your corrections are saved with the claim and recorded in its audit trail.</p>
                 </div>
               </div>
-            </div>
+            </section>
             {% endif %}
           {% endfor %}
         </div>
-        <div class="card-f row between"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Review claim</button></div>
+        <div class="panel-f row between wz-only"><button class="btn quiet" type="button" data-prev>Back</button><button class="btn" type="button" data-next>Review the claim</button></div>
       </section>
 
-      <!-- 4 review -->
-      <section class="card wizard-step" data-step="3">
-        <div class="card-h"><h2>Review &amp; submit</h2><span class="hint">Both models and all warranty rules run as soon as you submit.</span></div>
-        <div class="card-b stack">
-          <dl class="kv" data-review></dl>
-          <div class="callout small">By submitting you confirm the information is accurate. Your claim receives a unique Claim ID and you can follow every stage from the claim page.</div>
+      <section class="panel" data-step="3" aria-labelledby="s3-h">
+        <div class="panel-h"><h2 id="s3-h">Review and submit</h2><span class="hint">Both models and every warranty rule run when you submit</span></div>
+        <div class="panel-b stack">
+          <dl class="kv" data-review><dt>Product</dt><dd>Chosen in step 1</dd></dl>
+          <p class="callout small mb-0">By submitting you confirm the information is accurate. The claim gets its own ID and you can follow every stage on its page.</p>
         </div>
-        <div class="card-f row between">
-          <button class="btn quiet" type="button" data-prev>Back</button>
-          <div class="row">
+        <div class="panel-f row between">
+          <button class="btn quiet wz-only" type="button" data-prev>Back</button>
+          <div class="row tight">
             <button class="btn quiet" type="submit" name="action" value="draft" formnovalidate>Save as draft</button>
-            <button class="btn" type="submit" name="action" value="submit" data-submit><i class="bi bi-send"></i>Submit claim</button>
+            <button class="btn" type="submit" name="action" value="submit"><i class="bi bi-send" aria-hidden="true"></i>Submit claim</button>
           </div>
         </div>
       </section>
     </div>
 
-    <aside class="stack sticky">
-      <section class="card">
-        <div class="card-h"><h2>Claim readiness</h2><span class="badge" data-ready-badge>—</span></div>
-        <div class="card-b">
-          <div class="meter" aria-hidden="true"><i data-ready-bar style="width:0%"></i></div>
-          <ul class="list" data-ready-list style="margin: 10px -20px -18px;">
-            <li class="small muted">Choose a product to start the checklist.</li>
-          </ul>
+    <aside class="stack sticky" aria-label="Claim readiness">
+      <section class="panel" aria-labelledby="rd-h">
+        <div class="panel-h"><h2 id="rd-h">Readiness</h2><span class="tag" data-ready-tag><span class="dot" aria-hidden="true"></span><span data-ready-word>Not checked</span></span></div>
+        <div class="panel-b stack-sm">
+          <div class="meter" data-ready-meter role="img" aria-label="Readiness not checked yet"><i></i></div>
+          <ul class="checks" data-ready-list aria-live="polite"><li class="small muted">Choose a product to start the checklist.</li></ul>
         </div>
       </section>
-      <section class="card soft" data-policy-card hidden>
-        <div class="card-b stack-sm small">
-          <b data-policy-name></b>
-          <div class="row"><span class="chip"><i class="bi bi-hourglass"></i><span data-policy-reporting></span></span><span class="chip"><i class="bi bi-calendar-plus"></i><span data-policy-grace></span></span></div>
-          <div class="muted">Not covered: <span data-policy-excluded></span></div>
+      <section class="panel hidden" data-policy-card aria-labelledby="pc-h">
+        <div class="panel-h"><h2 id="pc-h" data-policy-name>Policy</h2></div>
+        <div class="panel-b stack-sm small">
+          <div class="row tight"><span class="chip"><i class="bi bi-hourglass" aria-hidden="true"></i><span data-policy-reporting></span></span>
+            <span class="chip"><i class="bi bi-calendar-plus" aria-hidden="true"></i><span data-policy-grace></span></span></div>
+          <p class="muted mb-0">Not covered: <span data-policy-excluded></span></p>
         </div>
       </section>
     </aside>
   </div>
 </form>
-<script type="application/json" id="wizard-data">{{ {
-  'products': products_data,
-  'faults': faults,
-  'policies': policies,
-  'staff': staff,
-  'initialFault': form.get('fault_category', '')
-}|tojson }}</script>
+<script type="application/json" id="wizard-data">{{ {'products': products_data, 'faults': faults, 'policies': policies, 'staff': staff}|tojson }}</script>
 {% endif %}
 {% endblock %}
+{% block page_js %}<script src="{{ asset('js/wizard.js') }}" defer></script>{% endblock %}

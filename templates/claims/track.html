@@ -1,51 +1,49 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import status, decision %}
+{# Tracking: the eight stages, what the current one means and what happens next, and the dated history. #}
+{% from "components/ui.html" import stage_timeline, status_tag, verdict_chip, panel as ui_panel %}
 {% block title %}Track {{ claim.claim_id }}{% endblock %}
-{% block content %}
-{% set reached = claim.status_history|map(attribute='new_status')|list %}
+{% block page_header %}
 <div class="page-head">
   <div>
-    <div class="crumbs"><a href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}"><span class="id">{{ claim.claim_id }}</span></a><i class="bi bi-chevron-right"></i><span>Tracking</span></div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}"><span class="id">{{ claim.claim_id }}</span></a><i class="bi bi-chevron-right" aria-hidden="true"></i><span aria-current="page">Tracking</span></nav>
     <h1>Where is my claim?</h1>
     <p class="lede">{{ claim.product.product_name }} · {{ claim.fault_category }}</p>
   </div>
-  <a class="btn quiet" href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}">Open full claim</a>
+  <a class="btn quiet" href="{{ url_for('claims.view_claim', claim_id=claim.claim_id) }}">Open the full claim</a>
 </div>
-
-<section class="card"><div class="card-b" style="padding: 28px 24px">
-  <ol class="stages" aria-label="Claim progress">
-    {% for s in stages %}<li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'todo') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>{% endfor %}
-  </ol>
-</div></section>
-
-<div class="grid grid-2 mt-3">
-  <section class="card">
-    <div class="card-h"><h2>Right now</h2>{{ status(claim.status) }}</div>
-    <div class="card-b stack-sm">
-      {% set explain_status = {
-        'Draft': 'The claim is saved but not submitted. Open it to add evidence and submit.',
-        'Submitted': 'We received the claim and are about to evaluate it.',
-        'Under Evaluation': 'Both models and the warranty rules are running.',
-        'Additional Information Required': 'A reviewer needs more information from you. Open the claim, upload what was asked for and resubmit.',
-        'Manual Review': 'A claim reviewer is checking the evidence. You will be notified of the decision.',
-        'Approved': 'The claim was approved. The service center will contact you about the repair or replacement.',
-        'Rejected': 'The claim was rejected. The reason is shown on the claim page.',
-        'Closed': 'The claim is closed. No further action is needed.'} %}
-      <p class="mb-0">{{ explain_status[claim.status] }}</p>
-      {% if claim.final_decision %}<div class="row"><span class="small muted">Automated recommendation:</span>{{ decision(claim.final_decision) }}</div>{% endif %}
-      {% if claim.status == 'Additional Information Required' and claim.reviewer_notes %}<div class="callout warn small"><b>Reviewer's request:</b> {{ claim.reviewer_notes }}</div>{% endif %}
-    </div>
-  </section>
-  <section class="card">
-    <div class="card-h"><h2>Timeline</h2></div>
-    <div class="card-b">
+{% endblock %}
+{% block content %}
+{% set now_text = {
+  'Draft': ('Saved, not submitted.', 'Open the claim, add the evidence and submit it. Nothing is checked until then.'),
+  'Submitted': ('Received.', 'Evaluation starts right away; it usually takes under a second.'),
+  'Under Evaluation': ('Being checked.', 'Both models and the warranty rules are running.'),
+  'Additional Information Required': ('A reviewer needs more from you.', 'Open the claim, upload what was asked for, and it goes back to the reviewer.'),
+  'Manual Review': ('With a claim reviewer.', 'A person is checking the evidence. You get a notification when they decide.'),
+  'Approved': ('Approved.', 'The service center will contact you about the repair or replacement.'),
+  'Rejected': ('Rejected.', 'The reason is on the claim page. You can contact support if you disagree.'),
+  'Closed': ('Closed.', 'No further action is needed.')} %}
+<div class="stack">
+  <section class="panel" aria-label="Claim progress"><div class="panel-b">{{ stage_timeline(claim) }}</div></section>
+  <div class="grid grid-2">
+    {% call ui_panel('Right now') %}
+      <div class="stack-sm">
+        <div class="row">{{ status_tag(claim.status) }}{% if claim.final_decision %}<span class="small muted">Automated recommendation</span>{{ verdict_chip(claim.final_decision) }}{% endif %}</div>
+        <p class="mb-0"><b>{{ now_text[claim.status][0] }}</b> {{ now_text[claim.status][1] }}</p>
+        {% if claim.status == 'Additional Information Required' and claim.reviewer_notes %}
+          <p class="callout warn small mb-0"><b>The reviewer asked:</b> {{ claim.reviewer_notes }}</p>
+          <a class="btn sm" href="{{ url_for('claims.view_claim', claim_id=claim.claim_id, _anchor='evidence') }}">Add the evidence</a>
+        {% endif %}
+      </div>
+    {% endcall %}
+    {% call ui_panel('History') %}
       <ol class="timeline">
         {% for h in claim.status_history|reverse %}
-          <li><span class="dot {{ tone('status', h.new_status) }}"></span><div class="small"><b>{{ h.new_status }}</b></div>
-            <div class="tiny muted">{{ h.reason_comment }}</div><div class="when">{{ h.created_at|date('%d %b %Y %H:%M') }}</div></li>
+          <li><b class="small">{{ h.new_status }}</b>
+            {% if h.reason_comment %}<div class="tiny muted">{{ h.reason_comment }}</div>{% endif %}
+            <div class="tiny mono muted">{{ h.created_at|date('%d %b %Y %H:%M') }} · {{ role_label(h.changed_by.role) if h.changed_by else 'System' }}</div></li>
         {% endfor %}
       </ol>
-    </div>
-  </section>
+    {% endcall %}
+  </div>
 </div>
 {% endblock %}

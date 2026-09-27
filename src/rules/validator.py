@@ -12,7 +12,7 @@ from src.core.vocab import (CATEGORIES, DAMAGE_TYPES, DEFAULT_DIAGNOSTIC_CONFIDE
 from src.rules.policy_store import get_policy
 
 MAX_TEXT = {"product_name": 120, "brand": 60, "model_number": 60, "serial_number": 80, "retailer": 100,
-            "invoice_number": 80, "warranty_provider": 100, "fault_description": 2000,
+            "invoice_number": 80, "warranty_provider": 100, "fault_description": 1000,
             "previous_replacement_details": 255}
 
 
@@ -78,7 +78,7 @@ def claim_form(form, product, *, is_staff: bool, today: date | None = None) -> t
     v["damage_type"] = form.get("damage_type", "")
     if v["damage_type"] not in DAMAGE_TYPES:
         e.append("Choose what caused the damage (pick 'Unknown / Not Sure' if you don't know).")
-    v["fault_description"] = _text(form, "fault_description", "Fault description", e, min_len=15)
+    v["fault_description"] = _text(form, "fault_description", "Fault description", e, min_len=20)
     v["previous_replacement_details"] = _text(form, "previous_replacement_details", "Previous replacement", e,
                                               required=False) or None
     v["fault_occurrence_date"] = try_parse_date(form.get("fault_occurrence_date", ""))

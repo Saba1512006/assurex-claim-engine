@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 import re
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'claims/wizard.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'claims/track.html', 'claims/search.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'admin/policies.html', 'admin/analytics.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -153,3 +154,51 @@ def test_macro_attributes_render_as_attributes_not_escaped_text(app, client):
     html = client.get("/register").get_data(as_text=True)
     assert 'placeholder="+92 300 1234567"' in html and 'autocomplete="email"' in html
     assert not re.search(r"<(input|button|select|textarea)\b[^>]*&#34;", html)       # no escaped quotes inside a tag
+
+
+def _step2(product, **over):
+    data = {"product_id": product.product_id, "fault_category": "Motherboard failure", "damage_type": "Manufacturing Defect",
+            "fault_occurrence_date": (date.today() - timedelta(days=3)).isoformat(),
+            "fault_description": "Laptop shuts down within minutes of starting."}
+    data.update(over)
+    return data
+
+
+def test_wizard_autosave_creates_one_draft_and_submit_reuses_it(app, client, gtm):
+    gtm.mirror_python()
+    u = make_user("c@x.io")
+    p = make_product(u)
+    login(client, "c@x.io")
+    r = client.post("/api/claims/draft", data=_step2(p))
+    body = r.get_json()
+    assert r.status_code == 200 and body["success"] and body["data"]["claim_id"].startswith("CLM-")
+    draft_id = body["data"]["claim_id"]
+    again = client.post("/api/claims/draft", data=_step2(p, draft_id=draft_id, fault_description="Shuts down after five minutes, every time."))
+    assert again.get_json()["data"]["claim_id"] == draft_id and Claim.query.count() == 1
+    assert Claim.query.one().fault_description.startswith("Shuts down") and Claim.query.one().status == "Draft"
+    assert wizard_post(client, p, draft_id=draft_id).status_code == 302
+    c = Claim.query.one()                                                 # the draft became the submitted claim
+    assert c.claim_id == draft_id and c.status != "Draft" and c.model_evaluation is not None
+
+
+def test_wizard_autosave_validates_and_never_touches_someone_elses_draft(app, client):
+    a = make_user("a@x.io")
+    pa = make_product(a)
+    login(client, "a@x.io")
+    short = client.post("/api/claims/draft", data=_step2(pa, fault_description="Too short"))
+    assert short.status_code == 400 and short.get_json()["error"]["code"] == "VALIDATION_FAILED" and Claim.query.count() == 0
+    theirs = client.post("/api/claims/draft", data=_step2(pa)).get_json()["data"]["claim_id"]
+    client.post("/logout")
+    b = make_user("b@x.io")
+    pb = make_product(b, serial="SN-TST-2000002", invoice="INV-2025-22222")
+    login(client, "b@x.io")
+    mine = client.post("/api/claims/draft", data=_step2(pb, draft_id=theirs)).get_json()["data"]["claim_id"]
+    assert mine != theirs and Claim.query.filter_by(claim_id=theirs).one().user_id == a.id
+
+
+def test_readiness_check_uses_the_envelope(app, client):
+    u = make_user("c@x.io")
+    p = make_product(u)
+    login(client, "c@x.io")
+    body = client.post("/claims/preparation-check", data={"product_id": p.product_id}).get_json()
+    assert body["success"] and {"items", "score", "ready"} <= set(body["data"])

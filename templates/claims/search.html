@@ -1,60 +1,79 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import status, decision, risk, empty %}
+{# Claim search: the common filters in one row, the rest under "More filters"; results 20 per page; export for roles that may. #}
+{% from "components/ui.html" import status_tag, verdict_chip, risk_tag, empty_state, pager %}
 {% block title %}Claims{% endblock %}
-{% block content %}
+{% block page_header %}
 <div class="page-head">
   <div>
     <h1>Claims</h1>
-    <p class="lede">Search and filter every claim you can see — by ID, product, serial, category, warranty, status, risk, confidence, reviewer and date.</p>
+    <p class="lede">Every claim you can see, filtered by ID, product, status, recommendation, risk, reviewer or date.</p>
   </div>
-  <div class="row">
-    {% if can('export.data') %}<a class="btn quiet" href="{{ url_with(export='csv') }}"><i class="bi bi-filetype-csv"></i>Export CSV</a>
-    <a class="btn quiet" href="{{ url_with(export='xlsx') }}"><i class="bi bi-file-earmark-spreadsheet"></i>Excel</a>{% endif %}
-    {% if can('claim.create') %}<a class="btn" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg"></i>New claim</a>{% endif %}
+  <div class="row tight">
+    {% if can('export.data') %}<a class="btn quiet" href="{{ url_with(export='csv', page=None) }}"><i class="bi bi-filetype-csv" aria-hidden="true"></i>Export CSV</a>
+    <a class="btn quiet" href="{{ url_with(export='xlsx', page=None) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>Export Excel</a>{% endif %}
+    {% if can('claim.create') %}<a class="btn" href="{{ url_for('claims.new_claim') }}"><i class="bi bi-plus-lg" aria-hidden="true"></i>File a claim</a>{% endif %}
   </div>
 </div>
+{% endblock %}
+{% block content %}
+{% set more = args.get('serial') or args.get('product_id') or args.get('category') or args.get('warranty') or args.get('risk') or args.get('conf_min') or args.get('conf_max') or args.get('reviewer') or args.get('start') or args.get('end') %}
+<div class="stack">
+  <form class="panel" method="get" role="search" aria-label="Filter claims">
+    <div class="panel-b stack-sm">
+      <div class="filters">
+        <div class="field grow"><label for="q-id">Claim ID</label><input class="input mono" id="q-id" name="claim_id" value="{{ args.get('claim_id', '') }}" placeholder="CLM-" maxlength="32"></div>
+        <div class="field"><label for="q-status">Status</label><select class="select" id="q-status" name="status" data-autosubmit><option value="">Any status</option>{% for s in statuses %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="q-dec">Recommendation</label><select class="select" id="q-dec" name="decision" data-autosubmit><option value="">Any</option>{% for d in ['Likely Valid', 'Likely Invalid', 'Manual Review Required'] %}<option {{ 'selected' if args.get('decision') == d }}>{{ d }}</option>{% endfor %}</select></div>
+        <div class="row tight"><button class="btn quiet" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i>Filter</button>
+          {% if args %}<a class="btn ghost" href="{{ url_for('claims.search') }}">Clear filters</a>{% endif %}</div>
+      </div>
+      <details {{ 'open' if more }}>
+        <summary class="small linkish">More filters</summary>
+        <div class="filters mt-2">
+          <div class="field"><label for="q-pid">Product ID</label><input class="input mono" id="q-pid" name="product_id" value="{{ args.get('product_id', '') }}" placeholder="PRD-" maxlength="32"></div>
+          <div class="field"><label for="q-sn">Serial</label><input class="input mono" id="q-sn" name="serial" value="{{ args.get('serial', '') }}" maxlength="80"></div>
+          <div class="field"><label for="q-cat">Category</label><select class="select" id="q-cat" name="category"><option value="">All</option>{% for c in categories %}<option {{ 'selected' if args.get('category') == c }}>{{ c }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="q-w">Warranty</label><select class="select" id="q-w" name="warranty"><option value="">Any</option>{% for s in ['Active', 'Expiring soon', 'Expired'] %}<option {{ 'selected' if args.get('warranty') == s }}>{{ s }}</option>{% endfor %}</select></div>
+          <div class="field"><label for="q-risk">Risk</label><select class="select" id="q-risk" name="risk"><option value="">Any</option>{% for r in ['Low', 'Medium', 'High'] %}<option {{ 'selected' if args.get('risk') == r }}>{{ r }}</option>{% endfor %}</select></div>
+          {% if details %}
+          <div class="field narrow"><label for="q-cmin">Python confidence from</label><input class="input mono" id="q-cmin" name="conf_min" value="{{ args.get('conf_min', '') }}" placeholder="0.00" inputmode="decimal"></div>
+          <div class="field narrow"><label for="q-cmax">to</label><input class="input mono" id="q-cmax" name="conf_max" value="{{ args.get('conf_max', '') }}" placeholder="1.00" inputmode="decimal"></div>
+          {% endif %}
+          {% if current_user.role != 'customer' %}
+          <div class="field"><label for="q-rev">Reviewer</label><select class="select" id="q-rev" name="reviewer"><option value="">Anyone</option><option value="unassigned" {{ 'selected' if args.get('reviewer') == 'unassigned' }}>Unassigned</option>{% for r in reviewers %}<option value="{{ r.user_id }}" {{ 'selected' if args.get('reviewer') == r.user_id }}>{{ r.full_name }}</option>{% endfor %}</select></div>
+          {% endif %}
+          <div class="field narrow"><label for="q-from">Filed from</label><input class="input" id="q-from" type="date" name="start" value="{{ args.get('start', '') }}"></div>
+          <div class="field narrow"><label for="q-to">to</label><input class="input" id="q-to" type="date" name="end" value="{{ args.get('end', '') }}"></div>
+        </div>
+      </details>
+    </div>
+  </form>
 
-<form class="card" method="get" role="search">
-  <div class="card-b filters">
-    <label class="field grow"><span>Claim ID</span><input class="input sm" name="claim_id" value="{{ args.get('claim_id', '') }}" placeholder="CLM-…"></label>
-    <label class="field"><span>Product ID</span><input class="input sm" name="product_id" value="{{ args.get('product_id', '') }}" placeholder="PRD-…"></label>
-    <label class="field"><span>Serial</span><input class="input sm" name="serial" value="{{ args.get('serial', '') }}"></label>
-    <label class="field"><span>Category</span><select class="select sm" name="category"><option value="">All</option>{% for c in categories %}<option {{ 'selected' if args.get('category') == c }}>{{ c }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Warranty</span><select class="select sm" name="warranty"><option value="">Any</option>{% for s in ['Active', 'Expiring soon', 'Expired'] %}<option {{ 'selected' if args.get('warranty') == s }}>{{ s }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Status</span><select class="select sm" name="status"><option value="">Any</option>{% for s in statuses %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Recommendation</span><select class="select sm" name="decision"><option value="">Any</option>{% for d in ['Likely Valid', 'Likely Invalid', 'Manual Review Required'] %}<option {{ 'selected' if args.get('decision') == d }}>{{ d }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Risk</span><select class="select sm" name="risk"><option value="">Any</option>{% for r in ['Low', 'Medium', 'High'] %}<option {{ 'selected' if args.get('risk') == r }}>{{ r }}</option>{% endfor %}</select></label>
-    <label class="field"><span>Python confidence</span><span class="row" style="gap:6px"><input class="input sm" name="conf_min" value="{{ args.get('conf_min', '') }}" placeholder="min" inputmode="decimal" style="width:50%"><input class="input sm" name="conf_max" value="{{ args.get('conf_max', '') }}" placeholder="max" inputmode="decimal" style="width:50%"></span></label>
-    {% if current_user.role != 'customer' %}
-    <label class="field"><span>Reviewer</span><select class="select sm" name="reviewer"><option value="">Anyone</option><option value="unassigned" {{ 'selected' if args.get('reviewer') == 'unassigned' }}>Unassigned</option>{% for r in reviewers %}<option value="{{ r.user_id }}" {{ 'selected' if args.get('reviewer') == r.user_id }}>{{ r.full_name }}</option>{% endfor %}</select></label>
+  <section class="panel" aria-labelledby="res-h">
+    <div class="panel-h"><h2 id="res-h" aria-live="polite">{{ page.total }} claim{{ '' if page.total == 1 else 's' }}</h2></div>
+    {% if page.items %}
+    <div class="table-wrap"><table class="table">
+      <caption class="sr">Claims matching the filters, newest first</caption>
+      <thead><tr><th scope="col">Claim</th>{% if current_user.role != 'customer' %}<th scope="col">Customer</th>{% endif %}<th scope="col">Status</th><th scope="col">Recommendation</th>
+        {% if details %}<th scope="col">Models</th>{% endif %}<th scope="col">Risk</th><th scope="col">Filed</th></tr></thead>
+      <tbody>
+        {% for c in page.items %}{% set e = c.model_evaluation %}
+        <tr>
+          <td><a class="row-link" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}"><span class="t-main">{{ c.product.product_name }}</span> <span class="t-sub"><span class="id">{{ c.claim_id }}</span> {{ c.fault_category }}</span></a></td>
+          {% if current_user.role != 'customer' %}<td><span class="t-main">{{ c.claimant.full_name }}</span> <span class="t-sub">{{ c.product.category }}</span></td>{% endif %}
+          <td>{{ status_tag(c.status) }}</td>
+          <td>{{ verdict_chip(c.final_decision) }}</td>
+          {% if details %}<td class="small mono nowrap">{% if e %}Py {{ '%.2f'|format(e.python_top) if e.python_top is not none else '—' }} · TM {{ '%.2f'|format(e.gtm_top) if e.gtm_top is not none else 'n/a' }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
+          <td>{{ risk_tag(c.risk_level) }}</td>
+          <td class="nowrap small">{{ c.claim_submission_date|date if c.claim_submission_date else 'Not filed' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    {{ pager(page) }}
+    {% else %}
+      {{ empty_state('No claims match these filters', 'Clear a filter or widen the date range.', url_for('claims.search') if args else None, 'Clear filters', 'bi-search') }}
     {% endif %}
-    <label class="field"><span>Submitted from</span><input class="input sm" type="date" name="start" value="{{ args.get('start', '') }}"></label>
-    <label class="field"><span>to</span><input class="input sm" type="date" name="end" value="{{ args.get('end', '') }}"></label>
-    <div class="row"><button class="btn sm" type="submit"><i class="bi bi-funnel"></i>Filter</button><a class="btn ghost sm" href="{{ url_for('claims.search') }}">Clear</a></div>
-  </div>
-</form>
-
-<section class="card mt-3">
-  <div class="card-h"><h2>{{ claims|length }} claim{{ 's' if claims|length != 1 }}</h2></div>
-  {% if claims %}
-  <div class="table-wrap"><table class="table">
-    <thead><tr><th>Claim</th><th>Customer</th><th>Status</th><th>Recommendation</th><th>Models</th><th>Risk</th><th>Submitted</th></tr></thead>
-    <tbody>
-      {% for c in claims %}{% set e = c.model_evaluation %}
-      <tr>
-        <td><a class="row-link" href="{{ url_for('claims.view_claim', claim_id=c.claim_id) }}"><div class="t-main">{{ c.product.product_name }}</div><div class="t-sub"><span class="id">{{ c.claim_id }}</span> · {{ c.fault_category }}</div></a></td>
-        <td><div>{{ c.claimant.full_name }}</div><div class="t-sub">{{ c.product.category }}</div></td>
-        <td>{{ status(c.status) }}</td>
-        <td>{{ decision(c.final_decision) }}</td>
-        <td class="small">{% if e %}<div>Py: <b>{{ e.python_predicted_class or '—' }}</b> {{ e.python_top|pct }}</div><div class="muted">TM: {{ e.gtm_predicted_class or 'unavailable' }}{% if e.gtm_top %} {{ e.gtm_top|pct }}{% endif %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td>{{ risk(c.risk_level) }}</td>
-        <td class="nowrap small muted">{{ c.claim_submission_date|date if c.claim_submission_date else 'Draft' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table></div>
-  {% else %}
-    {{ empty('bi-search', 'No claims match these filters', 'Clear a filter or widen the date range.') }}
-  {% endif %}
-</section>
+  </section>
+</div>
 {% endblock %}

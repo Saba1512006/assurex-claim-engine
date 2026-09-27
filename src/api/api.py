@@ -7,13 +7,17 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request, url_for
+
+from config.config import Config
+from database.db import db
 
 from src.api.errors import ErrorCode, fail, ok
 from src.app_security import limiter
 from src.core import features as feature_builder
 from src.core.pipeline import run as run_pipeline
 from src.models.entities import Claim
+from src.rules import validator
 from src.security.guards import authorize_object, require
 from src.services import verdict
 
@@ -61,3 +65,23 @@ def demo_evaluate():
     payload["total_ms"] = round((time.perf_counter() - started) * 1000)
     payload["gtm"]["card_url"] = "data:image/png;base64," + base64.b64encode(out["card_bytes"]).decode()
     return ok({"case": case, "title": sample["title"], "payload": payload, "meter": verdict.meter(payload)})
+
+
+@api_bp.post("/claims/draft")
+@require("claim.create")
+@limiter.limit("60/minute")
+def autosave_draft():
+    """Wizard autosave: create the Draft once step 2 is valid, then keep it in step with the form. Never submits."""
+    from src.api.claims import _eligible_products, save_draft
+    form = request.form
+    product = next((p for p in _eligible_products() if p.product_id == form.get("product_id")), None)
+    if product is None:
+        return fail(ErrorCode.VALIDATION_FAILED, fields={"product_id": "Choose one of your registered products."})
+    authorize_object("claim.create", product)
+    values, errors, _ = validator.claim_form(form, product, is_staff=g.user.role == Config.ROLE_STAFF)
+    if errors:
+        return fail(ErrorCode.VALIDATION_FAILED, " ".join(errors))
+    claim = save_draft(product, values, form.get("draft_id"))
+    db.session.commit()
+    return ok({"claim_id": claim.claim_id, "saved_at": claim.updated_at.strftime("%H:%M"),
+               "url": url_for("claims.view_claim", claim_id=claim.claim_id)})

@@ -5,7 +5,7 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import (Blueprint, Response, abort, current_app, flash, g, jsonify, redirect, render_template, request,
+from flask import (Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request,
                    send_file, url_for)
 
 from config.config import Config
@@ -16,12 +16,14 @@ from src.models.entities import (Claim, ClaimDocument, ClaimStatusHistory, Model
                                  User)
 from src.rules import validator
 from src.rules.policy_store import get_policy
+from src.api.errors import ok
 from src.security import rbac
 from src.security.guards import authorize_object, check, require, scoped_claims, scoped_products
 from src.services import analytics_service, claim_service, documents as doc_service, export_service, verdict
 from src.services.alert_service import alert_days, dispatch_expiry_alerts
 from src.services import receipt_scan
 from src.services.audit import audit
+from src.services.paging import ListPage
 from src.services.explain import explain, summarise
 from src.services.report_generator import build_pdf
 
@@ -164,8 +166,10 @@ def search():
         return Response(export_service.claims_csv(claims, fmt), mimetype=mimetype,
                         headers={"Content-Disposition": f"attachment; filename=assurex_claims.{fmt}"})
     reviewers = User.query.filter_by(role=Config.ROLE_REVIEWER, is_active=True).order_by(User.full_name).all()
-    return render_template("claims/search.html", claims=claims, categories=CATEGORIES, reviewers=reviewers,
-                           statuses=Config.ALL_CLAIM_STATUSES, args=request.args)
+    page = ListPage(claims, request.args.get("page", 1, type=int), per_page=20)
+    return render_template("claims/search.html", page=page, categories=CATEGORIES, reviewers=reviewers,
+                           statuses=Config.ALL_CLAIM_STATUSES, args=request.args,
+                           details=verdict.show_model_details(g.user))
 
 
 # ------------------------------------------------------------------ intake wizard (SRS x-xii, xxxiii)
@@ -191,14 +195,44 @@ def _apply_verified_entities(doc, form, prefix="verified_"):
 def _wizard(products, selected=None, form=None, code=200):
     data = [{"id": p.product_id, "name": p.product_name, "category": p.category, "serial": p.serial_number,
              "status": p.warranty.status, "expiry": p.warranty.expiry_date.isoformat(),
-             "purchase": p.purchase_date.isoformat(),
+             "purchase": p.purchase_date.isoformat(), "invoice": p.invoice_number or "", "model": p.model_number,
+             "retailer": p.retailer,
              "docs": sorted({d.document_type for d in p.documents if d.claim_id is None})} for p in products]
     policies = {c: {k: get_policy(c)[k] for k in ("policy_name", "grace_period_days", "claim_reporting_period_days",
                                                    "excluded_damage_types", "exclusion_min_diagnostic_confidence")}
                 for c in CATEGORIES}
-    return render_template("claims/wizard.html", products=products, products_data=data, selected=selected,
+    counts = {"required": ["receipt"], "recommended": ["warranty_card", "serial_photo", "damage_photo"]}
+    return render_template("claims/wizard.html", products=products, products_data=data, selected=selected, doc_need=counts,
                            faults=FAULTS, damage_types=DAMAGE_TYPES, doc_types=CLAIM_DOC_TYPES,
                            policies=policies, form=form or {}), code
+
+
+def own_draft(claim_id: str | None, product) -> Claim | None:
+    """The wizard's autosaved draft, if it still is an editable draft of this product that the user may edit."""
+    if not claim_id:
+        return None
+    draft = Claim.query.filter_by(claim_id=claim_id).first()
+    if draft is None or draft.status != Config.STATUS_DRAFT or draft.product_id != product.id:
+        return None
+    return authorize_object("claim.update_draft", draft)
+
+
+def save_draft(product, values: dict, draft_id: str | None = None) -> Claim:
+    """Create the Draft claim, or update the wizard's autosaved one (flushed, not committed)."""
+    claim = own_draft(draft_id, product)
+    if claim is not None:
+        for k, v in values.items():
+            setattr(claim, k, v)
+        return claim
+    claim = Claim(user_id=product.user_id, created_by_id=g.user.id, product=product, warranty=product.warranty,
+                  service_center_id=product.service_center_id or g.user.service_center_id, **values)
+    db.session.add(claim)
+    db.session.flush()
+    db.session.add(ClaimStatusHistory(claim=claim, previous_status=None, new_status=Config.STATUS_DRAFT,
+                                      changed_by_user_id=g.user.id, reason_comment="Claim created"))
+    audit("CLAIM_CREATED", "Claim", claim.claim_id, product=product.product_id,
+          on_behalf_of=product.owner.user_id if product.user_id != g.user.id else None)
+    return claim
 
 
 @claim_bp.route("/new", methods=["GET", "POST"])
@@ -218,14 +252,7 @@ def new_claim():
         for msg in errors:
             flash(msg, "warning")
         return _wizard(products, selected=product.product_id, form=form, code=400)
-    claim = Claim(user_id=product.user_id, created_by_id=g.user.id, product=product, warranty=product.warranty,
-                  service_center_id=product.service_center_id or g.user.service_center_id, **values)
-    db.session.add(claim)
-    db.session.flush()
-    db.session.add(ClaimStatusHistory(claim=claim, previous_status=None, new_status=Config.STATUS_DRAFT,
-                                      changed_by_user_id=g.user.id, reason_comment="Claim created"))
-    audit("CLAIM_CREATED", "Claim", claim.claim_id, product=product.product_id,
-          on_behalf_of=product.owner.user_id if product.user_id != g.user.id else None)
+    claim = save_draft(product, values, form.get("draft_id"))
     upload_warnings = []
     for kind in CLAIM_DOC_TYPES:
         f = request.files.get(kind)
@@ -270,7 +297,7 @@ def preparation_check():
     docs = {k for k in CLAIM_DOC_TYPES if request.form.get(f"has_{k}") == "1"}
     if product:
         docs |= {d.document_type for d in product.documents if d.claim_id is None}
-    return jsonify(validator.readiness(product, request.form, docs))
+    return ok(validator.readiness(product, request.form, docs))
 
 
 @claim_bp.post("/ocr-extract")

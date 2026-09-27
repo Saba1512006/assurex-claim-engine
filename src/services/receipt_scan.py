@@ -25,4 +25,4 @@ def scan(file):
         return fail(ErrorCode.UNREADABLE_FILE, UNAVAILABLE)
     if result["status"] != "ok" or not ocr.looks_like_receipt(result["entities"]):
         return fail(ErrorCode.UNREADABLE_FILE, UNREADABLE)
-    return ok({"entities": result["entities"]})
+    return ok({"entities": result["entities"], "text": result.get("text", "")})

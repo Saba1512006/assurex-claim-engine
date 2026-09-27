@@ -123,6 +123,7 @@
     describe(el, ok ? "" : el.validationMessage);
     return ok;
   };
+  AX.check = check;
   document.addEventListener("focusout", (e) => {
     const el = e.target;
     if (el.matches && el.matches("form:not([data-novalidate-ui]) .input, form:not([data-novalidate-ui]) .select, form:not([data-novalidate-ui]) .textarea") && el.value !== "") check(el);
