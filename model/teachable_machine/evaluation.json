@@ -1,0 +1,128 @@
+{
+  "val": {
+    "gtm_accuracy": 0.9733,
+    "gtm_f1_macro": 0.9734,
+    "confusion_matrix": [
+      [
+        74,
+        1,
+        0
+      ],
+      [
+        0,
+        73,
+        2
+      ],
+      [
+        0,
+        3,
+        72
+      ]
+    ],
+    "per_class": {
+      "Valid Claim": {
+        "precision": 1.0,
+        "recall": 0.9866666666666667,
+        "f1-score": 0.9932885906040269,
+        "support": 75.0
+      },
+      "Invalid Claim": {
+        "precision": 0.948051948051948,
+        "recall": 0.9733333333333334,
+        "f1-score": 0.9605263157894737,
+        "support": 75.0
+      },
+      "Manual Review": {
+        "precision": 0.972972972972973,
+        "recall": 0.96,
+        "f1-score": 0.9664429530201343,
+        "support": 75.0
+      },
+      "accuracy": 0.9733333333333334,
+      "macro avg": {
+        "precision": 0.9736749736749738,
+        "recall": 0.9733333333333333,
+        "f1-score": 0.9734192864712116,
+        "support": 225.0
+      },
+      "weighted avg": {
+        "precision": 0.9736749736749736,
+        "recall": 0.9733333333333334,
+        "f1-score": 0.9734192864712116,
+        "support": 225.0
+      }
+    },
+    "agreement_rate": 0.9644,
+    "status_counts": {
+      "Strong Match": 122,
+      "Acceptable Match": 65,
+      "Uncertain Result": 21,
+      "Weak Match": 15,
+      "Model Disagreement": 2
+    },
+    "model_version": "gtm-514702678b8c"
+  },
+  "test": {
+    "gtm_accuracy": 0.9378,
+    "gtm_f1_macro": 0.9379,
+    "confusion_matrix": [
+      [
+        73,
+        1,
+        1
+      ],
+      [
+        5,
+        68,
+        2
+      ],
+      [
+        4,
+        1,
+        70
+      ]
+    ],
+    "per_class": {
+      "Valid Claim": {
+        "precision": 0.8902439024390244,
+        "recall": 0.9733333333333334,
+        "f1-score": 0.9299363057324841,
+        "support": 75.0
+      },
+      "Invalid Claim": {
+        "precision": 0.9714285714285714,
+        "recall": 0.9066666666666666,
+        "f1-score": 0.9379310344827586,
+        "support": 75.0
+      },
+      "Manual Review": {
+        "precision": 0.958904109589041,
+        "recall": 0.9333333333333333,
+        "f1-score": 0.9459459459459459,
+        "support": 75.0
+      },
+      "accuracy": 0.9377777777777778,
+      "macro avg": {
+        "precision": 0.9401921944855456,
+        "recall": 0.9377777777777778,
+        "f1-score": 0.9379377620537296,
+        "support": 225.0
+      },
+      "weighted avg": {
+        "precision": 0.9401921944855457,
+        "recall": 0.9377777777777778,
+        "f1-score": 0.9379377620537296,
+        "support": 225.0
+      }
+    },
+    "agreement_rate": 0.9289,
+    "status_counts": {
+      "Strong Match": 117,
+      "Acceptable Match": 68,
+      "Uncertain Result": 15,
+      "Weak Match": 13,
+      "Model Disagreement": 12
+    },
+    "model_version": "gtm-514702678b8c"
+  }
+}
