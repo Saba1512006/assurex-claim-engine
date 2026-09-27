@@ -18,7 +18,7 @@ decision table running inside this application. No external AI API is called at 
 | Purpose | Image classification of Claim Summary Cards into Valid Claim / Invalid Claim / Manual Review |
 | Type of assistance | Browser-based transfer-learning of an image model on the team's training cards; TensorFlow Lite export |
 | Files / modules affected | `model/teachable_machine/` (export + `labels.txt` + `evaluation.json`), consumed by `src/core/gtm_classifier_v2.py` |
-| Status | **To be completed by the team**: train on `data/summary_cards/train/`, export, install via Admin › Models, run the evaluation |
+| Status | Trained by the team in the browser on the v3 cards and installed as `gtm-514702678b8c` (test accuracy 93.8%); see `documentation/GTM_EVIDENCE.md` |
 | Testing | `notebooks/evaluate_gtm.py` / Admin › Models › Run evaluation on the 225 validation and 225 test cards |
 
 ## 2. Claude Code (Anthropic) — v2 upgrade

@@ -150,7 +150,9 @@ Version 3 shows each fact against its policy limit as one of nine large tiles in
 coverage, reporting time, damage cause, receipt, supporting evidence, serial number, dates, invoice and
 repairs. A tile's colour and glyph change with the fact (within coverage, grace period or coverage ended;
 reported in time or late; covered or excluded cause), and a colour band shows the category. The same
-replica now scores 92.9–94.2% on the test cards. Text is still there, for humans. The card never shows a
+replica now scores 92.9–94.2% on the test cards, and the real Teachable Machine model trained on the
+version 3 cards scored 93.8% (validation 97.3%, macro F1 93.8%), agreeing with the Python model on 92.9% of
+the test claims. Text is still there, for humans. The card never shows a
 prediction, a confidence, a rule outcome or a decision.
 
 Each training claim is drawn twice with small, label-preserving variations — background tint, date format,
@@ -237,7 +239,7 @@ measured comparison with the real Teachable Machine model is produced by one scr
 
 ## Testing results
 
-192 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
+193 automated tests run in about 25 seconds: rule boundaries (last day of cover, first day after the grace
 period, the reporting deadline ±1 day, the exclusion threshold), contradiction and duplicate detection,
 OCR patterns, upload validation, both model runtimes, all five consistency statuses, the eleven
 demonstration cases from the competition brief, full HTTP journeys from registration to approval, and the

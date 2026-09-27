@@ -127,7 +127,7 @@ Out of scope (SRS §1.4): live manufacturer databases, payment systems, enterpri
 | Performance ≤ 5 s | Full evaluation (rules + Python + card + image model + decision) ~150–300 ms on a laptop; stored per claim (`latency_ms`) and tested |
 | Scalability (10,000 claims, several centers, concurrent users) | Indexed columns (claim_id, status, reviewer, serial, hashes); scoped SQL queries; stateless workers; any SQL database via `DATABASE_URL` |
 | Usability | Four-step wizard with live checklist, plain-language explanations, responsive layout (390 px phones and up), light/dark themes, keyboard focus styles |
-| Accuracy ≥ 85% | Python model 89.3% on 225 unseen claims; Teachable Machine measured after training |
+| Accuracy ≥ 85% | Python model 89.3%, Teachable Machine 93.8% on the 225 unseen test claims |
 | Availability ≥ 99% | Stateless app behind gunicorn; `/healthz` for uptime monitors; no runtime dependency on external APIs or CDNs |
 
 ## 10. Application architecture
@@ -270,7 +270,7 @@ Admin › Models, validated, versioned, and evaluated on the 450 held-out cards.
 | Model | Accuracy | Macro precision | Macro recall | Macro F1 | ROC-AUC |
 |---|---|---|---|---|---|
 | Python (HistGradientBoosting, calibrated), test | 89.3% | 89.5% | 89.3% | 89.2% | 0.948 |
-| Teachable Machine, test | measured after training (`evaluation.json`) | | | | |
+| Teachable Machine (`gtm-514702678b8c`), test | 93.8% | see `evaluation.json` | see `evaluation.json` | 93.8% | — |
 
 ## 28. Confusion matrix (Python model, test)
 
@@ -295,8 +295,9 @@ claims with every SRS column (IDs, actual class, both predictions and confidence
 difference, status, rule result, missing documents, contradictions, duplicates, final decision, explanation of
 disagreements, summary). Consistency rules: minimum top confidence 0.60 (else *Uncertain Result*); different
 classes → *Model Disagreement*; \|Δ\| ≤ 0.10 *Strong*, ≤ 0.25 *Acceptable*, otherwise *Weak Match*; the
-latter three statuses and disagreement all route to manual review. Until the Teachable Machine export is
-installed, the report states that its columns are unavailable rather than estimating them.
+latter three statuses and disagreement all route to manual review. On the test claims the two models agree
+on 92.9%. If the Teachable Machine export is missing, the report states that its columns are unavailable
+rather than estimating them.
 
 Design check with a simulated agreeing image model (not a reported metric): the rules + decision table map
 93.3% of test claims to their labelled class, and 10 of the 15 remaining differences are the deliberately
@@ -304,7 +305,7 @@ noisy labels — i.e. the combination is sound once the second model is in place
 
 ## 31. Testing strategy
 
-192 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
+193 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
 integration (full HTTP journeys through the real app, DB and file store), boundary, negative, security,
 database, model and demonstration cases; surprise-modification scenarios are tests too. Catalogue:
 `documentation/TEST_CASES.md`. Additionally every page is rendered for every role, and browser screenshots
@@ -330,7 +331,7 @@ restrict database backups, and define a retention period for closed claims and u
 
 ## 34. Limitations
 
-* Teachable Machine model pending browser training; until installed no claim is auto-approved.
+* The Teachable Machine model must be retrained in the browser whenever the card design or policy limits change.
 * Synthetic training data; rare scenarios (late reporting) are learned less well; real data needs retraining.
 * Image OCR requires Tesseract on the server.
 * Duplicate text similarity is lexical (≥ 90% sequence match), not semantic.

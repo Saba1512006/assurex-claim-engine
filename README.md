@@ -22,7 +22,7 @@ policy, and a config-driven **decision table** turns all of it into *Likely Vali
 | Macro precision / recall | 89.5% / 89.3% |
 | ROC-AUC (one-vs-rest) / log-loss / ECE | 0.948 / 0.406 / 0.082 |
 | Best single feature on its own (leakage audit) | 52.9% (no field is a disguised label) |
-| Teachable Machine model | **Not included yet** — trained in the browser; see [Teachable Machine](#google-teachable-machine) |
+| Teachable Machine model | `gtm-514702678b8c`: **93.8% test accuracy / 93.8% macro F1** (validation 97.3%) — see [Teachable Machine](#google-teachable-machine) |
 
 All numbers come from `model/python_model/model_card_v2.json`, written by the training script. The
 dataset carries 4% deliberate label noise (reviewer disagreement), so ~96% is the realistic ceiling.
@@ -43,7 +43,7 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (192 tests).
+Run the tests: `python -m pytest -q` (193 tests).
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`
 from `wsgi.py`). Set `SECRET_KEY` in the environment — the app refuses to start without one.
 
@@ -128,8 +128,9 @@ recorded result.
 ## Google Teachable Machine
 
 The image model has to be trained on **teachablemachine.withgoogle.com**; it cannot be produced from
-this repository, and there is deliberately **no substitute model**. Until it is installed the comparison
-reports *Uncertain Result* and every claim goes to manual review.
+this repository, and there is deliberately **no substitute model**. The team's model is included in
+`model/teachable_machine/` (93.8% on the 225 test cards). If it is removed, the comparison reports
+*Uncertain Result* and every claim goes to manual review. To retrain:
 
 1. Admin › *Models* › **Download training cards** (2,100 images in three class folders; validation and
    test cards are never included). Or use `data/summary_cards/train/{valid,invalid,manual_review}`.
@@ -194,8 +195,8 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 
 ## Known limitations
 
-* The Teachable Machine model must be trained in the browser and installed (above); until then no claim
-  is decided automatically as *Likely Valid*.
+* The Teachable Machine model is trained in the browser and must be retrained by hand whenever the card
+  design or the policy limits shown on the card change.
 * The dataset is synthetic (generated from the policy with 4% label noise). Real claims will need
   retraining and re-calibration.
 * OCR of **image** receipts needs the Tesseract binary; without it, images are accepted and the user types

@@ -49,9 +49,13 @@ Earlier days are in the Git history; team members should add their own entries b
 - Root cause found with an offline replica of Teachable Machine's trainer (`notebooks/tm_replica_check.py`):
   frozen MobileNet features cannot separate the v2 card's thin grey shapes (replica 58–66%).
 - Card redesigned (v3, policy-relative colour tiles); replica test accuracy 92.9–94.2%. Training cards
-  regenerated; the browser model must be retrained on them.
+  regenerated.
+
+**Teachable Machine, second run (card v3)**
+- Retrained in the browser on the 2,100 v3 cards with the same settings; installed as `gtm-514702678b8c`.
+- Test accuracy 93.8% (macro F1 93.8%), validation 97.3%, agreement with the Python model 92.9%.
+- Installing over the running model returned a 500 on Windows (memory-mapped .tflite could not be
+  archived). Fixed by loading models from bytes; regression test added.
 
 **Open items**
-- Train and install the Teachable Machine model; run `notebooks/evaluate_gtm.py` and
-  `reports/generate_comparison_report.py`; record results in `documentation/GTM_EVIDENCE.md`.
 - Republish the blog; redeploy and re-seed the live site; complete the team rows in `AI_USAGE.md`.
