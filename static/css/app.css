@@ -969,3 +969,84 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
   .nav a { border-radius: 0; }
   .nav .sheet-close { display: inline-grid; }     /* an earlier rule hid the close button at every width */
 }
+
+/* ================================================================== navbar v2: a floating glass island
+   The 64px sticky bar is transparent; inside it the island floats 8px from the top with rounded corners, glass,
+   a hairline ring and a two-stage shadow. A 2px teal-to-indigo line along its bottom edge fills as the page
+   scrolls (scroll-driven animation where supported). A soft pill glides behind the link under the pointer. */
+.topbar { background: transparent; box-shadow: none; padding: 8px var(--s5) 0; }
+.topbar::before, .topbar::after { display: none; }
+.topbar .wrap { position: relative; isolation: isolate; height: calc(var(--nav-h) - 12px); max-width: var(--content-wide); padding: 0 8px 0 10px;
+  border-radius: 18px; background: color-mix(in srgb, var(--paper) 76%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 0 0 1px rgba(21, 32, 43, .07), 0 6px 16px -10px rgba(21, 32, 43, .3), 0 24px 48px -30px rgba(21, 32, 43, .35);
+  transition: background-color 250ms var(--ease), box-shadow 250ms var(--ease); }
+.topbar .wrap::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px); }
+.topbar .wrap::after { content: ""; position: absolute; left: 18px; right: 18px; bottom: 0; height: 2px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--teal-mark), var(--gtm)); transform-origin: left; transform: scaleX(0); opacity: 0; }
+@supports (animation-timeline: scroll()) {
+  .topbar .wrap::after { opacity: 1; animation: nav-progress linear both; animation-timeline: scroll(root); }
+  @keyframes nav-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+}
+.brand-tile { width: 34px; height: 34px; border-radius: 10px; }
+.brand-name { font-size: 1.0625rem; }
+
+/* links: public (.pnav) and signed-in (.nav) share the tray and the gliding pill */
+.pnav { display: none; }
+@media (min-width: 992px) {
+  .pnav { position: relative; display: flex; align-items: center; gap: 2px; padding: 4px; margin: 0 auto; border-radius: var(--r-dot);
+    background: rgba(21, 32, 43, .04); box-shadow: inset 0 1px 2px rgba(21, 32, 43, .07), inset 0 0 0 1px rgba(21, 32, 43, .035); }
+  .pnav a { position: relative; z-index: 1; display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--r-dot);
+    font-size: var(--fs-sm); font-weight: 500; color: var(--ink-2); text-decoration: none; white-space: nowrap; transition: color var(--t-fast); }
+  .pnav a:hover { color: var(--ink); }
+  .pnav a[aria-current="page"] { color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(21, 32, 43, .07), 0 1px 2px rgba(21, 32, 43, .1), 0 6px 14px -8px rgba(21, 32, 43, .4); }
+  .pnav a:focus-visible { box-shadow: var(--focus); }
+  .pnav-m { display: none; }
+  .nav { position: relative; margin: 0 auto; }
+  .nav a { z-index: 1; height: 32px; }
+  .nav a:hover { background: transparent; }
+  .nav-glide { position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--gw, 0); transform: translateX(var(--gx, 0)); z-index: 0;
+    border-radius: var(--r-dot); background: rgba(255, 255, 255, .85); box-shadow: 0 0 0 1px rgba(21, 32, 43, .05), 0 2px 6px -2px rgba(21, 32, 43, .18);
+    opacity: 0; pointer-events: none; transition: transform 280ms var(--ease), width 280ms var(--ease), opacity 160ms; }
+  .gliding > .nav-glide { opacity: 1; }
+  :not(.gliding) > .nav-glide { transition: opacity 160ms; }
+}
+.nav-actions { gap: var(--s2); }
+
+/* a live chip: both model files are installed; hover shows their versions */
+.live-chip { display: none; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 10px; border-radius: var(--r-dot);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--ink-2); background: rgba(21, 32, 43, .04); box-shadow: inset 0 0 0 1px rgba(21, 32, 43, .06); white-space: nowrap; }
+.live-chip i { position: relative; width: 7px; height: 7px; border-radius: 50%; background: var(--valid-mark); }
+.live-chip i::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--valid-mark); animation: live-ping 2.4s ease-out infinite; }
+@keyframes live-ping { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(2.8); opacity: 0; } }
+@media (min-width: 1200px) { .live-chip { display: inline-flex; } }
+
+/* the call to action: arrow nudges on hover */
+.btn.cta { height: 38px; min-height: 38px; padding: 0 14px 0 16px; border-radius: 12px; }
+.btn.cta .ic { transition: transform var(--t-fast); }
+.btn.cta:hover .ic { transform: translateX(2px); }
+.topbar .btn.ghost { min-height: 38px; border-radius: 12px; }
+.user-btn { height: 38px; }
+.user-btn .initials { width: 30px; height: 30px; }
+
+/* landing: a dark glass island over the bench, turning to paper glass once the page scrolls */
+.nav-overlay .topbar, .nav-overlay .topbar:not(.scrolled), .nav-overlay .topbar.scrolled { background: transparent; box-shadow: none; }
+.nav-overlay .topbar:not(.scrolled) .wrap { background: rgba(21, 32, 42, .45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 0 1px rgba(255, 255, 255, .08), 0 20px 40px -24px rgba(0, 0, 0, .8); }
+.nav-overlay .topbar:not(.scrolled) .pnav { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+.nav-overlay .topbar:not(.scrolled) .pnav a { color: var(--on-bench-2); }
+.nav-overlay .topbar:not(.scrolled) .pnav a:hover { color: var(--on-bench); }
+.nav-overlay .topbar:not(.scrolled) .nav-glide { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+.nav-overlay .topbar:not(.scrolled) .live-chip { color: var(--on-bench-2); background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
+.nav-overlay .topbar:not(.scrolled) .live-chip i, .nav-overlay .topbar:not(.scrolled) .live-chip i::after { background: var(--valid-bright); }
+
+@media (max-width: 991px) {
+  .topbar { padding: 6px var(--s3) 0; }
+  .topbar .wrap { height: calc(var(--nav-h) - 10px); border-radius: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-chip i::after { animation: none; display: none; }
+  .nav-glide { transition: opacity 160ms !important; }
+  .topbar .wrap { transition: none; }
+}

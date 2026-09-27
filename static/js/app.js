@@ -206,6 +206,22 @@
     confirm.addEventListener("input", upd); pw.addEventListener("input", upd);
   });
 
+  /* navbar: a pill glides behind the link under the pointer (desktop tray only) */
+  $$(".nav, .pnav").forEach((nav) => {
+    const glide = document.createElement("span");
+    glide.className = "nav-glide";
+    glide.setAttribute("aria-hidden", "true");
+    nav.prepend(glide);
+    nav.addEventListener("pointerover", (e) => {
+      const a = e.target.closest("a");
+      if (!a || !nav.contains(a) || !matchMedia("(min-width: 992px)").matches) return;
+      glide.style.setProperty("--gx", `${a.offsetLeft}px`);
+      glide.style.setProperty("--gw", `${a.offsetWidth}px`);
+      requestAnimationFrame(() => nav.classList.add("gliding"));
+    });
+    nav.addEventListener("pointerleave", () => nav.classList.remove("gliding"));
+  });
+
   /* 3D tilt: the element leans toward the pointer inside its zone (fine pointers only, never with reduced motion) */
   $$("[data-tilt-zone]").forEach((zone) => {
     const el = $("[data-tilt]", zone);

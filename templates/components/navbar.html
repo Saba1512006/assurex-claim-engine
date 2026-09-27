@@ -1,5 +1,10 @@
-{# Sticky 64px navbar: wordmark, permission-driven links (a sheet below 992px), bell and user menu or sign-in. #}
+{# Sticky 64px bar holding a floating glass "island": wordmark, permission-driven links (a sheet below 992px),
+   bell and user menu; or, signed out, the public links and sign-in. A thin line along the island's bottom edge
+   fills as the page scrolls. #}
+{% from "components/ui.html" import icon %}
 {% set ep = request.endpoint or '' %}
+{% set mv = model_versions() %}
+{% set models_ready = mv.python != 'not installed' and mv.gtm != 'not installed' %}
 <header class="topbar">
   <div class="wrap">
     <a class="brand" href="{{ url_for('auth.home') if current_user else url_for('public.index') }}">
@@ -12,6 +17,7 @@
       </nav>
       <div class="sheet-backdrop" data-sheet-backdrop></div>
       <div class="nav-actions">
+        {% if models_ready %}<span class="live-chip" title="Python model {{ mv.python }} · Teachable Machine {{ mv.gtm }}"><i aria-hidden="true"></i>Models ready</span>{% endif %}
         <button class="icon-btn nav-toggle" type="button" aria-controls="main-nav" aria-expanded="false" data-sheet-open aria-label="Open menu"><i class="bi bi-list" aria-hidden="true"></i></button>
         {% set unread = unread_notifications() %}
         <div class="menu" data-menu>
@@ -55,9 +61,16 @@
         </div>
       </div>
     {% else %}
+      <nav class="pnav" aria-label="Main">
+        <a href="{{ url_for('public.index', _anchor='how') }}">How it works</a>
+        <a href="{{ url_for('public.index', _anchor='models') }}">Results</a>
+        <a href="{{ url_for('public.model_card') }}" {% if ep == 'public.model_card' %}aria-current="page"{% endif %}>Model card</a>
+        <a href="{{ url_for('public.blog') }}" {% if ep == 'public.blog' %}aria-current="page"{% endif %}>Technical blog</a>
+      </nav>
       <div class="nav-actions">
-        <a class="btn ghost" href="{{ url_for('public.model_card') }}">Model card</a>
-        {% if ep != 'auth.login' %}<a class="btn" href="{{ url_for('auth.login') }}">Sign in</a>{% endif %}
+        {% if models_ready %}<span class="live-chip" title="Python model {{ mv.python }} · Teachable Machine {{ mv.gtm }}"><i aria-hidden="true"></i>Models ready</span>{% endif %}
+        <a class="btn ghost pnav-m" href="{{ url_for('public.model_card') }}">Model card</a>
+        {% if ep != 'auth.login' %}<a class="btn cta" href="{{ url_for('auth.login') }}">Sign in{{ icon('arrow-right', 'sm') }}</a>{% endif %}
       </div>
     {% endif %}
   </div>
