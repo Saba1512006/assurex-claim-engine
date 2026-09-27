@@ -20,7 +20,7 @@ from src.rules import validator
 from src.rules.policy_store import get_policy
 from src.security import rbac
 from src.security.guards import authorize_object, check, require, scoped_claims, scoped_products
-from src.services import analytics_service, claim_service, documents as doc_service, export_service
+from src.services import analytics_service, claim_service, documents as doc_service, export_service, verdict
 from src.services.alert_service import alert_days, dispatch_expiry_alerts
 from src.services.audit import audit
 from src.services.explain import explain, summarise
@@ -249,7 +249,7 @@ def new_claim():
     db.session.commit()
     flash(f"Claim {claim.claim_id} submitted. Recommendation: {outcome.decision['decision']} → {claim.status}.",
           "success")
-    return redirect(url_for("claims.view_claim", claim_id=claim.claim_id, evaluated=1))
+    return redirect(url_for("claims.view_claim", claim_id=claim.claim_id, fresh=1))
 
 
 @claim_bp.post("/preparation-check")
@@ -302,7 +302,8 @@ def view_claim(claim_id):
         review_actions=[a for a, target in claim_service.REVIEW_ACTIONS.items()
                         if target in rbac.policy()["review_transitions"].get(claim.status, [])],
         override_pairs=[[d, s] for d, s in claim_service.OVERRIDES], action_targets=claim_service.REVIEW_ACTIONS,
-        stages=Config.ALL_CLAIM_STATUSES, just_evaluated=request.args.get("evaluated") == "1")
+        override_min=rbac.policy()["separation_of_duties"]["override_reason_min_chars"],
+        v=verdict.view(claim, fresh=request.args.get("fresh") == "1"), details=verdict.show_model_details(g.user))
 
 
 @claim_bp.get("/<string:claim_id>/track")
@@ -344,7 +345,7 @@ def submit_claim(claim_id):
         return redirect(url_for("claims.view_claim", claim_id=claim_id))
     db.session.commit()
     flash(f"Claim submitted. Recommendation: {outcome.decision['decision']} → {claim.status}.", "success")
-    return redirect(url_for("claims.view_claim", claim_id=claim_id, evaluated=1))
+    return redirect(url_for("claims.view_claim", claim_id=claim_id, fresh=1))
 
 
 @claim_bp.post("/<string:claim_id>/documents")

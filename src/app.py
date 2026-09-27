@@ -27,13 +27,14 @@ def create_app(config_class=Config) -> Flask:
     init_rbac(app, db, User, AuditLog)
 
     from src.api.access import access_bp
+    from src.api.api import api_bp
     from src.api.admin import admin_bp
     from src.api.auth import auth_bp
     from src.api.claims import claim_bp
     from src.api.products import product_bp
     from src.api.public import public_bp
     from src.api.reviewer import reviewer_bp
-    for bp in (public_bp, auth_bp, product_bp, claim_bp, reviewer_bp, admin_bp, access_bp):
+    for bp in (public_bp, auth_bp, product_bp, claim_bp, reviewer_bp, admin_bp, access_bp, api_bp):
         app.register_blueprint(bp)
 
     register_template_helpers(app)

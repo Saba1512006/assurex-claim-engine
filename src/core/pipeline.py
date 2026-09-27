@@ -78,34 +78,52 @@ def compare(py: dict | None, gtm: dict | None) -> dict:
     return {"status": status, "diff": diff, "match": match, "thresholds": t, "explanation": text}
 
 
-def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
-    """Run the full pipeline for a stored claim and persist the result (caller commits)."""
-    from database.db import db
-    from src.models.entities import ModelEvaluation, RuleValidationLog
-    from src.services.audit import audit
+STAGE_NAMES = ("preprocess", "python", "card", "gtm", "rules")
 
-    started = time.perf_counter()
-    product = claim.product
-    documents = list(claim.documents) + [d for d in product.documents if d.claim_id is None]
 
-    contradictions = contradiction_detector.detect(
-        purchase_date=product.purchase_date, fault_date=claim.fault_occurrence_date,
-        submission_date=claim.claim_submission_date, registered_serial=product.serial_number,
-        registered_model=product.model_number, registered_invoice=product.invoice_number,
-        documents=documents, repairs=list(product.repair_records))
-    duplicates = duplicate_detector.check(claim)
-    facts = feature_builder.build(claim, contradictions=contradictions, duplicates=duplicates)
-    rules = policy_engine.evaluate(facts)
-    missing = feature_builder.missing_mandatory(claim)
+def _short(version: str | None) -> str | None:
+    return version.split("+")[0] if version and version.startswith("v") else version
 
+
+def _check_scores(model: dict | None, name: str) -> None:
+    if model is not None:
+        total = sum(model["confidence_scores"].values())
+        if abs(total - 1) > 0.001:
+            raise ValueError(f"{name} scores sum to {total:.4f}, not 1")
+
+
+def run(facts: dict, *, contradictions: dict, duplicates: dict, missing: list, preprocess_ms: int,
+        claim_id: str, evidence_needed: list | None = None, card_url: str | None = None, explain: bool = True) -> dict:
+    """Models, card, rules, consistency and decision for one feature record. Pure: no database access.
+
+    Returns {"payload": verdict payload (stored with the evaluation and served by the API),
+             "card_bytes": PNG, "py": ..., "gtm": ..., "rules": RuleReport, "comparison": ..., "decision": ...}."""
+    from src.core.explain_models import gtm_occlusion, python_contributions
+    ms = {"preprocess": preprocess_ms}
+
+    t = time.perf_counter()
     py, py_err = _run_python(facts)
+    contributions = []
+    if py and explain:
+        clf = get_python_classifier()
+        contributions = python_contributions(facts, clf.pipeline, clf.classes, py["predicted_class"])
+    ms["python"] = round((time.perf_counter() - t) * 1000)
+
+    t = time.perf_counter()
     card = render_card(facts, variation=0)             # canonical card: no prediction or decision on it
     buf = io.BytesIO()
     card.save(buf, "PNG")
     card_bytes = buf.getvalue()
-    gtm, gtm_err = _run_gtm(card)
-    comparison = compare(py, gtm)
+    ms["card"] = round((time.perf_counter() - t) * 1000)
 
+    t = time.perf_counter()
+    gtm, gtm_err = _run_gtm(card)
+    occlusion = gtm_occlusion(card, facts, get_gtm_classifier(), gtm["predicted_class"]) if gtm and explain else []
+    ms["gtm"] = round((time.perf_counter() - t) * 1000)
+
+    t = time.perf_counter()
+    rules = policy_engine.evaluate(facts)
+    comparison = compare(py, gtm)
     decision_facts = {
         "hard_fail_count": len(rules.hard_fails),
         "contradiction_count": len(contradictions["findings"]),
@@ -117,9 +135,71 @@ def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
         "python_class": py["predicted_class"] if py else UNAVAILABLE,
         "gtm_class": gtm["predicted_class"] if gtm else UNAVAILABLE,
     }
-    policy = decision_table.load_policy()
-    decision = decision_table.decide(decision_facts, policy)
+    decision = decision_table.decide(decision_facts, decision_table.load_policy())
     decision["facts"] = decision_facts
+    ms["rules"] = round((time.perf_counter() - t) * 1000)
+    _check_scores(py, "Python")
+    _check_scores(gtm, "Teachable Machine")
+
+    def model_block(m, err, extra):
+        if m is None:
+            return {"available": False, "error": err, "version": None, "predicted": None, "top": None, "scores": {}, **extra}
+        return {"available": True, "error": None, "version": _short(m["model_version"]), "full_version": m["model_version"],
+                "predicted": m["predicted_class"], "top": m["top_confidence"],
+                "scores": {c: m["confidence_scores"][c] for c in ("Valid Claim", "Invalid Claim", "Manual Review")}, **extra}
+
+    results = rules.to_dict()["results"]
+    payload = {
+        "claim_id": claim_id, "state": "decided",
+        "stages": [{"name": n, "status": "done", "ms": ms[n]} for n in STAGE_NAMES],
+        "total_ms": sum(ms.values()),
+        "python": model_block(py, py_err, {"contributions": contributions}),
+        "gtm": model_block(gtm, gtm_err, {"card_url": card_url, "occlusion": occlusion}),
+        "consistency": {"status": comparison["status"],
+                        "difference": round(comparison["diff"], 4) if comparison["diff"] is not None else None,
+                        "match": comparison["match"], "explanation": comparison["explanation"],
+                        "thresholds": {k: comparison["thresholds"][k] for k in ("min_confidence", "strong_max_diff", "acceptable_max_diff")}},
+        "decision": {"value": decision["decision"], "rule_id": decision["rule_id"], "reason": decision["reason"],
+                     "policy_version": decision["policy_version"], "trace": decision["trace"], "facts": decision_facts},
+        "rules": {"policy": rules.policy_name,
+                  "passed": [r for r in results if not r["fired"]],
+                  "warnings": [r for r in results if r["fired"] and r["severity"] == "warning"],
+                  "review": [r for r in results if r["fired"] and r["severity"] == "manual_review"],
+                  "failed": [r for r in results if r["fired"] and r["severity"] == "hard_fail"]},
+        "contradictions": contradictions["findings"], "duplicates": duplicates["indicators"],
+        "evidence_needed": evidence_needed if evidence_needed is not None else [],
+        "override": None,
+    }
+    return {"payload": payload, "card_bytes": card_bytes, "py": py, "gtm": gtm, "py_err": py_err, "gtm_err": gtm_err,
+            "rules": rules, "comparison": comparison, "decision": decision}
+
+
+def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
+    """Run the full pipeline for a stored claim and persist the result (caller commits)."""
+    from database.db import db
+    from src.models.entities import ModelEvaluation, RuleValidationLog
+    from src.services.audit import audit
+    from src.services.explain import evidence_needed
+
+    started = time.perf_counter()
+    product = claim.product
+    documents = list(claim.documents) + [d for d in product.documents if d.claim_id is None]
+    contradictions = contradiction_detector.detect(
+        purchase_date=product.purchase_date, fault_date=claim.fault_occurrence_date,
+        submission_date=claim.claim_submission_date, registered_serial=product.serial_number,
+        registered_model=product.model_number, registered_invoice=product.invoice_number,
+        documents=documents, repairs=list(product.repair_records))
+    duplicates = duplicate_detector.check(claim)
+    facts = feature_builder.build(claim, contradictions=contradictions, duplicates=duplicates)
+    missing = feature_builder.missing_mandatory(claim)
+    preprocess_ms = round((time.perf_counter() - started) * 1000)
+
+    out = run(facts, contradictions=contradictions, duplicates=duplicates, missing=missing, preprocess_ms=preprocess_ms,
+              claim_id=claim.claim_id, card_url=f"/claims/{claim.claim_id}/card.png")
+    py, gtm, rules, comparison, decision = out["py"], out["gtm"], out["rules"], out["comparison"], out["decision"]
+    payload, card_bytes = out["payload"], out["card_bytes"]
+    fired = [r["rule_id"] for group in ("failed", "review", "warnings") for r in payload["rules"][group]]
+    payload["evidence_needed"] = evidence_needed(claim, fired)
 
     evaluation = ModelEvaluation(
         claim=claim, features_json=json.dumps(facts, default=str),
@@ -133,7 +213,7 @@ def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
         gtm_conf_valid=gtm and gtm["confidence_scores"]["Valid Claim"],
         gtm_conf_invalid=gtm and gtm["confidence_scores"]["Invalid Claim"],
         gtm_conf_manual=gtm and gtm["confidence_scores"]["Manual Review"],
-        model_errors_json=json.dumps({k: v for k, v in (("python", py_err), ("gtm", gtm_err)) if v}) or None,
+        model_errors_json=json.dumps({k: v for k, v in (("python", out["py_err"]), ("gtm", out["gtm_err"])) if v}) or None,
         is_class_match=comparison["match"], top_confidence_difference=comparison["diff"],
         model_consistency_status=comparison["status"],
         consistency_thresholds_json=json.dumps({**comparison["thresholds"], "explanation": comparison["explanation"]}),
@@ -148,6 +228,8 @@ def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
     rel = f"cards/{evaluation.evaluation_id}.png"
     (upload_dir / rel).write_bytes(card_bytes)
     evaluation.summary_card_image_path = rel
+    payload["evaluation_id"] = evaluation.evaluation_id
+    payload["gtm"]["card_url"] = f"/claims/{claim.claim_id}/card.png?evaluation={evaluation.evaluation_id}"
 
     rule_log = RuleValidationLog(
         claim=claim, evaluation_id=evaluation.id, policy_name=rules.policy_name,
@@ -167,14 +249,17 @@ def evaluate_claim(claim, *, upload_dir: Path, actor=None) -> Outcome:
     claim.risk_level = risk_level(decision["decision"], len(contradictions["findings"]),
                                   len(duplicates["indicators"]), len(rules.hard_fails))
     evaluation.latency_ms = int((time.perf_counter() - started) * 1000)
+    payload["total_ms"] = evaluation.latency_ms
+    evaluation.payload_json = json.dumps(payload, default=str)
 
     audit("MODEL_PREDICTION", "Claim", claim.claim_id, user=actor,
           python=py and {k: py[k] for k in ("predicted_class", "top_confidence", "model_version")},
           gtm=gtm and {k: gtm[k] for k in ("predicted_class", "top_confidence", "model_version")},
-          consistency=comparison["status"], diff=comparison["diff"], latency_ms=evaluation.latency_ms)
-    for name, err in (("Python", py_err), ("Teachable Machine", gtm_err)):
+          consistency=comparison["status"], diff=comparison["diff"], latency_ms=evaluation.latency_ms,
+          stages={s["name"]: s["ms"] for s in payload["stages"]})
+    for name, err in (("Python", out["py_err"]), ("Teachable Machine", out["gtm_err"])):
         if err:
             audit("MODEL_UNAVAILABLE", "Claim", claim.claim_id, user=actor, model=name, error=err)
     audit("FINAL_DECISION", "Claim", claim.claim_id, user=actor, decision=decision["decision"],
           rule=decision["rule_id"], policy_version=decision["policy_version"])
-    return Outcome(evaluation, rule_log, decision, policy["routing"][decision["decision"]])
+    return Outcome(evaluation, rule_log, decision, decision_table.load_policy()["routing"][decision["decision"]])

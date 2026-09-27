@@ -16,7 +16,7 @@ h1, h2, h3, h4 { margin: 0; color: var(--ink); font-weight: 600; letter-spacing:
 h1 { font-size: var(--fs-2xl); }
 h2 { font-size: var(--fs-lg); }
 h3 { font-size: var(--fs-md); }
-h4 { font-size: var(--fs-sm); }
+h4, .h4 { font-size: var(--fs-sm); }
 p { margin: 0 0 var(--s3); }
 code, .mono { font-family: var(--mono); font-size: .92em; }
 hr { border: 0; border-top: 1px solid var(--rule); margin: var(--s5) 0; }
@@ -363,7 +363,7 @@ a.stat:hover { background: var(--mist); }
 .gauge svg { width: 100%; min-width: 240px; max-width: 340px; height: auto; overflow: visible; }
 .gauge .delta { font-family: var(--mono); font-size: var(--fs-lg); }
 .gauge .caption { font-size: var(--fs-xs); color: var(--ink-2); max-width: 36ch; }
-.needle { transform-origin: 160px 160px; }
+.needle { transform-box: fill-box; transform-origin: 50% 100%; transform: rotate(var(--a, 0deg)); }
 .stamp-row { display: flex; justify-content: center; padding: 0 var(--s5) var(--s5); }
 .stamp { display: inline-flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s5); border: 1.5px solid currentColor; border-radius: var(--r-control);
   background: var(--paper); font-size: var(--fs-xl); font-weight: 600; transform: rotate(-3deg); box-shadow: var(--lift); }
@@ -373,7 +373,7 @@ a.stat:hover { background: var(--mist); }
 .verdict.animate .needle { animation: sweep 450ms cubic-bezier(.2, .8, .2, 1) both; }
 .verdict.animate .needle.gtm { animation-delay: 120ms; }
 .verdict.animate .stamp { animation: stamp 180ms ease-out 570ms both; }
-@keyframes sweep { from { transform: rotate(-90deg); } }
+@keyframes sweep { from { transform: rotate(-90deg); } to { transform: rotate(var(--a, 0deg)); } }
 @keyframes stamp { from { opacity: 0; transform: rotate(-3deg) scale(1.08); } to { opacity: 1; transform: rotate(-3deg) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .verdict.animate .needle, .verdict.animate .stamp { animation: none; } }
 .superseded { margin-top: var(--s3); font-size: var(--fs-xs); color: var(--ink-2); text-align: center; }

@@ -1,0 +1,153 @@
+{# Verdict component: agreement meter, both models' probabilities, decision stamp, reasons and what the image model saw.
+   `v` comes from src/services/verdict.py (stored payload + override + meter geometry); nothing is recomputed here. #}
+{% from "components/ui.html" import prob_bars, class_tag, consistency_tag, tag %}
+
+{% macro meter_svg(m) -%}
+{# 180° agreement gauge: teal = Python needle, indigo = Teachable Machine needle, dashed tick = minimum confidence. #}
+<svg viewBox="-24 -12 368 196" role="img" aria-label="{{ m.label }}">
+  <path d="{{ m.track }}" fill="var(--mist)" stroke="var(--rule)"/>
+  {% if m.arc %}<path d="{{ m.arc }}" fill="var({{ m.tone_var }})" fill-opacity=".2" stroke="var({{ m.tone_var }})" stroke-opacity=".5"/>{% endif %}
+  {% for t in m.ticks %}
+    <line x1="{{ t.x1 }}" y1="{{ t.y1 }}" x2="{{ t.x2 }}" y2="{{ t.y2 }}" stroke="var(--steel-line)" stroke-width="{{ 2 if t.min else 1.5 }}" {% if t.min %}stroke-dasharray="3 2"{% endif %}/>
+    <text x="{{ t.lx }}" y="{{ t.ly }}" text-anchor="middle" dominant-baseline="middle" font-size="11" fill="var(--ink-2)" font-family="var(--mono)">{{ t.label }}</text>
+  {% endfor %}
+  <text x="20" y="176" text-anchor="middle" font-size="11" fill="var(--steel)" font-family="var(--mono)">0</text>
+  <text x="300" y="176" text-anchor="middle" font-size="11" fill="var(--steel)" font-family="var(--mono)">1</text>
+  {% for n in m.needles %}
+    <g class="needle {{ n.cls }}" style="--a: {{ n.angle }}deg">
+      <line x1="{{ m.cx }}" y1="{{ m.cy }}" x2="{{ m.cx }}" y2="{{ m.cy - m.needle_len }}" stroke="var({{ '--teal' if n.cls == 'py' else '--gtm' }})"
+            stroke-width="3" stroke-linecap="round" {% if n.dashed %}stroke-dasharray="7 5"{% endif %}/>
+    </g>
+  {% endfor %}
+  <circle cx="{{ m.cx }}" cy="{{ m.cy }}" r="6" fill="var(--ink)"/>
+</svg>
+{%- endmacro %}
+
+{% macro stamp(v, compact=False) -%}
+{# Decision stamp; a reviewer's settling decision becomes the main stamp and the automated verdict stays below, struck through. #}
+{% set p, ov = v.p, v.p.override %}
+{% set icons = {'valid': 'bi-check-lg', 'invalid': 'bi-x-lg', 'review': 'bi-eye', 'none': 'bi-dash'} %}
+{% if ov %}
+  <div class="stamp {{ ov.tone }} {{ 'compact' if compact }}" role="status">
+    <i class="bi {{ icons[ov.tone] }}" aria-hidden="true"></i>
+    <span>{{ ov.label }}<span class="who">{{ ov.reviewer }} · {{ ov.at }}</span></span>
+  </div>
+{% else %}
+  <div class="stamp {{ v.decision_kind }} {{ 'compact' if compact }}" role="status">
+    <i class="bi {{ icons[v.decision_kind] }}" aria-hidden="true"></i><span>{{ p.decision.value|capitalize if p.decision.value else 'Not decided' }}</span>
+  </div>
+{% endif %}
+{%- endmacro %}
+
+{% macro model_column(m, name, key, details) -%}
+{# One model's prediction: class, version and the three probability bars (or why it could not run). #}
+<section class="model" aria-labelledby="{{ key }}-model-h">
+  <h3 id="{{ key }}-model-h"><span class="tag {{ 'teal' if key == 'python' else 'gtm' }}"><span class="dot" aria-hidden="true"></span>{{ name }}</span></h3>
+  {% if m.available %}
+    <span class="ver">{{ m.version }}</span>
+    <div class="pred">{{ class_tag(m.predicted) }}{% if details %} <span class="mono small">{{ '%.2f'|format(m.top) }}</span>{% endif %}</div>
+    {% if details %}{{ prob_bars(m.scores, model='gtm' if key == 'gtm' else 'python') }}{% endif %}
+  {% else %}
+    <div class="callout bad small"><b>Model unavailable.</b> {{ m.error or 'It could not run for this claim.' }} The claim was routed to a person instead of being decided on one model.</div>
+  {% endif %}
+</section>
+{%- endmacro %}
+
+{% macro verdict(v, claim, details=True, compact=False) -%}
+{% set p, m = v.p, v.meter %}
+<section class="panel verdict {{ 'animate' if v.fresh }}" aria-labelledby="verdict-h" data-verdict>
+  <div class="verdict-head">
+    <div class="ttl"><h2 id="verdict-h" class="sr">Verdict</h2><span class="id">{{ p.claim_id }}</span><span class="strong">{{ claim.product.product_name }}</span><span class="small muted">{{ claim.product.category }}</span></div>
+    {% if p.total_ms %}<span class="small muted">Decided in <span class="mono">{{ '%.2f'|format(p.total_ms / 1000) }} s</span></span>{% endif %}
+  </div>
+  <div class="verdict-main">
+    {{ model_column(p.python, 'Python model', 'python', details) }}
+    <div class="gauge">
+      {% if details %}{{ meter_svg(m) }}
+        <span class="delta">{% if p.consistency.difference is not none %}<span title="Difference {{ '%.4f'|format(p.consistency.difference) }}">Δ {{ '%.2f'|format(p.consistency.difference) }}</span>{% else %}Δ —{% endif %}</span>
+      {% endif %}
+      {{ consistency_tag(p.consistency.status) }}
+      <span class="caption">{{ m.caption }}</span>
+    </div>
+    {{ model_column(p.gtm, 'Teachable Machine', 'gtm', details) }}
+  </div>
+  <div class="stamp-row"><div>{{ stamp(v, compact) }}
+    {% if p.override and p.override.is_override %}
+      <p class="superseded">Automated recommendation <s>{{ p.override.previous_recommendation }}</s> overridden. Reason: {{ p.override.reason }}</p>
+    {% elif p.override %}
+      <p class="superseded">Automated recommendation: {{ p.decision.value }}. Reviewer comment: {{ p.override.reason }}</p>
+    {% endif %}
+  </div></div>
+  {% if not compact %}
+  <div class="verdict-why">
+    <section aria-labelledby="why-h">
+      <h3 id="why-h" class="mb-2">Why this decision</h3>
+      <p class="small">{{ p.decision.reason }}.{% if details %} Rule <span class="mono">{{ p.decision.rule_id }}</span> matched{% set before = p.decision.trace|rejectattr('matched')|map(attribute='id')|list %}{% if before %} ({{ before|first }}–{{ before|last }} did not){% endif %}.{% endif %}</p>
+      {% if details %}<div class="trace mb-2" aria-label="Decision table rows evaluated">{% for t in p.decision.trace %}<span class="{{ 'hit' if t.matched else 'miss' }}">{{ t.id }}</span>{% endfor %}{% if p.decision.rule_id == 'D99' %}<span class="hit">D99</span>{% endif %}</div>{% endif %}
+      <ul class="checks">
+        {% for r in p.rules.failed %}<li><i class="bi bi-x-lg no" aria-hidden="true"></i><span><span class="sr">Failed: </span>{{ r.description or r.title }}. <span class="muted">{{ r.message }}</span></span></li>{% endfor %}
+        {% for r in p.rules.review %}<li><i class="bi bi-exclamation-lg warn" aria-hidden="true"></i><span><span class="sr">Needs review: </span>{{ r.description or r.title }}. <span class="muted">{{ r.message }}</span></span></li>{% endfor %}
+        {% for r in p.rules.warnings %}<li><i class="bi bi-exclamation warn" aria-hidden="true"></i><span><span class="sr">Warning: </span>{{ r.message }}</span></li>{% endfor %}
+        {% for c in p.contradictions %}<li><i class="bi bi-arrow-left-right no" aria-hidden="true"></i><span><span class="sr">Contradiction: </span>{{ c.message }}</span></li>{% endfor %}
+        {% for d in p.duplicates %}<li><i class="bi bi-files warn" aria-hidden="true"></i><span><span class="sr">Possible duplicate: </span>{{ d.message }}</span></li>{% endfor %}
+      </ul>
+      <details class="mt-2"><summary class="small">{{ p.rules.passed|length }} warranty check{{ 's' if p.rules.passed|length != 1 }} passed</summary>
+        <ul class="checks mt-2">{% for r in p.rules.passed %}<li><i class="bi bi-check-lg ok" aria-hidden="true"></i><span>{{ r.message }}</span></li>{% endfor %}</ul>
+      </details>
+      <h4 class="mt-3">Evidence still needed</h4>
+      {% if p.evidence_needed %}<ul class="bullets mt-1">{% for e in p.evidence_needed %}<li>{{ e }}</li>{% endfor %}</ul>{% else %}<p class="small mb-0">None.</p>{% endif %}
+      {% if details and p.python.contributions %}
+        <h4 class="mt-3">What moved the Python model</h4>
+        <p class="tiny muted">Each input replaced by its typical training value; bar = change in the probability of “{{ p.python.predicted }}”.</p>
+        <div class="influence">
+          {% for c in p.python.contributions %}
+            <div class="row-i"><span>{{ c.label }}: <b>{{ c.value }}</b> <span class="toward">(typical {{ c.typical }})</span></span>
+              <span class="diverge" role="img" aria-label="{{ '%+.2f'|format(c.effect) }}"><i class="{{ 'neg' if c.effect < 0 }}" style="--p: {{ '%.3f'|format([c.effect|abs * 2, 1]|min) }}"></i></span>
+              <span class="v">{{ '%+.2f'|format(c.effect) }}</span></div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+    <section aria-labelledby="saw-h">
+      <h3 id="saw-h" class="mb-2">What the image model saw</h3>
+      {% if p.gtm.card_url %}
+      <figure class="card-figure">
+        <div class="occlusion">
+          <img class="summary-card-img" src="{{ p.gtm.card_url }}" alt="Claim Summary Card for {{ p.claim_id }}: claim facts drawn as nine tiles" width="600" height="600" loading="lazy">
+          {% if details and p.gtm.occlusion %}<div class="cells" aria-hidden="true">{% for t in p.gtm.occlusion %}<span style="--w: {{ t.weight }}"></span>{% endfor %}</div>{% endif %}
+        </div>
+        <figcaption>The card holds claim facts only — no prediction, confidence or decision.{% if details and p.gtm.occlusion %} Teal outlines mark the tiles that most drove the image model's answer.{% endif %}</figcaption>
+      </figure>
+      {% endif %}
+      {% if details and p.gtm.occlusion %}
+        {% set top_tiles = p.gtm.occlusion|sort(attribute='effect', reverse=True) %}
+        <div class="influence mt-2">
+          {% for t in top_tiles[:3] if t.effect > 0.005 %}
+            <div class="row-i"><span>{{ t.tile }} <span class="toward">({{ t.detail }})</span></span>
+              <span class="meter teal" role="img" aria-label="{{ '%.2f'|format(t.effect) }}"><i style="--p: {{ '%.3f'|format(t.weight) }}"></i></span>
+              <span class="v">−{{ '%.2f'|format(t.effect) }}</span></div>
+          {% else %}<p class="small muted">No single tile changed the answer by more than 0.01; the prediction rests on the card as a whole.</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if p.stages %}<p class="timings mt-2">Pipeline timings (ms): {% for s in p.stages %}{{ s.name }} {{ s.ms }}{{ ' · ' if not loop.last }}{% endfor %} · total {{ p.total_ms }}</p>{% endif %}
+    </section>
+  </div>
+  {% endif %}
+</section>
+{%- endmacro %}
+
+{% macro pending(claim) -%}
+{# Evaluation running: the five pipeline stages tick as /api/claims/<id>/evaluation reports them. #}
+<section class="panel" aria-labelledby="pending-h" x-data="pendingVerdict" data-url="{{ url_for('api.claim_evaluation', claim_id=claim.claim_id) }}" data-done-url="{{ url_for('claims.view_claim', claim_id=claim.claim_id, fresh=1) }}">
+  <div class="panel-h"><h2 id="pending-h">Checking the claim</h2><span class="hint" x-text="elapsed"></span></div>
+  <div class="panel-b">
+    <ul class="stages-live" aria-live="polite">
+      {% for n, label in [('preprocess', 'Preparing the claim record'), ('python', 'Python model'), ('card', 'Drawing the Claim Summary Card'), ('gtm', 'Teachable Machine'), ('rules', 'Warranty rules and decision')] %}
+        <li><i class="bi bi-circle" aria-hidden="true"></i><span>{{ label }}</span><span class="ms">waiting</span></li>
+      {% endfor %}
+    </ul>
+    <p class="callout bad small mt-2" x-show="failed" x-cloak>The checks are taking longer than expected. <button class="linkish" type="button" x-on:click="retry">Check again</button></p>
+  </div>
+</section>
+{%- endmacro %}

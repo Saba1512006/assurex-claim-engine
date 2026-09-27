@@ -68,6 +68,17 @@ def summarise(claim) -> dict:
     return {"text": " ".join(parts), "issues": issues, "documents": sorted(docs)}
 
 
+def evidence_needed(claim, fired_rule_ids) -> list[str]:
+    """Exact documents (and diagnoses) still needed, named as the policy names them."""
+    needed = [REQUEST.get(m, f"Upload the {DOCUMENT_LABELS[m].lower()}.")
+              for m in missing_mandatory(claim) + missing_supporting(claim)]
+    if any(r in ("EXCLUDED_DAMAGE_UNCONFIRMED", "UNKNOWN_CAUSE") for r in fired_rule_ids):
+        needed.append("A technician's diagnostic report confirming the cause of the fault.")
+    if "SERIAL_UNVERIFIED" in fired_rule_ids:
+        needed.append("A receipt and serial photo that show the same serial number.")
+    return needed
+
+
 def explain(claim) -> dict:
     """Factors for and against the recommendation, rules passed/failed, contradictions, evidence still needed."""
     ev, log = claim.model_evaluation, claim.rule_validation
@@ -100,12 +111,7 @@ def explain(claim) -> dict:
             support.append("Dates and identifiers are consistent across the evidence.")
         if not log.duplicate_flags:
             support.append("No duplicate claim or reused document was found.")
-    needed = [REQUEST.get(m, f"Upload the {DOCUMENT_LABELS[m].lower()}.")
-              for m in missing_mandatory(claim) + missing_supporting(claim)]
-    if log and any(r["rule_id"] in ("EXCLUDED_DAMAGE_UNCONFIRMED", "UNKNOWN_CAUSE") for r in failed):
-        needed.append("A technician's diagnostic report confirming the cause of the fault.")
-    if log and any(r["rule_id"] == "SERIAL_UNVERIFIED" for r in failed):
-        needed.append("A receipt and serial photo that show the same serial number.")
+    needed = evidence_needed(claim, [r["rule_id"] for r in failed])
     return {"decision": claim.final_decision, "rule_id": claim.decision_rule_id, "reason": claim.decision_reason,
             "supporting": support, "opposing": oppose, "passed": passed, "failed": failed,
             "contradictions": log.contradictions if log else [], "duplicates": log.duplicate_flags if log else [],

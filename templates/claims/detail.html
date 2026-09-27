@@ -1,220 +1,83 @@
 {% extends "components/base.html" %}
-{% from "components/macros.html" import status, decision, klass, risk, probs, csrf, empty, doc_icon %}
+{# Claim page: the Verdict at the top, then evidence, history and (for reviewers) the decision panel. #}
+{% from "components/ui.html" import csrf, status_tag, risk_tag, verdict_chip, evidence_tiles, stage_timeline, empty_state, doc_icon, tag, panel as ui_panel %}
+{% from "components/verdict.html" import verdict, pending %}
 {% block title %}{{ claim.claim_id }} · {{ claim.product.product_name }}{% endblock %}
-{% block content %}
-{% set p = claim.product %}{% set w = claim.warranty or p.warranty %}
-{% set reached = claim.status_history|map(attribute='new_status')|list %}
-{% set can_decide = can('review.decide', claim) %}
-
+{% block description %}Claim {{ claim.claim_id }}: both model predictions, the warranty-rule results and the decision.{% endblock %}
+{% block page_header %}
+{% set p = claim.product %}
 <div class="page-head">
   <div>
-    <div class="crumbs"><a href="{{ url_for('claims.search') }}">Claims</a><i class="bi bi-chevron-right"></i><span class="id">{{ claim.claim_id }}</span></div>
-    <h1>{{ p.product_name }} <span class="muted" style="font-weight:500">· {{ claim.fault_category }}</span></h1>
-    <div class="row mt-1">{{ status(claim.status) }}{{ risk(claim.risk_level) }}
-      <span class="chip"><i class="bi bi-person"></i>{{ claim.claimant.full_name }}</span>
-      {% if claim.created_by and claim.created_by_id != claim.user_id %}<span class="chip"><i class="bi bi-shop"></i>Filed by {{ claim.created_by.full_name }}</span>{% endif %}
-      {% if claim.assigned_reviewer %}<span class="chip"><i class="bi bi-person-check"></i>Reviewer: {{ claim.assigned_reviewer.full_name }}</span>{% endif %}
-    </div>
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ url_for('claims.search') if can('claim.read') and current_user.role != 'customer' else url_for('claims.dashboard') }}">Claims</a><span aria-hidden="true">/</span><span class="id">{{ claim.claim_id }}</span></nav>
+    <h1>{{ p.product_name }}</h1>
+    <p class="lede">{{ claim.fault_category }} · filed for {{ claim.claimant.full_name }}{% if claim.created_by and claim.created_by_id != claim.user_id %} by {{ claim.created_by.full_name }}{% endif %}</p>
+    <div class="row tight mt-2">{{ status_tag(claim.status) }}{{ risk_tag(claim.risk_level) }}
+      {% if claim.assigned_reviewer %}{{ tag('Reviewer: ' ~ claim.assigned_reviewer.full_name) }}{% endif %}</div>
   </div>
   <div class="row no-print">
-    <a class="btn quiet" href="{{ url_for('claims.track_claim', claim_id=claim.claim_id) }}"><i class="bi bi-signpost-split"></i>Track</a>
-    {% if ev and can('report.download', claim) %}<a class="btn quiet" href="{{ url_for('claims.download_report', claim_id=claim.claim_id) }}"><i class="bi bi-file-earmark-pdf"></i>Report (PDF)</a>{% endif %}
+    <a class="btn quiet" href="{{ url_for('claims.track_claim', claim_id=claim.claim_id) }}">Track progress</a>
+    {% if claim.model_evaluation and can('report.download', claim) %}<a class="btn quiet" href="{{ url_for('claims.download_report', claim_id=claim.claim_id) }}">Download report (PDF)</a>{% endif %}
     {% if claim.is_editable and can('claim.submit', claim) %}
       <form method="post" action="{{ url_for('claims.submit_claim', claim_id=claim.claim_id) }}" data-confirm="Submit this claim for evaluation now?">{{ csrf() }}
-        <button class="btn" type="submit"><i class="bi bi-send"></i>{{ 'Resubmit claim' if claim.status != 'Draft' else 'Submit claim' }}</button></form>
+        <button class="btn" type="submit">{{ 'Resubmit claim' if claim.status != 'Draft' else 'Submit claim' }}</button></form>
     {% endif %}
   </div>
 </div>
+{% endblock %}
 
-{% if just_evaluated and ev %}
-<div class="alert success" style="margin-bottom:16px"><i class="lead bi bi-lightning-charge-fill"></i><div>Evaluated in {{ ev.latency_ms }} ms: both models, {{ log.rules|length }} warranty rules, contradiction and duplicate checks. Scroll down to see why.</div></div>
+{% block content %}
+{% set p = claim.product %}{% set w = claim.warranty or p.warranty %}
+{% if v %}
+  {{ verdict(v, claim, details=details) }}
+{% elif claim.status in ['Submitted', 'Under Evaluation'] %}
+  {{ pending(claim) }}
+{% else %}
+  {% call ui_panel('Not submitted yet') %}
+    <p class="mb-0">This claim is a draft. Add the evidence below, then submit: both models and every warranty rule run the moment you submit.</p>
+  {% endcall %}
 {% endif %}
-
-{% if claim.final_decision %}
-  {% set t = tone('decision', claim.final_decision) %}
-  <section class="verdict {{ t }}">
-    <div class="mark"><i class="bi {{ {'good': 'bi-patch-check-fill', 'bad': 'bi-x-octagon-fill', 'warn': 'bi-person-bounding-box'}[t] }}"></i></div>
-    <div>
-      <div class="eyebrow mb-0">Automated recommendation · rule {{ claim.decision_rule_id }} · policy v{{ claim.decision_policy_version }}</div>
-      <h2>{{ claim.final_decision }}</h2>
-      <p>{{ claim.decision_reason }}.{% if claim.status in ['Approved', 'Rejected', 'Closed'] and claim.reviewer_actions %} A reviewer has since recorded a decision (see history).{% endif %}</p>
-    </div>
-    <div class="right">{{ status(claim.status) }}</div>
-  </section>
-{% elif claim.status == 'Draft' %}
-  <section class="verdict neutral">
-    <div class="mark"><i class="bi bi-pencil-square"></i></div>
-    <div><h2>Draft — not submitted yet</h2><p>Add the remaining evidence, then submit. Both models and all warranty rules run the moment you submit.</p></div>
-    <div></div>
-  </section>
-{% endif %}
-
-<section class="card mt-3"><div class="card-b">
-  <ol class="stages" aria-label="Claim progress">
-    {% for s in stages %}
-      <li class="stage {{ 'now' if s == claim.status else ('done' if s in reached else 'todo') }}">{{ s|replace('Additional Information Required', 'More info needed') }}</li>
-    {% endfor %}
-  </ol>
-</div></section>
 
 <div class="split-wide mt-3">
   <div class="stack">
-    <section class="card">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-stars"></i>Claim summary</h2><span class="hint">Generated from the stored evaluation — no external AI service</span></div>
-      <div class="card-b"><p class="mb-0" style="font-size:.95rem; line-height:1.7">{{ summary.text }}</p></div>
-    </section>
-
-    <section class="card" id="models">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-cpu"></i>Model predictions &amp; comparison</h2>
-        {% if ev %}<span class="hint">Evaluation <span class="id">{{ ev.evaluation_id }}</span> · {{ ev.evaluation_timestamp|date('%d %b %Y %H:%M') }} UTC</span>{% endif %}</div>
-      {% if ev %}
-      <div class="duel">
-        <div class="side">
-          <div class="model-name"><i class="bi bi-table"></i>Python model</div>
-          <div class="version">{{ ev.python_model_version or 'unavailable' }}</div>
-          {% if ev.python_available %}
-            <div class="pred">{{ klass(ev.python_predicted_class) }} <span class="muted small">{{ ev.python_top|pct(1) }}</span></div>
-            {{ probs(ev.python_scores()) }}
-          {% else %}
-            <div class="unavailable mt-2"><b><i class="bi bi-exclamation-triangle"></i> Unavailable</b>{{ ev.model_errors.get('python', '') }}</div>
-          {% endif %}
-        </div>
-        <div class="vs">
-          <div class="delta">
-            <span class="tiny muted">|Δ top confidence|</span>
-            <b>{{ '%.3f'|format(ev.top_confidence_difference) if ev.top_confidence_difference is not none else '—' }}</b>
-            <span class="badge {{ tone('consistency', ev.model_consistency_status) }}" style="margin-top:6px">{{ ev.model_consistency_status }}</span>
-            <div class="tiny muted mt-1">{% if ev.is_class_match is none %}not compared{% elif ev.is_class_match %}classes match{% else %}classes differ{% endif %}</div>
-          </div>
-        </div>
-        <div class="side">
-          <div class="model-name"><i class="bi bi-image"></i>Google Teachable Machine</div>
-          <div class="version">{{ ev.gtm_model_version or 'not installed' }}</div>
-          {% if ev.gtm_available %}
-            <div class="pred">{{ klass(ev.gtm_predicted_class) }} <span class="muted small">{{ ev.gtm_top|pct(1) }}</span></div>
-            {{ probs(ev.gtm_scores()) }}
-          {% else %}
-            <div class="unavailable mt-2"><b><i class="bi bi-exclamation-triangle"></i> Model unavailable</b>
-              <span>{{ ev.model_errors.get('gtm', 'The Teachable Machine export is not installed.') }}</span>
-              <span>The claim was sent to manual review instead of being decided on one model.</span></div>
-          {% endif %}
-        </div>
+    <section class="panel" id="evidence" aria-labelledby="evidence-h">
+      <div class="panel-h"><h2 id="evidence-h">Evidence</h2><span class="hint">Each file is fingerprinted (SHA-256); receipts are read by OCR</span></div>
+      <div class="panel-b">
+        {{ evidence_tiles([('Receipt', 'receipt' in present), ('Warranty card', 'warranty_card' in present), ('Damage photo', 'damage_photo' in present),
+                           ('Serial photo', 'serial_photo' in present), ('Repair report', 'diagnostic_report' in present)]) }}
       </div>
-      <div class="card-b" style="border-top:1px solid var(--line)">
-        <div class="card-split">
-          <figure style="margin:0">
-            <img class="summary-card-img" src="{{ url_for('claims.summary_card', claim_id=claim.claim_id, evaluation=ev.evaluation_id) }}" alt="Claim Summary Card given to the Teachable Machine model" width="600" height="600" loading="lazy">
-            <figcaption class="tiny muted mt-1">Claim Summary Card (input to Teachable Machine). Facts only — no prediction or decision on it.</figcaption>
-          </figure>
-          <div class="stack-sm small">
-            <b>How the status was decided</b>
-            <span class="muted">{{ ev.thresholds.get('explanation', '') }}</span>
-            <dl class="kv">
-              <dt>Minimum confidence</dt><dd>{{ ev.thresholds.get('min_confidence') }}</dd>
-              <dt>Strong match if Δ ≤</dt><dd>{{ ev.thresholds.get('strong_max_diff') }}</dd>
-              <dt>Acceptable match if Δ ≤</dt><dd>{{ ev.thresholds.get('acceptable_max_diff') }}</dd>
-              <dt>Card fingerprint</dt><dd><span class="id">{{ ev.summary_card_sha256[:16] }}…</span></dd>
-            </dl>
-            {% if can_decide %}
-            <form method="post" action="{{ url_for('reviewer.reevaluate', claim_id=claim.claim_id) }}" class="mt-1">{{ csrf() }}
-              <button class="btn quiet sm" type="submit"><i class="bi bi-arrow-repeat"></i>Re-run evaluation</button>
-              <span class="tiny muted">Earlier results are kept.</span></form>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% else %}
-        {{ empty('bi-hourglass', 'Not evaluated yet', 'Submit the claim to run both models and the warranty rules.') }}
-      {% endif %}
-    </section>
-
-    {% if ev %}
-    <section class="card">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-signpost-2"></i>Why this recommendation</h2></div>
-      <div class="card-b stack">
-        <div>
-          <div class="label mb-0" style="margin-bottom:8px">Decision table (first matching row wins)</div>
-          <div class="trace">{% for t in explanation.trace %}<span class="{{ 'hit' if t.matched }}">{{ t.id }}</span>{% endfor %}<span class="{{ 'hit' if claim.decision_rule_id == 'D99' }}">D99</span></div>
-        </div>
-        <div class="grid grid-2">
-          <div><div class="label" style="color:var(--good)"><i class="bi bi-plus-circle"></i> Supporting</div>
-            <ul class="bullets good small mt-1">{% for f in explanation.supporting %}<li>{{ f }}</li>{% else %}<li class="muted">None</li>{% endfor %}</ul></div>
-          <div><div class="label" style="color:var(--bad)"><i class="bi bi-dash-circle"></i> Opposing</div>
-            <ul class="bullets bad small mt-1">{% for f in explanation.opposing %}<li>{{ f }}</li>{% else %}<li class="muted">None</li>{% endfor %}</ul></div>
-        </div>
-        {% if explanation.evidence_needed %}
-        <div class="callout warn small"><b>Additional evidence that would help:</b>
-          <ul class="bullets mt-1">{% for e in explanation.evidence_needed %}<li>{{ e }}</li>{% endfor %}</ul></div>
-        {% endif %}
-      </div>
-    </section>
-
-    <section class="card" id="rules">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-list-check"></i>Warranty rules · {{ log.policy_name }}</h2>
-        <span class="badge {{ {'PASS': 'good', 'FAIL': 'bad', 'REVIEW': 'warn'}[log.overall_rule_status] }}">{{ log.overall_rule_status }}</span></div>
-      <div class="card-b" style="padding-top:6px; padding-bottom:6px">
-        {% set fired = log.rules|selectattr('fired')|list %}{% set passed = log.rules|rejectattr('fired')|list %}
-        {% for r in fired %}
-          <div class="rule {{ r.severity }}">
-            <span class="ic"><i class="bi {{ 'bi-x-lg' if r.severity == 'hard_fail' else ('bi-exclamation' if r.severity == 'manual_review' else 'bi-info') }}"></i></span>
-            <div><div class="t">{{ r.description or r.title }}</div><div class="m">{{ r.message }}</div></div>
-            <span class="badge plain {{ tone('severity', r.severity) }}">{{ r.severity|replace('_', ' ') }}</span>
-          </div>
-        {% endfor %}
-        {% if not fired %}<p class="small muted" style="margin:10px 0">No rule was triggered.</p>{% endif %}
-        <details class="mt-1" {{ 'open' if not fired }}>
-          <summary class="small" style="cursor:pointer; padding: 8px 0; font-weight:600; color:var(--good)"><i class="bi bi-check2-all"></i> {{ passed|length }} rule{{ 's' if passed|length != 1 }} passed</summary>
-          {% for r in passed %}
-            <div class="rule pass"><span class="ic"><i class="bi bi-check-lg"></i></span>
-              <div><div class="t">{{ r.title }}</div><div class="m">{{ r.message }}</div></div>
-              <span class="badge plain good">passed</span></div>
-          {% endfor %}
-        </details>
-      </div>
-      <div class="card-f grid grid-2 small">
-        <div><b><i class="bi bi-arrow-left-right"></i> Contradictions</b>
-          {% for c in log.contradictions %}<div class="mt-1" style="color:var(--bad)">{{ c.message }}</div>{% else %}<div class="muted mt-1">None — dates and identifiers agree.</div>{% endfor %}</div>
-        <div><b><i class="bi bi-files"></i> Duplicate indicators</b>
-          {% for d in log.duplicate_flags %}<div class="mt-1" style="color:var(--warn)">{{ d.message }}</div>{% else %}<div class="muted mt-1">None found.</div>{% endfor %}</div>
-      </div>
-    </section>
-    {% endif %}
-
-    <section class="card" id="evidence">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-paperclip"></i>Evidence</h2><span class="hint">SHA-256 fingerprinted · OCR where the file carries text</span></div>
       {% if docs %}
       <ul class="list">
         {% for d in docs %}
           <li>
-            <span class="ico"><i class="bi {{ doc_icon(d.document_type) }}"></i></span>
+            <span class="ico" aria-hidden="true"><i class="bi {{ doc_icon(d.document_type) }}"></i></span>
             <div class="grow">
-              <div class="row between">
-                <div><div class="ttl small">{{ doc_label(d.document_type) }} {% if d.claim_id is none %}<span class="badge plain">product file</span>{% endif %}</div>
-                  <div class="sub">{{ d.original_filename }} · {{ (d.file_size_bytes / 1024)|round(1) }} KB · <span class="mono">{{ d.file_hash_sha256[:12] }}</span> · {{ d.created_at|date }}</div></div>
-                <div class="row">
-                  {% if can('document.read', d) %}<a class="btn quiet sm" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener">Open</a>{% endif %}
+              <div class="row between top">
+                <div class="grow"><div class="ttl small">{{ doc_label(d.document_type) }}{% if d.claim_id is none %} <span class="chip">product file</span>{% endif %}</div>
+                  <div class="sub wrap-any">{{ d.original_filename }} · {{ (d.file_size_bytes / 1024)|round(1) }} KB · <span class="mono">{{ d.file_hash_sha256[:12] }}</span> · {{ d.created_at|date }}</div></div>
+                <div class="row tight">
+                  {% if can('document.read', d) %}<a class="btn quiet sm" href="{{ url_for('claims.open_document', doc_id=d.document_id) }}" target="_blank" rel="noopener">Open<span class="sr"> {{ doc_label(d.document_type) }}</span></a>{% endif %}
                   {% if can('document.delete', d) %}
-                    <form method="post" action="{{ url_for('claims.delete_document', doc_id=d.document_id) }}" data-confirm="Remove this document?">{{ csrf() }}<button class="btn danger sm" type="submit" aria-label="Remove">Remove</button></form>
+                    <form method="post" action="{{ url_for('claims.delete_document', doc_id=d.document_id) }}" data-confirm="Remove this document from the claim?">{{ csrf() }}<button class="btn danger sm" type="submit">Remove<span class="sr"> {{ doc_label(d.document_type) }}</span></button></form>
                   {% endif %}
                 </div>
               </div>
               {% set ocr = d.get_ocr_payload() %}
               {% if d.ocr_status != 'not_applicable' %}
-                <details class="mt-1">
-                  <summary class="small" style="cursor:pointer">
-                    {% if d.ocr_status == 'ok' %}<span class="badge good plain">text read</span>{% elif d.ocr_status == 'unavailable' %}<span class="badge plain">OCR not available for this file</span>{% else %}<span class="badge warn plain">no text found</span>{% endif %}
-                    {% if d.verified_by_user %}<span class="badge info plain">confirmed by user</span>{% endif %}
-                    Extracted details
-                  </summary>
+                <details class="mt-2">
+                  <summary class="small">Extracted details —
+                    {% if d.ocr_status == 'ok' %}text read{% elif d.ocr_status == 'unavailable' %}OCR not available for this file{% else %}no text found{% endif %}{% if d.verified_by_user %}, confirmed by the user{% endif %}</summary>
                   {% if can('document.correct_ocr', d) %}
                     <form class="form-grid mt-2" method="post" action="{{ url_for('claims.correct_document', doc_id=d.document_id) }}">{{ csrf() }}
                       {% for key, label in [('invoice_number', 'Invoice number'), ('purchase_date', 'Purchase date'), ('serial_number', 'Serial number'), ('model_number', 'Model'), ('retailer', 'Retailer'), ('purchase_amount', 'Amount')] %}
-                        <label class="field"><span>{{ label }}</span><input class="input sm" name="{{ key }}" value="{{ ocr.get(key, '') }}"></label>
+                        {% set mism = (key == 'serial_number' and ocr.get(key) and ocr.get(key)|replace('-', '')|upper != p.serial_number|replace('-', '')|upper) %}
+                        <div class="field"><label for="o-{{ d.document_id }}-{{ key }}">{{ label }}</label>
+                          <input class="input sm{{ ' mono' if key in ['invoice_number', 'serial_number', 'model_number'] }}{{ ' mismatch' if mism }}" id="o-{{ d.document_id }}-{{ key }}" name="{{ key }}" value="{{ ocr.get(key, '') }}" aria-describedby="o-{{ d.document_id }}-{{ key }}-d">
+                          <span class="help" id="o-{{ d.document_id }}-{{ key }}-d">{% if mism %}Differs from the registered serial {{ p.serial_number }}.{% endif %}</span></div>
                       {% endfor %}
-                      <div class="full"><button class="btn quiet sm" type="submit">Save corrections</button> <span class="tiny muted">Corrections are recorded in the audit trail.</span></div>
+                      <div class="full row"><button class="btn quiet sm" type="submit">Save corrections</button><span class="tiny muted">Corrections are recorded in the audit trail.</span></div>
                     </form>
                   {% else %}
-                    <dl class="kv mt-2 small">{% for k, v in ocr.items() %}<dt>{{ k|replace('_', ' ')|capitalize }}</dt><dd>{{ v }}</dd>{% else %}<dt>—</dt><dd class="muted">Nothing extracted</dd>{% endfor %}</dl>
+                    <dl class="kv mt-2">{% for k, val in ocr.items() %}<dt>{{ k|replace('_', ' ')|capitalize }}</dt><dd>{{ val }}</dd>{% else %}<dt>Result</dt><dd>Nothing extracted</dd>{% endfor %}</dl>
                   {% endif %}
                 </details>
               {% endif %}
@@ -223,147 +86,127 @@
         {% endfor %}
       </ul>
       {% else %}
-        {{ empty('bi-paperclip', 'No evidence uploaded') }}
+        {{ empty_state('No evidence uploaded', 'Add the receipt and photos of the fault so both models and the rules have something to check.', icon='bi-paperclip') }}
       {% endif %}
       {% if can_upload and can('document.upload', claim) %}
-      <form class="card-f row" method="post" enctype="multipart/form-data" action="{{ url_for('claims.upload_claim_document', claim_id=claim.claim_id) }}">{{ csrf() }}
-        <select class="select sm" name="document_type" style="width:auto" aria-label="Document type">
-          {% for k in doc_types %}<option value="{{ k }}" {{ 'selected' if k in missing or (not missing and k in missing_supporting and loop.first) }}>{{ doc_label(k) }}{{ ' (required)' if k in missing else (' (recommended)' if k in missing_supporting else '') }}</option>{% endfor %}
-        </select>
-        <input class="input sm" type="file" name="file" required style="flex:1; min-width:200px" accept=".pdf,.jpg,.jpeg,.png,.mp4">
-        <button class="btn sm" type="submit"><i class="bi bi-cloud-upload"></i>Upload</button>
+      <form class="panel-f form-grid" method="post" enctype="multipart/form-data" action="{{ url_for('claims.upload_claim_document', claim_id=claim.claim_id) }}">{{ csrf() }}
+        <div class="field"><label for="up-type">Document type</label>
+          <select class="select" id="up-type" name="document_type">
+            {% for k in doc_types %}<option value="{{ k }}" {{ 'selected' if k in missing or (not missing and k in missing_supporting and loop.first) }}>{{ doc_label(k) }}{{ ' (required)' if k in missing else (' (recommended)' if k in missing_supporting else '') }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label for="up-file">File</label>
+          <input class="input" id="up-file" type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.mp4" aria-describedby="up-file-d"><span class="help" id="up-file-d">PDF, JPG, PNG or MP4, at most 16 MB.</span></div>
+        <div class="full"><button class="btn sm" type="submit">Upload document</button></div>
       </form>
       {% endif %}
     </section>
 
     {% if claim.evaluations|length > 1 %}
-    <section class="card">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-clock-history"></i>Evaluation history</h2><span class="hint">Each run is kept with the model versions it used</span></div>
-      <div class="table-wrap"><table class="table compact small">
-        <thead><tr><th>When (UTC)</th><th>Python</th><th>Teachable Machine</th><th>Consistency</th><th>Decision</th><th>Models</th><th></th></tr></thead>
+    <section class="panel" aria-labelledby="hist-h">
+      <div class="panel-h"><h2 id="hist-h">Evaluation history</h2><span class="hint">Each run is kept with the model versions it used</span></div>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th scope="col">When (UTC)</th><th scope="col">Python</th><th scope="col">Teachable Machine</th><th scope="col">Consistency</th><th scope="col">Decision</th><th scope="col">Models</th></tr></thead>
         <tbody>{% for e in claim.evaluations|reverse %}
-          <tr><td class="nowrap">{{ e.evaluation_timestamp|date('%d %b %H:%M') }}</td>
-            <td>{{ e.python_predicted_class or '—' }} {% if e.python_top %}<span class="muted">{{ e.python_top|pct }}</span>{% endif %}</td>
-            <td>{{ e.gtm_predicted_class or 'unavailable' }} {% if e.gtm_top %}<span class="muted">{{ e.gtm_top|pct }}</span>{% endif %}</td>
-            <td>{{ e.model_consistency_status }}</td><td>{{ e.decision }} <span class="muted">{{ e.decision_rule_id }}</span></td>
-            <td class="mono tiny">{{ e.python_model_version }}<br>{{ e.gtm_model_version or '—' }}</td>
-            <td><a class="small" href="{{ url_for('claims.summary_card', claim_id=claim.claim_id, evaluation=e.evaluation_id) }}" target="_blank" rel="noopener">card</a></td></tr>
+          <tr><td class="nowrap mono tiny">{{ e.evaluation_timestamp|date('%d %b %H:%M') }}</td>
+            <td>{{ e.python_predicted_class or 'Unavailable' }}{% if details and e.python_top %} <span class="mono tiny">{{ '%.2f'|format(e.python_top) }}</span>{% endif %}</td>
+            <td>{{ e.gtm_predicted_class or 'Unavailable' }}{% if details and e.gtm_top %} <span class="mono tiny">{{ '%.2f'|format(e.gtm_top) }}</span>{% endif %}</td>
+            <td>{{ e.model_consistency_status }}</td><td>{{ verdict_chip(e.decision) }}</td>
+            <td class="mono tiny wrap-any">{{ (e.python_model_version or '')[:24] }}<br>{{ e.gtm_model_version or 'not installed' }}</td></tr>
         {% endfor %}</tbody>
       </table></div>
     </section>
     {% endif %}
+
+    <section class="panel" aria-labelledby="progress-h">
+      <div class="panel-h"><h2 id="progress-h">Progress</h2><a class="small" href="{{ url_for('claims.track_claim', claim_id=claim.claim_id) }}">Full tracking page</a></div>
+      <div class="panel-b">{{ stage_timeline(claim) }}</div>
+    </section>
   </div>
 
   <aside class="stack">
-    {% if can('claim.read', claim) and (can_decide or can('review.assign')) and claim.status in ['Manual Review', 'Under Evaluation', 'Additional Information Required', 'Approved', 'Rejected'] %}
-    <section class="card highlight" id="decision">
-      <div class="card-h"><h2 class="section-title"><i class="bi bi-person-check"></i>Reviewer decision</h2></div>
-      <div class="card-b stack">
+    {% set can_decide = can('review.decide', claim) %}
+    {% if (can_decide or can('review.assign')) and claim.status in ['Manual Review', 'Under Evaluation', 'Additional Information Required', 'Approved', 'Rejected'] %}
+    <section class="panel selected" id="decision" aria-labelledby="decide-h">
+      <div class="panel-h"><h2 id="decide-h">Reviewer decision</h2></div>
+      <div class="panel-b stack-sm">
         {% if can_decide %}
           {% if claim.assigned_reviewer_id is none %}
-            <form method="post" action="{{ url_for('reviewer.take', claim_id=claim.claim_id) }}">{{ csrf() }}
-              <button class="btn quiet block" type="submit"><i class="bi bi-hand-index"></i>Assign to me</button></form>
+            <form method="post" action="{{ url_for('reviewer.take', claim_id=claim.claim_id) }}">{{ csrf() }}<button class="btn quiet block" type="submit">Take this claim</button></form>
           {% endif %}
-          {% if review_actions %}
-          <form class="stack" method="post" action="{{ url_for('reviewer.decide', claim_id=claim.claim_id) }}" data-review-form
-                data-recommendation="{{ claim.final_decision or '' }}" data-overrides="{{ override_pairs|tojson|forceescape }}" data-targets="{{ action_targets|tojson|forceescape }}">{{ csrf() }}
-            <div class="stack-sm">
-              {% set labels = {'approve': ('Approve', 'bi-check-circle', 'good'), 'reject': ('Reject', 'bi-x-circle', 'bad'), 'request_info': ('Request more information', 'bi-chat-left-dots', 'warn'), 'close': ('Close claim', 'bi-archive', 'neutral'), 'reopen_review': ('Return to review', 'bi-arrow-counterclockwise', 'info')} %}
-              {% for a in review_actions %}
-                <label class="check"><input type="radio" name="action" value="{{ a }}" required> <span><i class="bi {{ labels[a][1] }}"></i> {{ labels[a][0] }}</span></label>
-              {% endfor %}
-            </div>
-            <label class="field"><span>Comment for the customer &amp; audit trail <span class="req">*</span></span>
-              <textarea class="textarea" name="comments" minlength="5" required placeholder="What you checked and why you decided this."></textarea></label>
-            <label class="field hidden" data-override-field><span>Override reason <span class="req">*</span></span>
-              <textarea class="textarea" name="override_reason" minlength="20" placeholder="At least 20 characters. Your decision contradicts the automated recommendation."></textarea>
-              <span class="help">The original AI result stays on record next to your override.</span></label>
-            <button class="btn block" type="submit">Record decision</button>
-          </form>
-          {% else %}
-            <p class="small muted mb-0">No reviewer action is possible at the “{{ claim.status }}” stage.</p>
-          {% endif %}
+          {% include "reviewer/_decision_form.html" %}
         {% elif current_user.role == 'claim_reviewer' %}
-          <p class="small muted mb-0">You can't decide this claim (it is assigned to someone else, or you filed it).</p>
+          <p class="small mb-0">You can't decide this claim: it is assigned to someone else, or you filed it.</p>
         {% endif %}
         {% if can('review.assign') %}
-          <form class="row" method="post" action="{{ url_for('reviewer.assign', claim_id=claim.claim_id) }}">{{ csrf() }}
-            <select class="select sm" name="reviewer" style="flex:1" aria-label="Reviewer">
-              <option value="">Unassigned</option>
-              {% for r in reviewers %}<option value="{{ r.user_id }}" {{ 'selected' if claim.assigned_reviewer_id == r.id }}>{{ r.full_name }}</option>{% endfor %}
-            </select>
-            <button class="btn quiet sm" type="submit">Assign</button>
+          <form class="row tight" method="post" action="{{ url_for('reviewer.assign', claim_id=claim.claim_id) }}">{{ csrf() }}
+            <label class="sr" for="assign-r">Reviewer</label>
+            <select class="select sm grow" id="assign-r" name="reviewer"><option value="">Unassigned</option>
+              {% for r in reviewers %}<option value="{{ r.user_id }}" {{ 'selected' if claim.assigned_reviewer_id == r.id }}>{{ r.full_name }}</option>{% endfor %}</select>
+            <button class="btn quiet sm" type="submit">Assign reviewer</button>
           </form>
+        {% endif %}
+        {% if can_decide and claim.model_evaluation %}
+          <form method="post" action="{{ url_for('reviewer.reevaluate', claim_id=claim.claim_id) }}">{{ csrf() }}
+            <button class="btn ghost sm" type="submit">Run the checks again</button><span class="tiny muted"> Earlier results are kept.</span></form>
         {% endif %}
       </div>
     </section>
     {% endif %}
 
     {% if claim.is_editable and can('claim.update_draft', claim) %}
-    <section class="card">
-      <div class="card-h"><h2>Edit claim details</h2></div>
-      <form class="card-b stack-sm" method="post" action="{{ url_for('claims.update_claim', claim_id=claim.claim_id) }}">{{ csrf() }}
-        <label class="field"><span>Fault</span><select class="select" name="fault_category">{% for f in faults[p.category] %}<option {{ 'selected' if f == claim.fault_category }}>{{ f }}</option>{% endfor %}</select></label>
-        <label class="field"><span>Cause</span><select class="select" name="damage_type">{% for d in damage_types %}<option {{ 'selected' if d == claim.damage_type }}>{{ d }}</option>{% endfor %}</select></label>
-        <label class="field"><span>Fault date</span><input class="input" type="date" name="fault_occurrence_date" value="{{ claim.fault_occurrence_date.isoformat() }}" max="{{ today.isoformat() }}"></label>
-        <label class="field"><span>Diagnostic confidence</span><input class="input" type="number" step="0.01" min="0" max="1" name="diagnostic_confidence" value="{{ claim.diagnostic_confidence if claim.diagnosis_source != 'Not assessed' else '' }}"></label>
-        <label class="field"><span>Description</span><textarea class="textarea" name="fault_description">{{ claim.fault_description }}</textarea></label>
-        <label class="field"><span>Previously replaced?</span><input class="input" name="previous_replacement_details" value="{{ claim.previous_replacement_details or '' }}"></label>
+    <section class="panel" aria-labelledby="edit-h">
+      <div class="panel-h"><h2 id="edit-h">Edit claim details</h2></div>
+      <form class="panel-b stack-sm" method="post" action="{{ url_for('claims.update_claim', claim_id=claim.claim_id) }}">{{ csrf() }}
+        <div class="field"><label for="e-fault">Fault</label><select class="select" id="e-fault" name="fault_category">{% for f in faults[p.category] %}<option {{ 'selected' if f == claim.fault_category }}>{{ f }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="e-cause">Cause</label><select class="select" id="e-cause" name="damage_type">{% for d in damage_types %}<option {{ 'selected' if d == claim.damage_type }}>{{ d }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="e-date">Fault date</label><input class="input" id="e-date" type="date" name="fault_occurrence_date" value="{{ claim.fault_occurrence_date.isoformat() }}" max="{{ today.isoformat() }}"></div>
+        {% if current_user.role != 'customer' %}
+        <div class="field"><label for="e-diag">Diagnostic confidence (0–1)</label><input class="input" id="e-diag" type="number" step="0.01" min="0" max="1" name="diagnostic_confidence" value="{{ claim.diagnostic_confidence if claim.diagnosis_source != 'Not assessed' else '' }}"></div>
+        {% endif %}
+        <div class="field"><label for="e-desc">Description</label><textarea class="textarea" id="e-desc" name="fault_description" data-counter="20:1000" minlength="20" maxlength="1000">{{ claim.fault_description }}</textarea><span class="counter" data-counter-for="e-desc"></span></div>
+        <div class="field"><label for="e-repl">Replaced before (optional)</label><input class="input" id="e-repl" name="previous_replacement_details" value="{{ claim.previous_replacement_details or '' }}"></div>
         <button class="btn quiet" type="submit">Save changes</button>
       </form>
     </section>
     {% endif %}
 
-    <section class="card">
-      <div class="card-h"><h2>Claim details</h2></div>
-      <div class="card-b">
+    <section class="panel" aria-labelledby="details-h">
+      <div class="panel-h"><h2 id="details-h">Claim details</h2></div>
+      <div class="panel-b">
         <dl class="kv">
           <dt>Product</dt><dd><a href="{{ url_for('products.view_product', product_id=p.product_id) }}">{{ p.product_name }}</a> <span class="id">{{ p.product_id }}</span></dd>
           <dt>Category</dt><dd>{{ p.category }}</dd>
           <dt>Serial</dt><dd class="mono">{{ p.serial_number }}</dd>
           <dt>Purchased</dt><dd>{{ p.purchase_date|date }} · {{ p.retailer }}</dd>
-          <dt>Warranty</dt><dd>{% if w %}<span class="badge {{ tone('warranty', w.status) }}">{{ w.status }}</span> until {{ w.expiry_date|date }}{% if w.is_extended %} · extended{% endif %}{% else %}—{% endif %}</dd>
+          <dt>Warranty</dt><dd>{% if w %}{{ w.status }} until {{ w.expiry_date|date }}{% if w.is_extended %} (extended){% endif %}{% else %}None on file{% endif %}</dd>
           <dt>Fault started</dt><dd>{{ claim.fault_occurrence_date|date }}</dd>
           <dt>Submitted</dt><dd>{{ claim.claim_submission_date|date if claim.claim_submission_date else 'Not yet' }}</dd>
           <dt>Cause given</dt><dd>{{ claim.damage_type }}</dd>
-          <dt>Diagnosis</dt><dd>{{ '%.2f'|format(claim.diagnostic_confidence) }} <span class="muted small">({{ claim.diagnosis_source }})</span></dd>
+          <dt>Diagnosis</dt><dd>{% if claim.diagnosis_source == 'Not assessed' %}Not assessed yet{% else %}<span class="mono">{{ '%.2f'|format(claim.diagnostic_confidence) }}</span> ({{ claim.diagnosis_source }}){% endif %}</dd>
           {% if claim.service_center %}<dt>Service center</dt><dd>{{ claim.service_center.name }}</dd>{% endif %}
           {% if claim.previous_replacement_details %}<dt>Replaced before</dt><dd>{{ claim.previous_replacement_details }}</dd>{% endif %}
         </dl>
-        <hr>
-        <div class="small"><b>Customer's description</b><p class="muted mt-1 mb-0">{{ claim.fault_description }}</p></div>
+        <h3 class="h4 mt-3">Customer's description</h3>
+        <p class="small mt-1 mb-0 pre">{{ claim.fault_description }}</p>
+        <h3 class="h4 mt-3">Summary</h3>
+        <p class="small mt-1 mb-0">{{ summary.text }}</p>
       </div>
     </section>
 
-    <section class="card">
-      <div class="card-h"><h2>Documents checklist</h2></div>
-      <ul class="list">
-        {% for k in ['receipt', 'warranty_card', 'serial_photo', 'damage_photo'] %}
-          {% set ok = k in present %}
-          <li><span class="ico {{ 'good' if ok else ('bad' if k in missing else 'warn') }}"><i class="bi {{ 'bi-check-lg' if ok else 'bi-dash-lg' }}"></i></span>
-            <div class="grow"><div class="ttl small">{{ doc_label(k) }}</div><div class="sub">{{ 'On file' if ok else ('Required — missing' if k in missing else 'Recommended — missing') }}</div></div></li>
-        {% endfor %}
-      </ul>
-    </section>
-
-    <section class="card">
-      <div class="card-h"><h2>History</h2></div>
-      <div class="card-b">
+    <section class="panel" aria-labelledby="hist2-h">
+      <div class="panel-h"><h2 id="hist2-h">History</h2></div>
+      <div class="panel-b">
         <ol class="timeline">
           {% for h in claim.status_history|reverse %}
-            <li><span class="dot {{ tone('status', h.new_status) }}"></span>
-              <div class="small"><b>{{ h.new_status }}</b></div>
+            <li><span class="dot done" aria-hidden="true"></span>
+              <div class="small strong">{{ h.new_status }}</div>
               <div class="tiny muted">{{ h.reason_comment }}</div>
               <div class="when">{{ h.created_at|date('%d %b %Y %H:%M') }} · {{ h.changed_by.full_name if h.changed_by else 'System' }}</div></li>
           {% endfor %}
         </ol>
-        {% for a in claim.reviewer_actions|reverse %}
-          <div class="callout small mt-2"><b>{{ a.reviewer.full_name }}</b> → {{ a.reviewer_decision }}{% if a.is_override %} <span class="badge warn plain">override of “{{ a.previous_recommendation }}”</span>{% endif %}
-            <div class="muted mt-1">{{ a.comments }}</div>{% if a.override_reason %}<div class="mt-1"><b>Reason:</b> {{ a.override_reason }}</div>{% endif %}
-            <div class="tiny faint mt-1">{{ a.timestamp|date('%d %b %Y %H:%M') }}</div></div>
-        {% endfor %}
       </div>
     </section>
   </aside>
 </div>
 {% endblock %}
+{% block page_js %}<script src="{{ asset('js/verdict.js') }}" defer></script><script src="{{ asset('js/review.js') }}" defer></script>{% endblock %}

@@ -110,6 +110,15 @@ def tiles(r: dict) -> list[tuple[str, str, str]]:
     return [cover, report, cause, receipt, support, serial, dates, invoice, repairs]
 
 
+GRID_X, GRID_Y, TILE_W, TILE_H, GAP = 16, 80, 184, 150, 8
+
+
+def tile_boxes() -> list[tuple[int, int, int, int]]:
+    """(x0, y0, x1, y1) of the nine tiles in grid order; shared by the renderer and the occlusion map."""
+    return [(GRID_X + (i % 3) * (TILE_W + GAP), GRID_Y + (i // 3) * (TILE_H + GAP),
+             GRID_X + (i % 3) * (TILE_W + GAP) + TILE_W, GRID_Y + (i // 3) * (TILE_H + GAP) + TILE_H) for i in range(9)]
+
+
 def _glyph(g: ImageDraw.ImageDraw, cx: int, cy: int, state: str) -> None:
     """White glyph per state: check / exclamation / cross / double-headed arrow."""
     w = 7
@@ -141,9 +150,8 @@ def render_card(r: dict, variation: int = 0) -> Image.Image:
     g.text((20, 22), "Claim summary", font=f_h, fill=INK)
     g.text((20, 52), f"{r.get('claim_id', '')}  ·  {cat}  ·  {r.get('fault_category', '')}", font=f_s, fill=MUTED)
 
-    x0, y0, tw, th, gap = 16, 80, 184, 150, 8
-    for i, (title, detail, state) in enumerate(tiles(r)):
-        x, y = x0 + (i % 3) * (tw + gap), y0 + (i // 3) * (th + gap)
+    for (title, detail, state), (x, y, _, _) in zip(tiles(r), tile_boxes()):
+        tw, th = TILE_W, TILE_H
         colour = jitter(STATE[state])
         g.rounded_rectangle([x, y, x + tw, y + th], radius=14, fill=colour)
         _glyph(g, x + tw // 2, y + 50, state)

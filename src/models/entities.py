@@ -410,6 +410,7 @@ class ModelEvaluation(db.Model):
     summary_card_image_path = db.Column(db.String(255), nullable=True)
     summary_card_sha256 = db.Column(db.String(64), nullable=True)
     latency_ms = db.Column(db.Integer, nullable=True)
+    payload_json = db.Column(db.Text, nullable=True)      # full verdict payload incl. stage timings + explanations
     evaluation_timestamp = db.Column(db.DateTime, default=utcnow)
 
     def python_scores(self) -> dict:

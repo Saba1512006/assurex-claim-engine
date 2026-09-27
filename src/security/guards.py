@@ -60,11 +60,18 @@ def init_rbac(app, db, User, AuditLog) -> None:
             abort(403)
         return None
 
+    def _can(perm, obj=None, **ctx):
+        return bool(rbac.authorize(g.get("user"), perm, obj, **ctx))
+
+    def _role_label(r):
+        return rbac.policy()["roles"].get(r, {}).get("label", r or "Visitor")
+
+    # globals (not only context) so macros imported without context can use them too
+    app.jinja_env.globals.update(can=_can, role_label=_role_label)
+
     @app.context_processor
     def _inject():
-        return {"current_user": g.get("user"),
-                "can": lambda perm, obj=None, **ctx: bool(rbac.authorize(g.get("user"), perm, obj, **ctx)),
-                "role_label": lambda r: rbac.policy()["roles"].get(r, {}).get("label", r or "Visitor")}
+        return {"current_user": g.get("user")}
 
     @app.errorhandler(403)
     def _forbidden(_e):
@@ -87,6 +94,9 @@ def require(permission: str | None = None):
         @wraps(view)
         def wrapper(*args, **kwargs):
             if g.get("user") is None:
+                if request.path.startswith("/api/"):
+                    from src.api.errors import ErrorCode, fail
+                    return fail(ErrorCode.NOT_AUTHENTICATED)
                 flash(rbac.MESSAGES["NOT_AUTHENTICATED"], "warning")
                 return redirect(url_for("auth.login", next=request.full_path))
             if permission and not rbac.has_permission(g.user, permission):

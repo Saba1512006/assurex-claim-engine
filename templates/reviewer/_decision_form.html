@@ -1,0 +1,26 @@
+{# Reviewer decision form (claim page and workbench): allowed transitions only, mandatory comment, override reason with a live counter. #}
+{% set labels = {'approve': ('Approve claim', 'approve'), 'reject': ('Reject claim', 'reject'), 'request_info': ('Request information', 'quiet'),
+                 'close': ('Close claim', 'quiet'), 'reopen_review': ('Return to review', 'quiet')} %}
+{% if review_actions %}
+<form class="stack-sm" method="post" action="{{ url_for('reviewer.decide', claim_id=claim.claim_id) }}" data-review-form
+      data-recommendation="{{ claim.final_decision or '' }}" data-overrides="{{ override_pairs|tojson|forceescape }}" data-targets="{{ action_targets|tojson|forceescape }}"
+      data-min="{{ override_min }}">
+  {{ csrf() }}
+  <fieldset class="stack-xs">
+    <legend class="small strong">Decision</legend>
+    {% for a in review_actions %}
+      <label class="check"><input type="radio" name="action" value="{{ a }}" required data-key="{{ {'approve': 'a', 'reject': 'r', 'request_info': 'i'}.get(a, '') }}"><span>{{ labels[a][0] }}</span></label>
+    {% endfor %}
+  </fieldset>
+  <div class="field"><label for="rv-comments">Comment for the customer and the audit trail <span class="req">(required)</span></label>
+    <textarea class="textarea" id="rv-comments" name="comments" minlength="5" required aria-describedby="rv-comments-d"></textarea>
+    <span class="help" id="rv-comments-d">Say what you checked and why you decided this.</span></div>
+  <div class="field" data-override-field hidden><label for="rv-override">Override reason <span class="req">(required, at least {{ override_min }} characters)</span></label>
+    <textarea class="textarea" id="rv-override" name="override_reason" data-counter="{{ override_min }}:1000" aria-describedby="rv-override-d"></textarea>
+    <span class="counter" data-counter-for="rv-override"></span>
+    <span class="help" id="rv-override-d">Your decision differs from the automated recommendation ({{ claim.final_decision }}). It stays on record next to yours.</span></div>
+  <button class="btn block" type="submit" data-review-submit>Record decision</button>
+</form>
+{% else %}
+<p class="small mb-0">No reviewer action is possible at the “{{ claim.status }}” stage.</p>
+{% endif %}
