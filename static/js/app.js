@@ -45,13 +45,28 @@
     debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; },
   };
 
-  /* ---------------------------------------------------------------- preloader (first view of a session only) */
+  /* ---------------------------------------------------------------- preloader (first view of a session only)
+     It plays its logo animation once (about 1.9 s), then leaves as soon as the page has also finished loading;
+     a 4 s ceiling guards against a stalled asset. With reduced motion it never shows. */
   const pre = $("[data-preloader]");
-  const hidePre = () => { if (pre) { pre.classList.add("done"); setTimeout(() => pre.remove(), 200); } };
   try { sessionStorage.setItem("ax-seen", "1"); } catch { /* storage blocked */ }
   if (pre) {
-    if (!document.documentElement.classList.contains("first-view")) pre.remove();
-    else { hidePre(); setTimeout(hidePre, 600); }
+    if (!document.documentElement.classList.contains("first-view") || reduced()) pre.remove();
+    else {
+      let gone = false;
+      const leave = () => {
+        if (gone) return;
+        gone = true;
+        pre.classList.add("done");
+        document.documentElement.classList.remove("first-view-lock");
+        setTimeout(() => pre.remove(), 520);
+      };
+      document.documentElement.classList.add("first-view-lock");
+      const played = new Promise((r) => setTimeout(r, Math.max(0, 2400 - performance.now())));
+      const loaded = new Promise((r) => (document.readyState === "complete" ? r() : window.addEventListener("load", r, { once: true })));
+      Promise.all([played, loaded]).then(leave);
+      setTimeout(leave, 4500);
+    }
   }
 
   /* ---------------------------------------------------------------- menus (bell, account) */
