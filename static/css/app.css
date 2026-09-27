@@ -1439,7 +1439,7 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
   background-image: linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
   background-size: 32px 32px; -webkit-mask-image: linear-gradient(180deg, #000, transparent 75%); mask-image: linear-gradient(180deg, #000, transparent 75%); }
 .footer .wrap { display: grid; max-width: calc(var(--content-wide) + 2 * var(--s5)); }
-.footer-top { grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: var(--s7); padding-top: var(--s8); padding-bottom: var(--s6); }
+.footer-top { grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: var(--s7); padding-top: var(--s8); padding-bottom: var(--s6); }
 .footer-brand { display: grid; gap: var(--s4); align-content: start; max-width: 420px; }
 .footer-logo { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; justify-self: start; }
 .footer-logo img { width: 52px; height: 43px; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .5)); }
@@ -1472,7 +1472,7 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 .to-top:hover { background: rgba(255, 255, 255, .1); color: var(--on-bench) !important; }
 .footer :focus-visible { box-shadow: var(--focus-bench); border-radius: 6px; }
 @media (max-width: 991px) {
-  .footer-top { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s6); padding-top: var(--s7); }
+  .footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6); padding-top: var(--s7); }
   .footer-brand { grid-column: 1 / -1; max-width: none; }
   .footer-bottom { grid-template-columns: 1fr; }
 }
@@ -1480,13 +1480,13 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 @media (prefers-reduced-motion: reduce) { .status-dot.on::after { animation: none; } .footer-col a:hover { transform: none; } }
 @media print { .footer { display: none !important; } }
 /* footer layout, stated with enough weight to beat the older one-row footer rules above */
-.footer .wrap.footer-top { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: var(--s7);
+.footer .wrap.footer-top { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: var(--s7);
   padding-top: var(--s8); padding-bottom: var(--s6); align-items: start; }
 .footer nav.footer-col { display: grid; gap: var(--s3); align-content: start; justify-items: start; }
 .footer .wrap.footer-bottom { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--s3) var(--s5);
   padding-top: var(--s4); padding-bottom: var(--s5); }
 @media (max-width: 991px) {
-  .footer .wrap.footer-top { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s6); padding-top: var(--s7); }
+  .footer .wrap.footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6); padding-top: var(--s7); }
   .footer .wrap.footer-bottom { grid-template-columns: 1fr; justify-items: start; }
 }
 @media (max-width: 560px) { .footer .wrap.footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
