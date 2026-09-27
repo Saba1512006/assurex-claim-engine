@@ -69,7 +69,7 @@ class Session:
         self.base = base_url
         self.ctx = browser.new_context(viewport={"width": width, "height": 900},
                                        reduced_motion="reduce" if reduced_motion else "no-preference")
-        self.ctx.add_init_script("try { sessionStorage.setItem('ax-seen', '1') } catch (e) {}")
+        self.ctx.add_init_script("try { sessionStorage.setItem('ax-seen', 'off') } catch (e) {}")
         self.page = self.ctx.new_page()
         self.problems: list[str] = []
         self.page.on("console", lambda m: self.problems.append(f"console: {m.text}") if m.type == "error" else None)

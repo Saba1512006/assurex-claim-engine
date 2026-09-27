@@ -45,13 +45,13 @@
     debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; },
   };
 
-  /* ---------------------------------------------------------------- preloader (first view of a session only)
-     It plays its logo animation once (about 1.9 s), then leaves as soon as the page has also finished loading;
-     a 4 s ceiling guards against a stalled asset. With reduced motion it never shows. */
+  /* ---------------------------------------------------------------- preloader (home page loads and the first page of a session)
+     The logo animation plays (about 2 s), the finished logo holds for a beat, then it leaves once the page has also
+     loaded; a 5 s ceiling guards against a stalled asset. With reduced motion a still logo shows briefly, then fades. */
   const pre = $("[data-preloader]");
-  try { sessionStorage.setItem("ax-seen", "1"); } catch { /* storage blocked */ }
+  try { if (sessionStorage.getItem("ax-seen") !== "off") sessionStorage.setItem("ax-seen", "1"); } catch { /* storage blocked */ }
   if (pre) {
-    if (!document.documentElement.classList.contains("first-view") || reduced()) pre.remove();
+    if (!document.documentElement.classList.contains("first-view")) pre.remove();
     else {
       let gone = false;
       const leave = () => {
@@ -62,10 +62,11 @@
         setTimeout(() => pre.remove(), 520);
       };
       document.documentElement.classList.add("first-view-lock");
-      const played = new Promise((r) => setTimeout(r, Math.max(0, 2400 - performance.now())));
+      const hold = reduced() ? 1200 : 2800;
+      const played = new Promise((r) => setTimeout(r, Math.max(0, hold - performance.now())));
       const loaded = new Promise((r) => (document.readyState === "complete" ? r() : window.addEventListener("load", r, { once: true })));
       Promise.all([played, loaded]).then(leave);
-      setTimeout(leave, 4500);
+      setTimeout(leave, 5000);
     }
   }
 
