@@ -1,97 +1,120 @@
-{# Hero strip under the headline and metrics: the dual inference engine in one line. The Python ML engine (teal) and
-   the Teachable Machine vision engine (indigo) each send their inference into the AssureX decision core between them;
-   the core hands down to the policy engine and the three outcomes. Decoration only (aria-hidden): the live check on the
-   right carries the real result. Animations live in pages/landing.css and stop under reduced motion. #}
+{# Hero engine: a full-bleed background layer behind the hero content (aria-hidden, no focusable parts).
+   Layer A (ambient): dot grid, rings around the live check, soft glows and an edge vignette, masked out behind every
+   text block. Layer B (engine): the Python ML node, the vision node (its top tucked behind the card), the decision
+   core under the column gutter, the policy junction and the three outcome terminals. Layer C (motion) is driven by
+   static/js/hero_engine.js, which measures the [data-engine-avoid] blocks, re-lays everything out with
+   static/js/hero_engine_math.js and follows the live check through AX.bus ("engine:run").
+   The coordinates below are the server-rendered fallback for a 1440 x 800 hero; the script replaces them. #}
+{% set d = {"py": [172.8, 677], "tm": [1238.4, 619.4], "core": [720, 669], "pyd": "M218.8 677.0 C431.7 677.0 479.1 669.0 692.0 669.0",
+            "tmd": "M1195.2 635.1 C993.9 635.1 949.2 669.0 748.0 669.0", "feed": [750, 601, 720, 643], "pol": [720, 711],
+            "t": {"invalid": [630, 741], "review": [720, 741], "valid": [810, 741]},
+            "b": {"invalid": "M720.0 717.0 C720.0 729.0 630.0 723.0 630.0 737.0", "review": "M720.0 717.0 C720.0 729.0 720.0 723.0 720.0 737.0",
+                  "valid": "M720.0 717.0 C720.0 729.0 810.0 723.0 810.0 737.0"},
+            "lp": [455.4, 663], "rings": [1028, 342, [327, 397, 467, 537, 607]]} %}
+{% set v = bench.views['valid'] %}
 
-{% macro ticks(r1, r2, every=5, long=6) -%}
-  {% for i in range(0, 360, every) %}<line x1="0" y1="{{ -r2 if (i // every) % long else -(r2 + 5) }}" x2="0" y2="{{ -r1 }}" transform="rotate({{ i }})"/>{% endfor %}
-{%- endmacro %}
-
-{% macro engine(cx, cy, tone, conf, scale=0.5) -%}
-<g class="eng eng-{{ tone }}" transform="translate({{ cx }} {{ cy }}) scale({{ scale }})">
-  <circle class="eng-halo" r="140"/>
-  <circle class="eng-ring faint" r="124"/>
-  <circle class="eng-sweep eng-rot rev" r="131" pathLength="360"/>
-  <circle class="eng-seg eng-rot" r="112" pathLength="360"/>
-  <g class="eng-ticks eng-rot slow">{{ ticks(96, 102) }}</g>
-  <circle class="eng-track" r="84" pathLength="100"/>
-  <circle class="eng-conf" r="84" pathLength="100" stroke-dasharray="{{ (conf * 100)|round(1) }} 100" transform="rotate(-90)"/>
-  <circle class="eng-ring dotted eng-rot rev slow" r="66" pathLength="200"/>
-  {{ caller() }}
-  <circle class="eng-hub" r="14" cy="30"/>
-  <circle class="eng-hub-core" r="4" cy="30"/>
+{% macro node(key, name, x, y, p, predicted) -%}
+<g class="he-node {{ key }}" data-he-node="{{ key }}" transform="translate({{ x }} {{ y }})">
+  <g class="he-node-ring" data-he-scale>
+    <circle class="he-ring-out he-spin" r="46"/>
+    <circle class="he-ring-track" r="40" pathLength="100"/>
+    <circle class="he-ring-conf" r="40" pathLength="100" stroke-dasharray="{{ '%.1f'|format((p or 0) * 100) }} 100" transform="rotate(-90)" data-he-conf/>
+    <circle class="he-ring-in" r="33"/>
+    {% if key == 'py' %}
+      <path class="he-glyph" d="M-18 0 L-12 0 L-9 -8 L-5 9 L-1 -13 L3 11 L7 -6 L10 3 L13 0 L18 0"/>
+    {% else %}
+      <g class="he-glyph">
+        <path d="M-15 -9v-6h6M9 -15h6v6M15 9v6h-6M-9 15h-6v-6"/>
+        {% for r in range(3) %}{% for c in range(3) %}<rect x="{{ -8 + c * 6 }}" y="{{ -8 + r * 6 }}" width="4" height="4" rx="1" class="{{ 'on' if (r * 3 + c) in [1, 3, 4, 5, 7] }}"/>{% endfor %}{% endfor %}
+      </g>
+    {% endif %}
+  </g>
+  <text class="he-name" y="62" data-he-name>{{ name }}</text>
+  <text class="he-val" y="76" data-he-val>p {{ '%.2f'|format(p) if p is not none else '—' }} · {{ 'VALID' if predicted == 'Valid Claim' else ('INVALID' if predicted == 'Invalid Claim' else 'REVIEW') }}</text>
 </g>
 {%- endmacro %}
 
-<svg class="hero-engines" viewBox="0 0 600 180" aria-hidden="true" focusable="false">
-  <defs>
-    <linearGradient id="eg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5DD3C9"/><stop offset="1" stop-color="#0E9A91"/></linearGradient>
-    <linearGradient id="eg-b" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3FB8AE"/><stop offset="1" stop-color="#0B7C80"/></linearGradient>
-    <linearGradient id="eg-c" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4B5FA8"/><stop offset="1" stop-color="#6F82D6"/></linearGradient>
-    <radialGradient id="eg-glow"><stop offset="0" stop-color="#3FB8AE" stop-opacity=".32"/><stop offset=".55" stop-color="#4B5FA8" stop-opacity=".12"/><stop offset="1" stop-color="#4B5FA8" stop-opacity="0"/></radialGradient>
-  </defs>
+<div class="hero-engine" data-hero-engine aria-hidden="true" role="presentation">
+  <svg class="he-svg" width="100%" height="100%" focusable="false" data-he-svg>
+    <defs>
+      <pattern id="he-dots" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="14" cy="14" r="1" fill="#fff" fill-opacity=".07"/></pattern>
+      <radialGradient id="he-dotfade" gradientUnits="userSpaceOnUse" cx="1028" cy="669" r="1000" data-he-dotfade>
+        <stop offset="0" stop-color="#fff"/><stop offset=".55" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <mask id="he-dotmask" maskUnits="userSpaceOnUse" x="-50" y="-50" width="4000" height="3000"><rect x="-50" y="-50" width="4000" height="3000" fill="url(#he-dotfade)"/></mask>
+      <filter id="he-feather" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="8"/></filter>
+      <mask id="he-textmask" maskUnits="userSpaceOnUse" x="-50" y="-50" width="4000" height="3000">
+        <rect x="-50" y="-50" width="4000" height="3000" fill="#fff"/>
+        <g filter="url(#he-feather)" data-he-holes>
+          <rect x="96" y="96" width="256" height="74" rx="16"/><rect x="96" y="138" width="579" height="165" rx="16"/>
+          <rect x="96" y="271" width="504" height="106" rx="16"/><rect x="96" y="345" width="453" height="96" rx="16"/>
+          <rect x="96" y="421" width="632" height="167" rx="16"/>
+        </g>
+      </mask>
+      <radialGradient id="he-glow-py"><stop offset="0" stop-color="#3FB8AE" stop-opacity=".12"/><stop offset="1" stop-color="#3FB8AE" stop-opacity="0"/></radialGradient>
+      <radialGradient id="he-glow-tm"><stop offset="0" stop-color="#6F82D6" stop-opacity=".12"/><stop offset="1" stop-color="#6F82D6" stop-opacity="0"/></radialGradient>
+      <radialGradient id="he-glow-core"><stop offset="0" stop-color="#E9EEF3" stop-opacity=".06"/><stop offset="1" stop-color="#E9EEF3" stop-opacity="0"/></radialGradient>
+      <radialGradient id="he-vig" cx=".5" cy=".5" r=".72"><stop offset=".86" stop-color="#0D141B" stop-opacity="0"/><stop offset="1" stop-color="#0D141B" stop-opacity=".9"/></radialGradient>
+      <linearGradient id="he-lg-py" gradientUnits="userSpaceOnUse" x1="218.8" y1="0" x2="692" y2="0" data-he-lg="py">
+        <stop offset="0" stop-color="#3FB8AE"/><stop offset="1" stop-color="#8A9AAB" stop-opacity=".55"/></linearGradient>
+      <linearGradient id="he-lg-tm" gradientUnits="userSpaceOnUse" x1="1195.2" y1="0" x2="748" y2="0" data-he-lg="tm">
+        <stop offset="0" stop-color="#8EA0E6"/><stop offset="1" stop-color="#8A9AAB" stop-opacity=".55"/></linearGradient>
+      <linearGradient id="he-frame" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3FB8AE"/><stop offset="1" stop-color="#6F82D6"/></linearGradient>
+      <linearGradient id="he-xa" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5DD3C9"/><stop offset="1" stop-color="#0E9A91"/></linearGradient>
+      <linearGradient id="he-xb" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3FB8AE"/><stop offset="1" stop-color="#0B7C80"/></linearGradient>
+      <linearGradient id="he-xc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4B5FA8"/><stop offset="1" stop-color="#6F82D6"/></linearGradient>
+    </defs>
 
-  <g class="eng-guides"><line x1="10" y1="72" x2="590" y2="72" stroke-dasharray="2 6"/></g>
-
-  {% call engine(78, 72, 'py', 0.89) %}
-    <g class="eng-bars" transform="translate(-27 6)">
-      {% for h in [10, 18, 13, 22, 8, 16, 20, 11, 15] %}<rect class="eng-bar" x="{{ loop.index0 * 6 }}" y="{{ -h }}" width="3" height="{{ h }}" rx="1"/>{% endfor %}
+    {# Layer A: ambient, masked out behind the text blocks #}
+    <g class="he-ambient" mask="url(#he-textmask)">
+      <g class="he-par-a" data-he-par="a">
+        <rect class="he-dots" x="-40" y="-40" width="4000" height="3000" fill="url(#he-dots)" mask="url(#he-dotmask)"/>
+        <g class="he-rings" data-he-rings>{% for r in d.rings[2] %}<circle cx="{{ d.rings[0] }}" cy="{{ d.rings[1] }}" r="{{ r }}"/>{% endfor %}</g>
+        <circle class="he-glow" data-he-glow="py" cx="{{ d.py[0] }}" cy="{{ d.py[1] }}" r="150" fill="url(#he-glow-py)"/>
+        <circle class="he-glow" data-he-glow="tm" cx="{{ d.tm[0] }}" cy="{{ d.tm[1] }}" r="150" fill="url(#he-glow-tm)"/>
+        <circle class="he-glow" data-he-glow="core" cx="{{ d.core[0] }}" cy="{{ d.core[1] }}" r="110" fill="url(#he-glow-core)"/>
+      </g>
+      <rect class="he-vignette" width="100%" height="100%" fill="url(#he-vig)"/>
     </g>
-  {% endcall %}
 
-  {% call engine(522, 72, 'tm', 0.99) %}
-    <g class="eng-aperture" transform="translate(-14 -26)">
-      <path class="eng-frame" d="M-6 2v-8h8M30 -6h8v8M38 22v8h-8M2 30h-8v-8"/>
-      {% for r in range(5) %}{% for c in range(5) %}<rect class="eng-px{{ ' on' if (r * 5 + c) in [2, 6, 7, 8, 11, 12, 13, 17, 22] }}" x="{{ c * 6 }}" y="{{ r * 6 }}" width="4" height="4" rx=".8"/>{% endfor %}{% endfor %}
-      <rect class="eng-scan" x="-4" y="0" width="36" height="1.5"/>
+    {# Layer B: the engine, full intensity, routed clear of every text block and of the card #}
+    <g class="he-engine" data-he-engine>
+      <g class="he-par-b" data-he-par="b">
+        <path class="he-path py" d="{{ d.pyd }}" stroke="url(#he-lg-py)" data-he-path="py"/>
+        <path class="he-path tm" d="{{ d.tmd }}" stroke="url(#he-lg-tm)" data-he-path="tm"/>
+        <line class="he-feed" x1="{{ d.feed[0] }}" y1="{{ d.feed[1] }}" x2="{{ d.feed[2] }}" y2="{{ d.feed[3] }}" data-he-feed/>
+        <line class="he-trunk" x1="{{ d.core[0] }}" y1="{{ d.core[1] + 26 }}" x2="{{ d.pol[0] }}" y2="{{ d.pol[1] - 6 }}" data-he-trunk/>
+        {% for k in ['invalid', 'review', 'valid'] %}
+          <path class="he-branch {{ k }}{{ ' is-on' if k == v.tone }}" d="{{ d.b[k] }}" pathLength="100" data-he-branch="{{ k }}"/>
+        {% endfor %}
+        <text class="he-label he-path-label" x="{{ d.lp[0] }}" y="{{ d.lp[1] }}" text-anchor="middle" data-he-label="path">OCR OK · SERIAL VERIFIED</text>
+
+        {{ node('py', 'PYTHON ML', d.py[0], d.py[1], v.python.top, v.python.predicted) }}
+        {{ node('tm', 'VISION MODEL', d.tm[0], d.tm[1], v.gtm.top, v.gtm.predicted) }}
+
+        <g class="he-core" data-he-core transform="translate({{ d.core[0] }} {{ d.core[1] }})">
+          <g data-he-scale>
+            <rect class="he-core-halo" x="-34" y="-34" width="68" height="68" rx="18"/>
+            <rect class="he-core-frame" x="-26" y="-26" width="52" height="52" rx="13"/>
+            <g transform="translate(-18 -15) scale(.3)">
+              <polygon points="80,6 116,6 84.9,42 48.9,42" fill="url(#he-xb)"/>
+              <polygon points="35.1,58 71.1,58 40,94 4,94" fill="url(#he-xc)"/>
+              <polygon points="4,6 40,6 116,94 80,94" fill="url(#he-xa)"/>
+            </g>
+          </g>
+        </g>
+        <text class="he-label he-core-label" x="{{ d.core[0] - 34 }}" y="{{ d.core[1] - 22 }}" text-anchor="end" data-he-label="core">DECISION CORE</text>
+        <text class="he-label he-delta" x="{{ d.core[0] + 34 }}" y="{{ d.core[1] - 22 }}" data-he-label="delta">Δ {{ '%.2f'|format(v.consistency.difference) if v.consistency.difference is not none else '—' }} · {{ 'AGREE' if 'Match' in (v.consistency.status or '') else 'SPLIT' }}</text>
+
+        <g class="he-policy" data-he-policy transform="translate({{ d.pol[0] }} {{ d.pol[1] }})"><rect x="-4.5" y="-4.5" width="9" height="9" rx="1.5" transform="rotate(45)"/></g>
+        <text class="he-label he-policy-label" x="{{ d.pol[0] + 12 }}" y="{{ d.pol[1] + 4 }}" data-he-label="policy">POLICY · RULES 16</text>
+
+        {% for k, label in [('invalid', 'INVALID'), ('review', 'MANUAL REVIEW'), ('valid', 'LIKELY VALID')] %}
+          <g class="he-term {{ k }}{{ ' is-on' if k == v.tone }}" data-he-term="{{ k }}" transform="translate({{ d.t[k][0] }} {{ d.t[k][1] }})">
+            <circle r="4"/><text y="18" text-anchor="middle">{{ label }}</text>
+          </g>
+        {% endfor %}
+        <g class="he-packets" data-he-packets></g>
+      </g>
     </g>
-  {% endcall %}
-
-  {# inference from each engine into the decision core, a pulse riding each path #}
-  <path class="eng-link" d="M146 64 C 196 44, 238 50, 270 56"/>
-  <path class="eng-link" d="M454 64 C 404 44, 362 50, 330 56"/>
-  <path class="eng-flow py" d="M146 64 C 196 44, 238 50, 270 56" pathLength="100"/>
-  <path class="eng-flow tm" d="M454 64 C 404 44, 362 50, 330 56" pathLength="100"/>
-
-  <g class="eng-core" transform="translate(300 56) scale(.78)">
-    <circle class="core-glow" r="64"/>
-    <g class="core-ticks eng-rot slow">{{ ticks(42, 46, 10, 3) }}</g>
-    <circle class="core-half py" r="35" pathLength="100" transform="rotate(90)"/>
-    <circle class="core-half tm" r="35" pathLength="100" transform="rotate(-90)"/>
-    <circle class="core-ping" r="35"/>
-    <g transform="translate(-18 -15) scale(.3)">
-      <polygon points="80,6 116,6 84.9,42 48.9,42" fill="url(#eg-b)"/>
-      <polygon points="35.1,58 71.1,58 40,94 4,94" fill="url(#eg-c)"/>
-      <polygon points="4,6 40,6 116,94 80,94" fill="url(#eg-a)"/>
-    </g>
-  </g>
-
-  {# core → policy engine → outcomes #}
-  <line class="eng-link hot" x1="300" y1="94" x2="300" y2="116"/>
-  <line class="eng-flow out" x1="300" y1="94" x2="300" y2="116" pathLength="100"/>
-  <g class="eng-policy" transform="translate(300 126)">
-    <circle class="pol-ring" r="10"/>
-    <rect class="pol-diamond" x="-4" y="-4" width="8" height="8" rx="1.5" transform="rotate(45)"/>
-  </g>
-  <path class="eng-link" d="M300 136 C 300 146, 204 144, 204 154"/>
-  <path class="eng-link" d="M300 136 L 300 154"/>
-  <path class="eng-link hot" d="M300 136 C 300 146, 396 144, 396 154"/>
-  <path class="eng-flow out" d="M300 136 C 300 146, 396 144, 396 154" pathLength="100"/>
-
-  <g class="eng-out">
-    <circle cx="204" cy="157" r="3"/><text x="204" y="174" text-anchor="middle">INVALID</text>
-    <circle cx="300" cy="157" r="3"/><text x="300" y="174" text-anchor="middle">MANUAL REVIEW</text>
-    <circle class="win" cx="396" cy="157" r="3.5"/><text class="win" x="396" y="174" text-anchor="middle">LIKELY VALID</text>
-  </g>
-
-  <g class="eng-tele">
-    <text class="eng-name py" x="78" y="164" text-anchor="middle">PYTHON ML</text>
-    <text x="78" y="176" text-anchor="middle">p 0.89 · VALID</text>
-    <text class="eng-name tm" x="522" y="164" text-anchor="middle">VISION MODEL</text>
-    <text x="522" y="176" text-anchor="middle">p 0.99 · VALID</text>
-    <text x="300" y="12" text-anchor="middle">DECISION CORE</text>
-    <text x="310" y="106" class="hi">Δ 0.11 · AGREE</text>
-    <text x="316" y="129">POLICY · RULES 16</text>
-    <text x="284" y="129" text-anchor="end">OCR OK · SERIAL VERIFIED</text>
-  </g>
-</svg>
+  </svg>
+</div>

@@ -1483,11 +1483,11 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 .footer .wrap.footer-top { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); gap: var(--s7);
   padding-top: var(--s8); padding-bottom: var(--s6); align-items: start; }
 .footer nav.footer-col { display: grid; gap: var(--s3); align-content: start; justify-items: start; }
-.footer .wrap.footer-bottom { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: var(--s3) var(--s5);
+.footer .wrap.footer-bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--s3) var(--s5);
   padding-top: var(--s4); padding-bottom: var(--s5); }
 @media (max-width: 991px) {
   .footer .wrap.footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6); padding-top: var(--s7); }
-  .footer .wrap.footer-bottom { grid-template-columns: 1fr; justify-items: start; }
+  .footer .wrap.footer-bottom { grid-template-columns: 1fr; justify-items: center; text-align: center; }
 }
 @media (max-width: 560px) { .footer .wrap.footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
@@ -1570,3 +1570,7 @@ body:has(.decision-bar) .fab-top { bottom: 132px; }
 button[data-retry-lock]:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .retry-dial .retry-arc { transition: none; } }
 .row.center { justify-content: center; }
+/* footer bottom: the credit centred, back to top on the right (stacked and centred on small screens) */
+.footer-bottom .footer-credit { grid-column: 2; text-align: center; }
+.footer-bottom .to-top { grid-column: 3; justify-self: end; }
+@media (max-width: 991px) { .footer-bottom .footer-credit, .footer-bottom .to-top { grid-column: auto; justify-self: center; } }

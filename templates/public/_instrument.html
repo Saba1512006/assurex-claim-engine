@@ -7,7 +7,7 @@
 {% set views, geo = bench.views, bench.meter %}
 {% set v = views['valid'] %}
 {% set stamp_icons = {'valid': 'check', 'invalid': 'x', 'review': 'eye', 'none': 'minus'} %}
-<section class="instrument hero-instrument" aria-labelledby="im-h" data-instrument data-url="{{ url_for('api.demo_evaluate') }}">
+<section class="instrument hero-instrument" aria-labelledby="im-h" data-engine-avoid="card" data-instrument data-url="{{ url_for('api.demo_evaluate') }}">
   <div class="im-head">
     <h2 id="im-h" class="im-title"><span class="live-dot" aria-hidden="true"></span>Live check</h2>
     <span class="mono im-total" data-im-total title="Time from the claim record to the decision">{{ '%.2f'|format(v.total_ms / 1000) }} s</span>

@@ -71,6 +71,8 @@
     $("[data-im-times]").textContent = v.stages.map((s) => `${s.name} ${s.ms}`).join(" · ");
     $("[data-im-live]").textContent = `${v.short}: ${v.decision.value}. ${v.consistency.status}.`;
     reveal();
+    if (window.AX.bus) window.AX.bus.emit("engine:run", {                     // the hero engine replays this result
+      tab: v.case, python: v.python.top, vision: v.gtm.top, delta: v.consistency.difference, outcome: v.tone, view: v });
   }
 
   const current = () => (root.querySelector("input[name=im-case]:checked") || {}).value || "valid";

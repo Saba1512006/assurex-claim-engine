@@ -215,6 +215,7 @@ role change or disable signs them out everywhere. Also: generic login errors, 5-
 rotation, CSRF on every form, rate-limited sign-in, strict Content-Security-Policy (no inline or third-party
 scripts), magic-byte upload validation, CSV formula-injection protection and an append-only audit trail.
 Details: [`documentation/RBAC_DESIGN.md`](documentation/RBAC_DESIGN.md).
+Landing hero background: [`documentation/HERO_ENGINE.md`](documentation/HERO_ENGINE.md).
 
 ---
 

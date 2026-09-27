@@ -1,5 +1,5 @@
 {# Site footer on the bench: the brand with a one-line promise and the live model versions, two link columns
-   (product, resources), a bottom bar with the event credit and back to top, and a large
+   (product, resources), a bottom bar with the event credit centred and back to top, and a large
    outlined wordmark as a quiet signature. Every figure shown is read from the installed model files. #}
 {% from "components/ui.html" import icon %}
 {# icons: external-link book-open file-code-2 cpu arrow-up shield-check #}
@@ -35,8 +35,7 @@
   <div class="footer-mark" aria-hidden="true">AssureX</div>
 
   <div class="wrap footer-bottom">
-    <span>AssureX Claim Engine · Built for TechWiz 7 · NextWave AI and ML</span>
-    <span class="versions" title="Installed model versions">py {{ mv.python }} · {{ mv.gtm }} · times in server time (UTC)</span>
+    <span class="footer-credit">AssureX Claim Engine · Built for TechWiz 7 · NextWave AI and ML</span>
     <a class="to-top" href="#main">Back to top{{ icon('arrow-up', 'sm') }}</a>
   </div>
 </footer>

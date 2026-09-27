@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="{{ asset('css/tokens.css') }}">
   <link rel="stylesheet" href="{{ asset('css/app.css') }}">
   {% block page_css %}{% endblock %}
-  <script nonce="{{ csp_nonce() }}">try{var n=performance.getEntriesByType("navigation")[0],t=n?n.type:"navigate",r=document.referrer;if(sessionStorage.getItem("ax-seen")!=="off"&&t!=="back_forward"&&(t==="reload"||!r||r.indexOf(location.origin+"/")!==0))document.documentElement.classList.add("first-view")}catch(e){}</script>
+  <script nonce="{{ csp_nonce() }}">document.documentElement.classList.add("js");try{var n=performance.getEntriesByType("navigation")[0],t=n?n.type:"navigate",r=document.referrer;if(sessionStorage.getItem("ax-seen")!=="off"&&t!=="back_forward"&&(t==="reload"||!r||r.indexOf(location.origin+"/")!==0))document.documentElement.classList.add("first-view")}catch(e){}</script>
 </head>
 <body data-page="{{ request.endpoint or '' }}" class="{% block body_class %}{% endblock %}">
   <a class="skip" href="#main">Skip to content</a>

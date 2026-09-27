@@ -199,72 +199,71 @@
   .hero-copy { padding-top: 0; }
 }
 
-/* ---------------------------------------------------------------- hero strip: the dual inference engine
-   Under the headline and metrics: the two engine cores feed the decision core between them, which hands down to the
-   policy engine and the outcomes. Faint and slow, so it reads as the system running rather than as content. */
-.hero-engines { display: block; width: 100%; max-width: 600px; height: auto; margin-top: calc(var(--s2) * -1); overflow: visible; }
-.eng-guides { fill: none; stroke: #15202B; stroke-width: 1; }
-.eng-guides circle, .eng-guides line { stroke: rgba(120, 150, 175, .12); }
-.eng { --c: #3FB8AE; --c-soft: rgba(63, 184, 174, .22); }
-.eng-tm { --c: #6F82D6; --c-soft: rgba(75, 95, 168, .3); }
-.eng-halo { fill: var(--c); opacity: .045; }
-.eng-ring { fill: none; stroke: var(--c); stroke-width: 1; opacity: .3; }
-.eng-ring.faint { opacity: .16; }
-.eng-ring.dotted { stroke-dasharray: 1 3; opacity: .45; }
-.eng-sweep { fill: none; stroke: var(--c); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 70 290; opacity: .55; }
-.eng-seg { fill: none; stroke: var(--c); stroke-width: 6; stroke-dasharray: 7 5; opacity: .2; }
-.eng-ticks line, .core-ticks line, .pol-rules line { stroke: var(--c, #3FB8AE); stroke-width: 1; opacity: .38; }
-.eng-track { fill: none; stroke: var(--c-soft); stroke-width: 3; opacity: .5; }
-.eng-conf { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; animation: eng-breathe 5s ease-in-out infinite; }
-.eng-hub { fill: var(--c-soft); stroke: var(--c); stroke-width: 1; opacity: .8; }
-.eng-hub-core { fill: #fff; opacity: .85; }
-.eng-label { font: 600 8.5px/1 var(--mono); letter-spacing: .22em; text-anchor: middle; fill: var(--c); opacity: .9; }
-.eng-bar { fill: var(--c); opacity: .75; transform-box: fill-box; transform-origin: 50% 100%; animation: eng-feat 1.9s ease-in-out infinite alternate; }
-.eng-bar:nth-child(3n) { animation-duration: 2.6s; } .eng-bar:nth-child(3n + 1) { animation-duration: 1.5s; animation-delay: -.7s; }
-.eng-bar:nth-child(even) { animation-delay: -1.1s; }
-.eng-frame { fill: none; stroke: var(--c); stroke-width: 1; opacity: .6; }
-.eng-px { fill: var(--c); opacity: .18; }
-.eng-px.on { opacity: .85; }
-.eng-scan { fill: #fff; opacity: .7; animation: eng-scan 2.8s ease-in-out infinite alternate; }
+/* ---------------------------------------------------------------- hero engine: full-bleed background layer
+   The layer sits behind the hero content (z-index 0; content z-index 1). The engine band lives in the hero's bottom
+   padding; hero_engine.js routes every node and path clear of the [data-engine-avoid] blocks, and the ambient layer
+   is masked out behind the text, so the foreground renders exactly as without the layer. */
+.hero--engine { position: relative; }
+.hero--engine > .wrap { position: relative; z-index: 1; }
+.hero-engine { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.he-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.js .hero-engine:not(.is-ready) .he-engine { opacity: 0; }
+.he-engine { transition: opacity .5s var(--ease); }
+.he-hide { display: none; }
+.hero-engine[data-tier="mini"] .he-rings, .hero-engine[data-tier="mini"] .he-path-label, .hero-engine[data-tier="mini"] .he-policy-label,
+.hero-engine[data-tier="mini"] .he-term text { display: none; }
 
-.eng-link { fill: none; stroke: rgba(160, 190, 210, .2); stroke-width: 1; }
-.eng-link.hot { stroke: rgba(63, 184, 174, .45); }
-.eng-flow { fill: none; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 8 92; animation: eng-flow 2.8s linear infinite; }
-.eng-flow.py, .eng-flow.out { stroke: #3FB8AE; }
-.eng-flow.tm { stroke: #8EA0E6; animation-delay: -.5s; }
-.eng-flow.out { animation-duration: 3.6s; animation-delay: 2.2s; }
+/* engine band: room under the content for the nodes and the outcome fan */
+@media (min-width: 1081px) { .hero.hero--engine { padding-bottom: clamp(136px, 22vh, 230px); } }
+@media (min-width: 768px) and (max-width: 1080px) { .hero.hero--engine { padding-bottom: 210px; } }
+@media (max-width: 767px) { .hero.hero--engine { padding-bottom: 150px; } }
 
-.core-glow { fill: url(#eg-glow); animation: eng-breathe 4.8s ease-in-out infinite; }
-.core-ticks { --c: #8EA0E6; }
-.core-half { fill: rgba(13, 20, 27, .8); stroke-width: 2; stroke-dasharray: 50 50; }
-.core-half.py { stroke: #3FB8AE; } .core-half.tm { stroke: #6F82D6; fill: none; }
-.core-ping { fill: none; stroke: #3FB8AE; stroke-width: 1; opacity: 0; transform-box: fill-box; transform-origin: center; animation: eng-ping 4.8s ease-out 1.2s infinite; }
-
-.eng-tele text, .eng-tele-t, .eng-out text { font: 500 9px/1 var(--mono); letter-spacing: .12em; fill: rgba(233, 238, 243, .42); }
-.eng-tele .hi { fill: rgba(233, 238, 243, .62); }
-.eng-tele .eng-name { font-weight: 600; letter-spacing: .2em; }
-.eng-tele .eng-name.py { fill: #3FB8AE; } .eng-tele .eng-name.tm { fill: #8EA0E6; }
-.eng-tele-t.dim { fill: rgba(233, 238, 243, .3); }
-.pol-ring { fill: rgba(13, 20, 27, .8); stroke: rgba(142, 160, 230, .5); stroke-width: 1; }
-.pol-rules { --c: #8EA0E6; }
-.pol-diamond { fill: none; stroke: #3FB8AE; stroke-width: 1.2; }
-.eng-out circle { fill: #0D141B; stroke: rgba(233, 238, 243, .3); stroke-width: 1; }
-.eng-out circle.win { fill: #3FB8AE; stroke: rgba(63, 184, 174, .35); stroke-width: 4; animation: eng-breathe 3.6s ease-in-out 2.2s infinite; }
-.eng-out text.win { fill: rgba(63, 184, 174, .9); }
-
-.eng-rot { transform-box: fill-box; transform-origin: center; animation: eng-spin 80s linear infinite; }
-.eng-rot.rev { animation-direction: reverse; animation-duration: 55s; }
-.eng-rot.slow { animation-duration: 140s; }
-@keyframes eng-spin { to { rotate: 360deg; } }
-@keyframes eng-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-@keyframes eng-feat { from { transform: scaleY(.45); } to { transform: scaleY(1); } }
-@keyframes eng-scan { from { transform: translateY(0); } to { transform: translateY(28px); } }
-@keyframes eng-breathe { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
-@keyframes eng-ping { 0% { opacity: .55; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(1.7); } }
+/* layer A: ambient */
+.he-rings circle { fill: none; stroke: rgba(233, 238, 243, .05); stroke-width: 1; }
+/* layer B: engine, full intensity */
+.he-path { fill: none; stroke-width: 1.25; stroke-linecap: round; }
+.he-feed { stroke: rgba(154, 171, 190, .45); stroke-width: .75; stroke-dasharray: 2 6; }
+.he-trunk { stroke: rgba(154, 171, 190, .5); stroke-width: 1.25; }
+.he-branch { fill: none; stroke: rgba(154, 171, 190, .32); stroke-width: 1.25; stroke-dasharray: 100 0; transition: stroke .3s var(--ease); }
+.he-branch.is-on.valid { stroke: var(--valid-bright); } .he-branch.is-on.invalid { stroke: var(--invalid-bright); }
+.he-branch.is-on.review { stroke: var(--review-bright); }
+.he-branch.is-drawing { stroke-dasharray: 100 100; animation: he-draw .6s var(--ease) both; }
+.he-label, .he-name, .he-val, .he-term text { font: 500 10.5px/1 var(--mono); letter-spacing: .12em; fill: var(--on-bench-2); }
+.hero-engine[data-tier="compact"] .he-label, .hero-engine[data-tier="strip"] .he-label { font-size: 10px; }
+.hero-engine[data-tier="mini"] .he-label, .hero-engine[data-tier="mini"] .he-name, .hero-engine[data-tier="mini"] .he-val,
+.hero-engine[data-tier="mini"] .he-term text { font-size: 9px; letter-spacing: .08em; }
+.he-name { font-weight: 600; text-anchor: middle; }
+.he-val { text-anchor: middle; }
+.he-node.py { --c: #3FB8AE; } .he-node.tm { --c: #8EA0E6; }
+.he-node .he-name { fill: var(--c); }
+.he-ring-out { fill: none; stroke: var(--c); stroke-width: 1.25; stroke-dasharray: 3 5; opacity: .75; }
+.he-ring-track { fill: none; stroke: rgba(154, 171, 190, .18); stroke-width: 2; }
+.he-ring-conf { fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; transition: stroke-dasharray .4s var(--ease); }
+.he-ring-in { fill: #111B24; stroke: var(--c); stroke-width: 1.25; }
+.he-glyph { fill: none; stroke: var(--c); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.he-glyph rect { fill: rgba(142, 160, 230, .3); stroke: none; }
+.he-glyph rect.on { fill: var(--c); }
+.he-core-frame { fill: #111B24; stroke: url(#he-frame); stroke-width: 1.5; }
+.he-core-halo { fill: none; stroke: rgba(233, 238, 243, .16); stroke-width: 1; transform-box: fill-box; transform-origin: center; animation: he-halo 4s ease-in-out infinite; }
+.he-core.is-flash .he-core-halo { animation: he-flash .7s ease-out 1, he-halo 4s ease-in-out .7s infinite; }
+.he-policy rect { fill: #111B24; stroke: #8EA0E6; stroke-width: 1.25; }
+.he-term circle { fill: #0D141B; stroke: rgba(154, 171, 190, .55); stroke-width: 1.25; transition: fill .3s var(--ease), stroke .3s var(--ease); }
+.he-term.is-on.valid circle { fill: var(--valid-bright); stroke: var(--valid-bright); } .he-term.is-on.valid text { fill: var(--valid-bright); }
+.he-term.is-on.invalid circle { fill: var(--invalid-bright); stroke: var(--invalid-bright); } .he-term.is-on.invalid text { fill: var(--invalid-bright); }
+.he-term.is-on.review circle { fill: var(--review-bright); stroke: var(--review-bright); } .he-term.is-on.review text { fill: var(--review-bright); }
+/* layer C: packets */
+.he-packets { will-change: transform; }
+.he-packet circle { fill: #fff; }
+.he-packet polyline { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.he-packet.py polyline, .he-packet.valid polyline { stroke: #3FB8AE; } .he-packet.tm polyline { stroke: #8EA0E6; }
+.he-packet.invalid polyline { stroke: var(--invalid-bright); } .he-packet.review polyline { stroke: var(--review-bright); }
+.he-spin { transform-box: fill-box; transform-origin: center; animation: he-spin 60s linear infinite; }
+.hero-engine.is-paused * { animation-play-state: paused !important; }
+@keyframes he-spin { to { rotate: 360deg; } }
+@keyframes he-halo { 0%, 100% { scale: 1; } 50% { scale: 1.06; } }
+@keyframes he-flash { 0% { scale: 1; stroke: rgba(233, 238, 243, .7); } 100% { scale: 1.35; stroke: rgba(233, 238, 243, 0); } }
+@keyframes he-draw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .hero-engines * { animation: none !important; }
+  .hero-engine * { animation: none !important; transition: none !important; }
+  .he-packets { display: none; }
 }
-/* the strip gives way before the hero stops fitting one screen, and on phones where its labels would be too small */
-@media (min-width: 1081px) and (max-height: 760px) { .hero-engines { max-width: 460px; } }
-@media (min-width: 1081px) and (max-height: 660px) { .hero-engines { max-width: 380px; margin-top: calc(var(--s3) * -1); } }
-@media (max-width: 560px) { .hero-engines { display: none; } }

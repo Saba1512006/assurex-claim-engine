@@ -43,6 +43,11 @@
     },
     fmt: (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(d)),
     debounce(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; },
+    /* tiny page event bus: AX.bus.emit("engine:run", detail) / AX.bus.on("engine:run", fn) */
+    bus: (() => {
+      const t = new EventTarget();
+      return { on: (name, fn) => t.addEventListener(name, (e) => fn(e.detail)), emit: (name, detail) => t.dispatchEvent(new CustomEvent(name, { detail })) };
+    })(),
   };
 
   /* ---------------------------------------------------------------- preloader (opening the site, a new tab or a reload; not link clicks inside it)
