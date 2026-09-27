@@ -408,10 +408,34 @@
   });
 })();
 
-/* Landing: the navbar is transparent over the bench until the page scrolls 24px (observer, not a scroll listener). */
+/* Adaptive navbar: it always takes the opposite tone of the surface scrolling under it. Over a dark (bench)
+   section it turns light; over a light section it turns dark; at the very top of the landing page it is a
+   see-through dark glass over the hero. The surface is read at the island's centre on scroll (one check per
+   frame), so no section needs to be registered anywhere: dark sections are the ones built on .bench. */
 (() => {
-  const bar = document.querySelector(".nav-overlay .topbar");
-  const sentinel = document.querySelector("[data-nav-sentinel]");
-  if (!bar || !sentinel || !("IntersectionObserver" in window)) { if (bar) bar.classList.add("scrolled"); return; }
-  new IntersectionObserver(([e]) => bar.classList.toggle("scrolled", !e.isIntersecting)).observe(sentinel);
+  const bar = document.querySelector(".topbar");
+  if (!bar) return;
+  const overlay = document.body.classList.contains("nav-overlay");
+  const island = bar.querySelector(".wrap") || bar;
+  let queued = false;
+  const surfaceIsDark = () => {
+    const r = island.getBoundingClientRect();
+    const y = Math.round(r.top + r.height / 2);
+    for (const x of [Math.round(r.left + r.width / 2), Math.round(r.left + 12), Math.round(r.right - 12)]) {   // the middle decides
+      const under = document.elementsFromPoint(x, y).find((el) => !bar.contains(el) && el !== document.documentElement);
+      if (under) return !!under.closest(".bench, .footer");
+    }
+    return false;                                     // nothing under it yet: the page background is light
+  };
+  const update = () => {
+    queued = false;
+    const top = overlay && window.scrollY < 24;
+    bar.classList.toggle("is-top", top);
+    bar.classList.toggle("scrolled", !top);
+    bar.classList.toggle("tone-dark", top || !surfaceIsDark());
+  };
+  const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+  window.addEventListener("scroll", queue, { passive: true });
+  window.addEventListener("resize", queue);
+  update();
 })();

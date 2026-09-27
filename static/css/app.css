@@ -856,14 +856,14 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .nav-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 24px; pointer-events: none; }
 .nav-overlay .topbar { position: fixed; left: 0; right: 0; background: transparent; border-bottom-color: transparent;
   transition: background-color 200ms, border-color 200ms; }
-.nav-overlay .topbar:not(.scrolled) .brand { color: var(--on-bench); }
-.nav-overlay .topbar:not(.scrolled) .m-body { fill: var(--on-bench); }
-.nav-overlay .topbar:not(.scrolled) .m-line { stroke: var(--bench); }
-.nav-overlay .topbar:not(.scrolled) .m-dot { fill: var(--teal-mark); }
-.nav-overlay .topbar:not(.scrolled) .btn { background: var(--teal-bright); border-color: var(--teal-bright); color: var(--bench); }
-.nav-overlay .topbar:not(.scrolled) .btn.ghost { background: transparent; border-color: transparent; color: var(--on-bench); }
-.nav-overlay .topbar:not(.scrolled) .btn.ghost:hover { background: rgba(255, 255, 255, .06); }
-.nav-overlay .topbar:not(.scrolled) :focus-visible { box-shadow: var(--focus-bench); }
+.topbar.tone-dark .brand { color: var(--on-bench); }
+.topbar.tone-dark .m-body { fill: var(--on-bench); }
+.topbar.tone-dark .m-line { stroke: var(--bench); }
+.topbar.tone-dark .m-dot { fill: var(--teal-mark); }
+.topbar.tone-dark .btn { background: var(--teal-bright); border-color: var(--teal-bright); color: var(--bench); }
+.topbar.tone-dark .btn.ghost { background: transparent; border-color: transparent; color: var(--on-bench); }
+.topbar.tone-dark .btn.ghost:hover { background: rgba(255, 255, 255, .06); }
+.topbar.tone-dark :focus-visible { box-shadow: var(--focus-bench); }
 .nav-overlay .topbar.scrolled { background: var(--paper); border-bottom-color: var(--rule); }
 @media (prefers-reduced-motion: reduce) { .nav-overlay .topbar { transition: none; } }
 
@@ -928,12 +928,12 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .menu-panel a, .menu-panel button.menu-item { border-radius: 8px; }
 
 /* landing: the bar floats over the bench, then turns to glass paper after 24px of scroll */
-.nav-overlay .topbar:not(.scrolled) { background: transparent; box-shadow: none; }
-.nav-overlay .topbar:not(.scrolled)::after { -webkit-backdrop-filter: none; backdrop-filter: none; }
-.nav-overlay .topbar:not(.scrolled)::before { background: linear-gradient(90deg, transparent, var(--teal-bright) 20%, var(--gtm-bright) 50%, var(--teal-bright) 80%, transparent); opacity: .8; }
-.nav-overlay .topbar:not(.scrolled) .brand-tile { background: linear-gradient(160deg, #22313E, #131D26);
+.topbar.tone-dark { background: transparent; box-shadow: none; }
+.topbar.tone-dark::after { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.topbar.tone-dark::before { background: linear-gradient(90deg, transparent, var(--teal-bright) 20%, var(--gtm-bright) 50%, var(--teal-bright) 80%, transparent); opacity: .8; }
+.topbar.tone-dark .brand-tile { background: linear-gradient(160deg, #22313E, #131D26);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 18px -8px rgba(0, 0, 0, .8); }
-.nav-overlay .topbar:not(.scrolled) .brand-name small { color: var(--on-bench-2); }
+.topbar.tone-dark .brand-name small { color: var(--on-bench-2); }
 .nav-overlay .topbar.scrolled { background: color-mix(in srgb, var(--paper) 80%, transparent);
   box-shadow: 0 1px 0 rgba(21, 32, 43, .08), 0 10px 30px -22px rgba(21, 32, 43, .45); }
 
@@ -958,7 +958,7 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 6px 16px -10px rgba(0, 0, 0, .8); }
 .bench .btn.ghost, .bench .btn.danger { background-image: none; box-shadow: none; }
 .bench .btn:focus-visible { box-shadow: var(--focus-bench); }
-.nav-overlay .topbar:not(.scrolled) .btn:not(.ghost) { background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 60%);
+.topbar.tone-dark .btn:not(.ghost) { background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 60%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 8px 22px -8px color-mix(in srgb, var(--teal-bright) 70%, transparent); }
 @media (prefers-reduced-motion: reduce) { .btn:hover, .btn:active { transform: none; } .menu-panel:not([hidden]) { animation: none; } }
 
@@ -1031,15 +1031,15 @@ details.panel-f > summary { cursor: pointer; font-weight: 600; font-size: var(--
 .user-btn .initials { width: 30px; height: 30px; }
 
 /* landing: a dark glass island over the bench, turning to paper glass once the page scrolls */
-.nav-overlay .topbar, .nav-overlay .topbar:not(.scrolled), .nav-overlay .topbar.scrolled { background: transparent; box-shadow: none; }
-.nav-overlay .topbar:not(.scrolled) .wrap { background: rgba(21, 32, 42, .45);
+.nav-overlay .topbar, .topbar.tone-dark, .nav-overlay .topbar.scrolled { background: transparent; box-shadow: none; }
+.topbar.tone-dark .wrap { background: rgba(21, 32, 42, .45);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 0 1px rgba(255, 255, 255, .08), 0 20px 40px -24px rgba(0, 0, 0, .8); }
-.nav-overlay .topbar:not(.scrolled) .pnav { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
-.nav-overlay .topbar:not(.scrolled) .pnav a { color: var(--on-bench-2); }
-.nav-overlay .topbar:not(.scrolled) .pnav a:hover { color: var(--on-bench); }
-.nav-overlay .topbar:not(.scrolled) .nav-glide { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
-.nav-overlay .topbar:not(.scrolled) .live-chip { color: var(--on-bench-2); background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
-.nav-overlay .topbar:not(.scrolled) .live-chip i, .nav-overlay .topbar:not(.scrolled) .live-chip i::after { background: var(--valid-bright); }
+.topbar.tone-dark .pnav { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+.topbar.tone-dark .pnav a { color: var(--on-bench-2); }
+.topbar.tone-dark .pnav a:hover { color: var(--on-bench); }
+.topbar.tone-dark .nav-glide { background: rgba(255, 255, 255, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+.topbar.tone-dark .live-chip { color: var(--on-bench-2); background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
+.topbar.tone-dark .live-chip i, .topbar.tone-dark .live-chip i::after { background: var(--valid-bright); }
 
 @media (max-width: 991px) {
   .topbar { padding: 6px var(--s3) 0; }
@@ -1343,17 +1343,17 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 
 /* signed-in on the landing page: the dark island carries the role links, bell and account button */
 @media (min-width: 992px) {
-  .nav-overlay .topbar:not(.scrolled) .nav { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
-  .nav-overlay .topbar:not(.scrolled) .nav a { color: var(--on-bench-2); }
-  .nav-overlay .topbar:not(.scrolled) .nav a:hover { color: var(--on-bench); }
+  .topbar.tone-dark .nav { background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+  .topbar.tone-dark .nav a { color: var(--on-bench-2); }
+  .topbar.tone-dark .nav a:hover { color: var(--on-bench); }
 }
-.nav-overlay .topbar:not(.scrolled) .icon-btn { color: var(--on-bench-2); }
-.nav-overlay .topbar:not(.scrolled) .icon-btn:hover { color: var(--on-bench); background: rgba(255, 255, 255, .08); }
-.nav-overlay .topbar:not(.scrolled) .count-pip { box-shadow: 0 0 0 2px var(--bench); }
-.nav-overlay .topbar:not(.scrolled) .user-btn { background: rgba(255, 255, 255, .06); color: var(--on-bench);
+.topbar.tone-dark .icon-btn { color: var(--on-bench-2); }
+.topbar.tone-dark .icon-btn:hover { color: var(--on-bench); background: rgba(255, 255, 255, .08); }
+.topbar.tone-dark .count-pip { box-shadow: 0 0 0 2px var(--bench); }
+.topbar.tone-dark .user-btn { background: rgba(255, 255, 255, .06); color: var(--on-bench);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 0 0 1px rgba(255, 255, 255, .1); }
-.nav-overlay .topbar:not(.scrolled) .user-btn .initials { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 0 0 2px var(--bench), 0 0 0 3.5px var(--teal-bright); }
-.nav-overlay .topbar:not(.scrolled) .user-btn .role { color: var(--on-bench); }
+.topbar.tone-dark .user-btn .initials { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 0 0 2px var(--bench), 0 0 0 3.5px var(--teal-bright); }
+.topbar.tone-dark .user-btn .role { color: var(--on-bench); }
 
 /* dropdown menus never run off the screen: they cap at the viewport, scroll inside with the wheel (the page
    behind stays put), and show a thin see-through scrollbar only while the pointer is over them */
@@ -1382,11 +1382,11 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
 .brand-word { font: 600 1.5rem/1 var(--font); letter-spacing: -0.035em; color: var(--ink); }
 .brand-x { background: linear-gradient(135deg, #22B3A9 10%, #0B7C80 55%, #2F5BAE); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .brand-name small { font-size: .625rem; font-weight: 600; letter-spacing: .22em; text-transform: none; color: var(--steel); }
-.nav-overlay .topbar:not(.scrolled) .brand-mark.on-light { display: none; }
-.nav-overlay .topbar:not(.scrolled) .brand-mark.on-dark { display: block; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45)); }
-.nav-overlay .topbar:not(.scrolled) .brand-word { color: var(--on-bench); }
-.nav-overlay .topbar:not(.scrolled) .brand-x { background-image: linear-gradient(135deg, #5DD3C9 10%, #22B3A9 55%, #8EA0E6); }
-.nav-overlay .topbar:not(.scrolled) .brand-name small { color: var(--on-bench-2); }
+.topbar.tone-dark .brand-mark.on-light { display: none; }
+.topbar.tone-dark .brand-mark.on-dark { display: block; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45)); }
+.topbar.tone-dark .brand-word { color: var(--on-bench); }
+.topbar.tone-dark .brand-x { background-image: linear-gradient(135deg, #5DD3C9 10%, #22B3A9 55%, #8EA0E6); }
+.topbar.tone-dark .brand-name small { color: var(--on-bench-2); }
 @media (max-width: 991px) { .brand-mark { width: 40px; height: 33px; } .brand-word { font-size: 1.1875rem; } }
 
 /* ================================================================== footer on the bench
@@ -1452,3 +1452,24 @@ a.kpi:focus-visible { box-shadow: var(--focus); }
   .footer .wrap.footer-bottom { grid-template-columns: 1fr; justify-items: start; }
 }
 @media (max-width: 560px) { .footer .wrap.footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* adaptive navbar tones: dark glass over light pages, see-through dark glass at the top of the landing hero,
+   light glass over dark sections; colours cross-fade as the surface underneath changes */
+.topbar.tone-dark:not(.is-top) .wrap { background: rgba(13, 20, 27, .86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 0 0 1px rgba(255, 255, 255, .06), 0 14px 34px -16px rgba(0, 0, 0, .55); }
+.topbar.tone-dark:not(.is-top) .wrap::after { background: linear-gradient(90deg, var(--teal-bright), var(--gtm-bright)); }
+.topbar .brand-word, .topbar .brand-name small, .topbar .nav a, .topbar .pnav a, .topbar .icon-btn, .topbar .live-chip, .topbar .user-btn {
+  transition: color 250ms var(--ease), background-color 250ms var(--ease), box-shadow 250ms var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+  .topbar .brand-word, .topbar .brand-name small, .topbar .nav a, .topbar .pnav a, .topbar .icon-btn, .topbar .live-chip, .topbar .user-btn { transition: none; }
+}
+/* light tone is a near-solid paper glass (a see-through light bar over a dark section turns muddy) */
+.topbar:not(.tone-dark) .wrap { background: rgba(255, 255, 255, .94); }
+/* dark tone: the current page's pill is a lit glass chip, not a white one */
+@media (min-width: 992px) {
+  .topbar.tone-dark .pnav a[aria-current="page"], .topbar.tone-dark .nav a[aria-current="page"] {
+    color: var(--on-bench); background: rgba(255, 255, 255, .12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 1px rgba(255, 255, 255, .08); }
+  .topbar.tone-dark .nav a[aria-current="page"]::after { background: var(--teal-bright); }
+}
+.topbar.tone-dark .role--administrator::before, .topbar.tone-dark .role--claim_reviewer::before { background: var(--on-bench); }
