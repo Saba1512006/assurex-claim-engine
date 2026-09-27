@@ -37,7 +37,8 @@ colours from `--valid-bright`, `--review-bright`, `--invalid-bright`, labels in 
 
 * Ring count and spacing: `out.rings` in `layout()` (5 rings, 70 px apart).
 * Dot grid: the `he-dots` pattern (28 px pitch, 7 % white) and the `he-dotfade` radial mask.
-* Node size: `NODE_R` and the per-tier `scale` in `layout()`; band height: `.hero.hero--engine` padding in landing.css.
+* Node size: `NODE_R` and the per-tier `scale` in `layout()` (it also shrinks to fit a short band, down to 0.5);
+  band height: `.hero.hero--engine` padding in landing.css, set per height bracket so the hero stays one screen tall.
 * Motion: idle packet every 5 s (`scheduleIdle`), packet travel 2.6–2.8 s, at most 3 packets at once.
 
 ## Responsive tiers

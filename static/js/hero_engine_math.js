@@ -86,9 +86,13 @@
      Returns coordinates plus `ok` (everything placed clear of the zones) and `hidden` (elements that had no room). */
   function layout(hero, raw, opts = {}) {
     const t = opts.tier || tier(hero.w);
-    const s = t === "full" ? 1 : t === "compact" ? 0.85 : t === "strip" ? 0.85 : 0.7;
     const text = ["badge", "h1", "lede", "cta", "stats"].filter((k) => raw[k]).map((k) => inflate(raw[k]));
     const card = raw.card ? inflate(raw.card) : null;
+    /* short heroes: the band under the content is what is left of the screen, so the engine scales to fit it
+       (label above the core + core + policy + terminals + their labels = 38 + 98 * scale) */
+    const band = hero.h - 8 - Math.max(card ? card.b : 0, ...text.map((z) => z.b), 0);
+    const tierScale = t === "full" ? 1 : t === "compact" ? 0.85 : t === "strip" ? 0.85 : 0.7;
+    const s = Math.max(0.5, Math.min(tierScale, (band - 38) / 98));
     const zones = card ? text.concat([card]) : text;
     const hidden = [];
     const R = NODE_R * s, CH = CORE_H * s;

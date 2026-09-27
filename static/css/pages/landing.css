@@ -214,7 +214,12 @@
 .hero-engine[data-tier="mini"] .he-term text { display: none; }
 
 /* engine band: room under the content for the nodes and the outcome fan */
-@media (min-width: 1081px) { .hero.hero--engine { padding-bottom: clamp(136px, 22vh, 230px); } }
+/* desktop: the band is whatever the screen has left under the content, so the hero stays exactly one screen tall
+   (card heights per height bracket: 588 / 519 / 460 / 432 px, see the short-screen rules above) */
+@media (min-width: 1081px) { .hero.hero--engine { padding-bottom: max(88px, min(230px, calc(100svh - 690px))); } }
+@media (min-width: 1081px) and (max-height: 820px) { .hero.hero--engine { padding-bottom: max(88px, min(230px, calc(100svh - 600px))); } }
+@media (min-width: 1081px) and (max-height: 700px) { .hero.hero--engine { padding-bottom: max(80px, min(230px, calc(100svh - 542px))); } }
+@media (min-width: 1081px) and (max-height: 600px) { .hero.hero--engine { padding-bottom: max(72px, calc(100svh - 510px)); } }
 @media (min-width: 768px) and (max-width: 1080px) { .hero.hero--engine { padding-bottom: 210px; } }
 @media (max-width: 767px) { .hero.hero--engine { padding-bottom: 150px; } }
 
