@@ -13,7 +13,7 @@ from tests.test_workflow import wizard_post
 
 ROOT = Path(__file__).resolve().parent.parent
 # Pages still on the pre-rebuild markup; the list shrinks with each frontend phase and ends empty.
-NOT_YET_REBUILT = {'public/blog.html', 'public/index.html', 'components/macros.html', 'claims/wizard.html', 'auth/login.html', 'admin/policies.html', 'admin/analytics.html', 'products/detail.html', 'auth/profile.html', 'products/list.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'claims/track.html', 'claims/dashboard.html', 'claims/search.html', 'products/register.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
+NOT_YET_REBUILT = {'public/blog.html', 'components/macros.html', 'claims/wizard.html', 'auth/login.html', 'admin/policies.html', 'admin/analytics.html', 'products/detail.html', 'auth/profile.html', 'products/list.html', 'admin/audit.html', 'admin/dashboard.html', 'admin/models.html', 'claims/track.html', 'claims/dashboard.html', 'claims/search.html', 'products/register.html', 'reviewer/queue.html', 'admin/access_control.html', 'components/nav.html'}
 CLASSES = ["Valid Claim", "Invalid Claim", "Manual Review"]
 
 
@@ -52,7 +52,7 @@ def test_evaluation_api_returns_the_stored_payload_in_the_envelope(app, client, 
     body = r.get_json()
     assert r.status_code == 200 and body["success"] is True and body["error"] is None
     stored = json.loads(c.model_evaluation.payload_json)
-    assert body["data"]["decision"] == stored["decision"] and body["data"]["python"]["scores"] == stored["python"]["scores"]
+    assert body["data"]["decision"] == stored["decision"] and list(body["data"]["python"]["scores"].items()) == list(stored["python"]["scores"].items())
 
 
 def test_evaluation_api_errors_use_the_envelope(app, client, gtm):
@@ -99,3 +99,51 @@ def test_templates_have_no_unsafe_patterns():
             assert all(part.strip().startswith("--") for part in style.split(";") if part.strip()), (rel, style)
         for tag in re.findall(r"<script(?![^>]*\bsrc=)(?![^>]*application/json)[^>]*>", text):
             assert "nonce=" in tag, (rel, tag)
+
+
+def _row_counts():
+    from database.db import db
+    return {t.name: db.session.query(t).count()
+            for t in db.metadata.sorted_tables}
+
+
+def test_demo_evaluate_runs_the_real_pipeline_and_writes_nothing(app, client, gtm):
+    gtm.mirror_python()
+    before = _row_counts()
+    for case, sample in (("valid", "01_valid_claim"), ("invalid", "02_invalid_claim"), ("boundary", "10_boundary_date_claim")):
+        r = client.post("/api/demo/evaluate", json={"case": case})
+        body = r.get_json()
+        assert r.status_code == 200 and body["success"] is True, case
+        p = body["data"]["payload"]
+        assert decide(p["decision"]["facts"], load_policy())["decision"] == p["decision"]["value"]   # same table as a real claim
+        assert list(p["python"]["scores"]) == CLASSES and p["gtm"]["card_url"].startswith("data:image/png;base64,")
+        expected = json.loads((ROOT / "sample_claims" / f"{sample}.json").read_text())["expected"]
+        if case != "boundary":                                            # boundary's expected D04 needs the real image model
+            assert (p["decision"]["value"], p["decision"]["rule_id"]) == (expected["decision"], expected["rule"]), case
+        assert body["data"]["meter"]["label"].startswith("Python model:")
+    assert _row_counts() == before
+
+
+def test_demo_evaluate_rejects_unknown_cases_with_field_errors(app, client):
+    r = client.post("/api/demo/evaluate", json={"case": "../../etc/passwd"})
+    body = r.get_json()
+    assert r.status_code == 400 and body["error"]["code"] == "VALIDATION_FAILED" and "case" in body["error"]["fields"]
+
+
+def test_demo_evaluate_is_rate_limited(tmp_path, monkeypatch):
+    from config.config import TestConfig
+    from database.db import db
+    from src.app import create_app
+
+    class Limited(TestConfig):
+        RATELIMIT_ENABLED = True
+    monkeypatch.setattr(Limited, "UPLOAD_DIR", tmp_path / "uploads")
+    app = create_app(Limited)
+    with app.app_context():
+        db.create_all()
+        c = app.test_client()
+        codes = [c.post("/api/demo/evaluate", json={"case": "nope"}).status_code for _ in range(11)]
+        assert codes[:10] == [400] * 10 and codes[10] == 429
+        assert c.post("/api/demo/evaluate", json={"case": "nope"}).get_json()["error"]["code"] == "RATE_LIMITED"
+        db.session.remove()
+        db.drop_all()

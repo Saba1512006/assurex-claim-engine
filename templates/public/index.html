@@ -1,72 +1,94 @@
 {% extends "components/base.html" %}
-{% block title %}Warranty claims, decided with two models and clear rules{% endblock %}
+{# Landing: proves the system works (live bench on real sample claims), shows measured results, explains the flow. #}
+{% from "components/ui.html" import button, tag %}
+{% from "public/_cmx.html" import cmx %}
+{% block title %}Warranty claims, checked twice{% endblock %}
+{% block description %}AssureX checks every warranty claim with a Python model, a Google Teachable Machine image model and a warranty policy engine. Try it on a real sample claim.{% endblock %}
 {% block main %}
-<section class="hero">
+<section class="hero" aria-labelledby="hero-h">
   <div class="wrap">
     <div>
-      <div class="eyebrow" style="color:#7dd3fc"><i class="bi bi-shield-check"></i> NextWave AI &amp; ML · AssureX Claim Engine</div>
-      <h1>Warranty claims decided by <em>two independent models</em> and rules you can read.</h1>
-      <p class="lead">Customers and service centers submit claims with receipts and photos. A Python model scores the structured record, a Google Teachable Machine model scores a visual Claim Summary Card, and a configurable rule engine checks the warranty policy. Anything uncertain goes to a human reviewer.</p>
+      <h1 id="hero-h">Every warranty claim, checked twice.</h1>
+      <p class="lede">Two independent models and a policy engine agree, or a person decides.</p>
       <div class="row">
-        <a class="btn lg" href="{{ url_for('auth.register') }}">Create a customer account</a>
-        <a class="btn lg quiet" href="{{ url_for('auth.login') }}">Sign in</a>
+        <a class="btn lg" href="{{ url_for('auth.login', _anchor='personas') }}">Sign in as evaluator</a>
+        <a class="btn lg quiet" href="{{ url_for('public.model_card') }}">Read the model card</a>
       </div>
     </div>
-    <div class="hero-panel" aria-label="Measured model results">
-      <div class="row between" style="margin-bottom:8px"><b style="color:#fff">Measured on 225 unseen test claims</b><span class="badge info plain">live from model files</span></div>
-      <div class="rowx"><span>Python model</span><b>{{ (metrics.python_model or '—')|replace('_', ' ')|title }}</b></div>
-      <div class="rowx"><span>Accuracy</span><b>{{ metrics.python_accuracy|pct(1) }}</b></div>
-      <div class="rowx"><span>Macro F1</span><b>{{ metrics.python_f1|pct(1) }}</b></div>
-      <div class="rowx"><span>ROC-AUC (one-vs-rest)</span><b>{{ '%.3f'|format(metrics.python_auc) if metrics.python_auc else '—' }}</b></div>
-      <div class="rowx"><span>Teachable Machine</span><b>{% if metrics.gtm_installed %}{{ metrics.gtm_accuracy|pct(1) if metrics.gtm_accuracy is not none else 'installed, not yet evaluated' }}{% else %}not installed yet{% endif %}</b></div>
-    </div>
+    <section class="bench" aria-labelledby="bench-h" x-data="bench" data-url="{{ url_for('api.demo_evaluate') }}">
+      <div class="panel-h"><h2 id="bench-h">Try a real claim</h2><span class="hint">Runs both models and the rules; nothing is saved</span></div>
+      <form class="panel-b stack-sm" x-on:submit.prevent="run" data-novalidate-ui>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <fieldset>
+          <legend>Pick a sample claim</legend>
+          <label class="opt"><input type="radio" name="case" value="valid" checked><span>Clean hardware fault<small>Laptop motherboard failure, 7 months old, every document on file</small></span></label>
+          <label class="opt"><input type="radio" name="case" value="invalid"><span>Liquid damage<small>Refrigerator control board, water ingress confirmed by a technician</small></span></label>
+          <label class="opt"><input type="radio" name="case" value="boundary"><span>Warranty ended 4 days ago<small>Inside the 7-day grace period: a boundary case</small></span></label>
+        </fieldset>
+        <button class="btn block" type="submit" x-bind:disabled="busy"><span x-text="buttonLabel">Run the checks</span></button>
+        <div class="bench-result" aria-live="polite" x-show="done" x-cloak>
+          <svg viewBox="-24 -12 368 196" role="img" data-bench-meter class="bench-meter">
+            <path data-track fill="var(--mist)" stroke="var(--rule)"/>
+            <path data-arc fill-opacity=".2" stroke-opacity=".5"/>
+            <g class="needle py" data-needle="python"><line x1="160" y1="160" x2="160" y2="42" stroke="var(--teal)" stroke-width="3" stroke-linecap="round"/></g>
+            <g class="needle gtm" data-needle="gtm"><line x1="160" y1="160" x2="160" y2="42" stroke="var(--gtm)" stroke-width="3" stroke-linecap="round"/></g>
+            <circle cx="160" cy="160" r="6" fill="var(--ink)"/>
+          </svg>
+          <p class="small mb-0"><span class="tag teal"><span class="dot" aria-hidden="true"></span><span x-text="pyText"></span></span>
+            <span class="tag gtm"><span class="dot" aria-hidden="true"></span><span x-text="gtmText"></span></span></p>
+          <p class="small mb-0" x-text="consistencyText"></p>
+          <div class="stamp compact" x-bind:class="stampClass"><span x-text="stampText"></span></div>
+          <p class="tiny muted mb-0" x-text="timingText"></p>
+        </div>
+        <p class="callout bad small" x-show="error" x-cloak x-text="error"></p>
+      </form>
+    </section>
   </div>
 </section>
 
-<section class="band" id="how">
+<section class="band" id="how" aria-labelledby="how-h">
   <div class="wrap">
-    <div class="eyebrow">How a claim is decided</div>
-    <h2 class="big">Five steps, every one recorded</h2>
-    <p class="muted" style="max-width:70ch">The same claim record goes to both models in different formats. Neither model sees the other's answer, and the Claim Summary Card never contains a prediction or decision.</p>
-    <div class="flow mt-3">
-      <div><h3>Collect</h3><p>Product, warranty, fault details and evidence. Receipts are read by OCR and confirmed by the user.</p></div>
-      <div><h3>Check</h3><p>Dates, serial numbers, duplicates and missing documents are compared across every source.</p></div>
-      <div><h3>Predict twice</h3><p>Python model on the structured record; Teachable Machine on the Claim Summary Card image.</p></div>
-      <div><h3>Compare</h3><p>Class match and |confidence difference| give one of five consistency statuses.</p></div>
-      <div><h3>Decide</h3><p>A config-driven decision table combines rules and models: Likely Valid, Likely Invalid or Manual Review Required.</p></div>
-    </div>
+    <h2 id="how-h">How a claim is decided</h2>
+    <p class="lede">The same five steps run for every claim, in this order, and every step is stored with the result.</p>
+    <ol class="flow">
+      <li><h3>Intake</h3><p>The customer or a service center files the claim; a checklist says what is missing before submission.</p></li>
+      <li><h3>Documents</h3><p>Receipts are read by OCR, files are checked by their contents and fingerprinted, and conflicts are flagged.</p></li>
+      <li><h3>Two models</h3><p>A Python classifier reads the claim record; a Teachable Machine model reads a picture of the same facts.</p></li>
+      <li><h3>Policy</h3><p>Sixteen checks from the category's warranty policy run: coverage, deadlines, exclusions, serials, repairs.</p></li>
+      <li><h3>Decision</h3><p>A decision table combines everything. When the models disagree or are unsure, a reviewer decides.</p></li>
+    </ol>
   </div>
 </section>
 
-<section class="band alt" id="models">
-  <div class="wrap grid grid-3">
-    <div class="feature"><i class="bi bi-diagram-3"></i><h3>Python classification model</h3><p>Three algorithms compared with 5-fold cross-validation, selected on the validation split, then probability-calibrated so confidence scores mean something.</p></div>
-    <div class="feature"><i class="bi bi-image"></i><h3>Google Teachable Machine</h3><p>Trained on 2,100 square Claim Summary Cards (two variations per training claim). Validation and test cards never leave the evaluation set.</p></div>
-    <div class="feature"><i class="bi bi-sliders"></i><h3>Readable warranty rules</h3><p>Coverage, grace periods, reporting deadlines, exclusions and document rules live in one JSON file per category, editable by administrators.</p></div>
-    <div class="feature"><i class="bi bi-fingerprint"></i><h3>Duplicate &amp; fraud checks</h3><p>SHA-256 hashes of every file, invoice-number reuse, open claims on the same serial and near-identical fault descriptions.</p></div>
-    <div class="feature"><i class="bi bi-person-check"></i><h3>Human in the loop</h3><p>Reviewers see both predictions, every rule, contradictions and evidence. Overrides need a written reason and stay in the audit trail.</p></div>
-    <div class="feature"><i class="bi bi-shield-lock"></i><h3>Access by role and record</h3><p>Customers see their own claims, staff their service center's, reviewers the queue. Everything else returns “not found”.</p></div>
-  </div>
-</section>
-
-{% if demo_accounts %}
-<section class="band">
+<section class="band" id="models" aria-labelledby="models-h">
   <div class="wrap">
-    <div class="eyebrow">Evaluator accounts</div>
-    <h2 class="big">Try every role</h2>
-    <p class="muted">Demo data only. Every claim you see was evaluated by the live pipeline when the database was seeded.</p>
-    <div class="grid grid-4 mt-3">
-      {% for role, email, pw, desc in demo_accounts %}
-      <div class="card"><div class="card-b stack-sm">
-        <b>{{ role }}</b>
-        <span class="small muted">{{ desc }}</span>
-        <code class="small">{{ email }}</code>
-        <code class="small">{{ pw }}</code>
-        <a class="btn quiet sm" href="{{ url_for('auth.login', email=email) }}">Sign in as {{ role|lower }}</a>
-      </div></div>
+    <h2 id="models-h">Measured, not claimed</h2>
+    <p class="lede">Both models on the same {{ mc.dataset.splits.get('test') or 'held-out' }} test claims that neither saw in training. Numbers are read from the evaluation files when this page loads.</p>
+    <div class="grid grid-2">
+      {% for key, name, m in [('python', 'Python classification model', mc.python), ('gtm', 'Google Teachable Machine', mc.gtm)] %}
+      <section class="panel" aria-labelledby="m-{{ key }}-h">
+        <div class="panel-h"><h3 id="m-{{ key }}-h">{{ tag(name, 'teal' if key == 'python' else 'gtm') }}</h3>{% if m %}<span class="id">{{ (m.version or '')[:20] }}</span>{% endif %}</div>
+        <div class="panel-b stack-sm">
+          {% if m %}
+          <div class="metric-grid">
+            <div class="metric"><div class="v">{{ m.accuracy|pct(1) }}</div><div class="l">Test accuracy</div></div>
+            <div class="metric"><div class="v">{{ m.f1|pct(1) }}</div><div class="l">Macro F1</div></div>
+          </div>
+          {{ cmx(m.matrix, name) }}
+          {% else %}<p class="small">Not evaluated yet.</p>{% endif %}
+        </div>
+      </section>
       {% endfor %}
     </div>
+    <p class="mt-3"><a href="{{ url_for('public.model_card') }}">Full model card: dataset, calibration, per-class results and limitations</a></p>
   </div>
 </section>
-{% endif %}
+
+<section class="band" aria-labelledby="who-h">
+  <div class="wrap">
+    <h2 id="who-h">Who uses it</h2>
+    <ul class="who-list mt-3">{% for label, line in roles %}<li><b>{{ label }}.</b> {{ line }}</li>{% endfor %}</ul>
+  </div>
+</section>
 {% endblock %}
+{% block page_js %}<script src="{{ asset('js/bench.js') }}" defer></script>{% endblock %}

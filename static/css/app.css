@@ -391,7 +391,7 @@ a.stat:hover { background: var(--mist); }
   .verdict-why { grid-template-columns: minmax(0, 1fr); }
   .verdict-why > section + section { border-left: 0; border-top: 1px solid var(--rule); }
 }
-.summary-card-img { width: 100%; max-width: 360px; border: 1px solid var(--rule); border-radius: var(--r-bar); background: var(--mist); }
+.summary-card-img { width: 100%; max-width: 360px; height: auto; aspect-ratio: 1; border: 1px solid var(--rule); border-radius: var(--r-bar); background: var(--mist); }
 .card-figure { margin: 0; display: grid; gap: var(--s2); }
 .card-figure figcaption { font-size: var(--fs-xs); color: var(--ink-2); }
 /* occlusion map over the 3x3 card grid */
@@ -501,7 +501,7 @@ a.stat:hover { background: var(--mist); }
 .empty p { margin: 0; max-width: 48ch; }
 
 /* warranty plates (products) */
-.plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s4); }
+.plates { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--s4); }
 .plate { display: grid; gap: var(--s3); padding: var(--s4); background: var(--paper); border: 1px solid var(--rule); border-radius: var(--r-panel); color: var(--ink); text-decoration: none; min-width: 0; }
 a.plate:hover { border-color: var(--steel-line); }
 a.plate:hover .name { text-decoration: underline; text-underline-offset: 3px; }
@@ -681,3 +681,7 @@ dialog .panel-b { display: grid; gap: var(--s3); }
 
 /* print */
 @media print { .topbar, .footer, .no-print, .btn, .toasts, .decision-bar { display: none !important; } body { background: var(--paper); } .panel, .card { break-inside: avoid; } }
+.bench-meter { width: 100%; max-width: 300px; height: auto; overflow: visible; }
+.bench-meter.swept .needle { animation: sweep 450ms cubic-bezier(.2, .8, .2, 1) both; }
+.bench-meter.swept .needle.gtm { animation-delay: 120ms; }
+@media (prefers-reduced-motion: reduce) { .bench-meter.swept .needle { animation: none; } }

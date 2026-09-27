@@ -1,0 +1,161 @@
+{% extends "components/base.html" %}
+{# Public model card: dataset, both models, calibration, per-category results, label noise, leakage audit, errors, limitations — all read from the artefact files. #}
+{% from "components/ui.html" import tag %}
+{% from "public/_cmx.html" import cmx %}
+{% block title %}Model card{% endblock %}
+{% block description %}Dataset, accuracy, confusion matrices, calibration and limitations of the two AssureX models, read from the evaluation files.{% endblock %}
+
+{% macro reliability(rel, colour, label) -%}
+{# Reliability diagram: dots = observed accuracy per confidence bin; the diagonal is perfect calibration. #}
+{% if rel %}
+<svg class="reliability" viewBox="0 0 240 240" role="img" aria-label="{{ label }} calibration: {% for b in rel.bins %}confidence {{ '%.2f'|format(b.confidence) }} accuracy {{ '%.2f'|format(b.accuracy) }} over {{ b.n }} claims; {% endfor %}">
+  <rect x="30" y="10" width="200" height="200" fill="var(--paper)" stroke="var(--rule)"/>
+  <line x1="30" y1="210" x2="230" y2="10" stroke="var(--steel-line)" stroke-dasharray="4 3"/>
+  {% for b in rel.bins %}
+    {% set x = 30 + b.confidence * 200 %}{% set y = 210 - b.accuracy * 200 %}
+    <circle cx="{{ '%.1f'|format(x) }}" cy="{{ '%.1f'|format(y) }}" r="{{ [3 + b.n / 12, 11]|min }}" fill="var({{ colour }})" fill-opacity=".75"/>
+  {% endfor %}
+  <text x="130" y="232" text-anchor="middle" font-size="10" fill="var(--ink-2)">Top-class confidence</text>
+  <text x="12" y="110" text-anchor="middle" font-size="10" fill="var(--ink-2)" transform="rotate(-90 12 110)">Observed accuracy</text>
+</svg>
+<p class="tiny muted">Expected calibration error on these bins: <span class="mono">{{ '%.3f'|format(rel.ece) }}</span> over {{ rel.n }} test claims. Dot size = claims in the bin.</p>
+{% else %}<p class="small">Not evaluated yet.</p>{% endif %}
+{%- endmacro %}
+
+{% block page_header %}
+<div class="page-head">
+  <div>
+    <h1>Model card</h1>
+    <p class="lede">What the two models were trained on, how well they do on claims they never saw, where they go wrong and what they should not be used for. Every number on this page is read from the evaluation files in the repository.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="panel" aria-labelledby="ds-h">
+    <div class="panel-h"><h2 id="ds-h">Dataset</h2><span class="hint">data/raw, data/splits, data/claim_scenarios.json</span></div>
+    <div class="panel-b grid grid-2">
+      <dl class="kv">
+        <dt>Claims</dt><dd>{{ mc.dataset.total or 'Not generated' }}</dd>
+        <dt>Split (train / validation / test)</dt><dd>{{ mc.dataset.splits.get('train') }} / {{ mc.dataset.splits.get('val') }} / {{ mc.dataset.splits.get('test') }}, stratified by class</dd>
+        <dt>Class balance</dt><dd>{% for c, n in mc.dataset.by_class.items() %}{{ c }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}</dd>
+        <dt>Label noise</dt><dd>{{ mc.dataset.noise_rate|pct(0) }} of labels deliberately flipped to simulate reviewer disagreement</dd>
+        <dt>How labels were made</dt><dd>Claim attributes are sampled first; the label is then derived from the warranty policy files, so no field is a disguised label.</dd>
+        <dt>Image dataset</dt><dd>Two Claim Summary Cards per training claim (2,100), one per validation and test claim; test cards never leave the test split.</dd>
+      </dl>
+      <div class="table-wrap"><table class="table compact">
+        <caption class="sr">Scenario counts</caption>
+        <thead><tr><th scope="col">Scenario</th><th scope="col">Class</th><th scope="col" class="num">Claims</th></tr></thead>
+        <tbody>{% for s in mc.dataset.scenarios %}<tr><td title="{{ s.definition }}">{{ s.scenario|replace('_', ' ')|capitalize }}</td><td>{{ s.class }}</td><td class="num mono">{{ s.claims }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <div class="grid grid-2">
+    {% for key, name, m, colour in [('python', 'Python classification model', mc.python, '--teal'), ('gtm', 'Google Teachable Machine', mc.gtm, '--gtm')] %}
+    <section class="panel" aria-labelledby="mc-{{ key }}-h">
+      <div class="panel-h"><h2 id="mc-{{ key }}-h">{{ tag(name, 'teal' if key == 'python' else 'gtm') }}</h2></div>
+      <div class="panel-b stack-sm">
+        {% if m %}
+        <dl class="kv">
+          {% if key == 'python' %}<dt>Algorithm</dt><dd>{{ m.algorithm|replace('_', ' ')|capitalize }}, sigmoid-calibrated; chosen on the validation split</dd>
+          <dt>Version</dt><dd class="mono wrap-any">{{ m.version }}</dd><dt>Library</dt><dd>scikit-learn {{ m.sklearn }}</dd>
+          {% else %}<dt>Model</dt><dd>Standard image model trained in the browser, exported as TensorFlow Lite</dd>
+          <dt>Version</dt><dd class="mono">{{ m.version }}</dd><dt>Validation accuracy</dt><dd>{{ m.val_accuracy|pct(1) }}</dd>{% endif %}
+        </dl>
+        <div class="metric-grid">
+          <div class="metric"><div class="v">{{ m.accuracy|pct(1) }}</div><div class="l">Test accuracy</div></div>
+          <div class="metric"><div class="v">{{ m.f1|pct(1) }}</div><div class="l">Macro F1</div></div>
+          <div class="metric"><div class="v">{{ m.precision|pct(1) }}</div><div class="l">Macro precision</div></div>
+          <div class="metric"><div class="v">{{ m.recall|pct(1) }}</div><div class="l">Macro recall</div></div>
+          {% if m.auc %}<div class="metric"><div class="v mono">{{ '%.3f'|format(m.auc) }}</div><div class="l">ROC-AUC (one-vs-rest)</div></div>{% endif %}
+          {% if m.agreement %}<div class="metric"><div class="v">{{ m.agreement|pct(1) }}</div><div class="l">Agrees with the Python model</div></div>{% endif %}
+        </div>
+        <h3 class="h4 mt-2">Confusion matrix (test)</h3>
+        {{ cmx(m.matrix, name) }}
+        <h3 class="h4 mt-2">Per class (test)</h3>
+        <div class="table-wrap"><table class="table compact">
+          <thead><tr><th scope="col">Class</th><th scope="col" class="num">Precision</th><th scope="col" class="num">Recall</th><th scope="col" class="num">F1</th></tr></thead>
+          <tbody>{% for r in m.per_class %}<tr><td>{{ r['class'] }}</td><td class="num mono">{{ '%.3f'|format(r.precision) }}</td><td class="num mono">{{ '%.3f'|format(r.recall) }}</td><td class="num mono">{{ '%.3f'|format(r['f1-score']) }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        <h3 class="h4 mt-2">Calibration: does “0.8 confident” mean right 8 times in 10?</h3>
+        {{ reliability(m.reliability, colour, name) }}
+        {% else %}<p class="small">Not evaluated yet.</p>{% endif %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+
+  <div class="grid grid-2">
+    <section class="panel" aria-labelledby="cat-h">
+      <div class="panel-h"><h2 id="cat-h">Accuracy by product category</h2><span class="hint">Test split</span></div>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th scope="col">Category</th><th scope="col" class="num">Claims</th><th scope="col" class="num">Python</th><th scope="col" class="num">Teachable Machine</th></tr></thead>
+        <tbody>{% for r in mc.by_category %}<tr><td>{{ r.category }}</td><td class="num mono">{{ r.n }}</td><td class="num mono">{{ r.python|pct(1) }}</td><td class="num mono">{{ r.gtm|pct(1) }}</td></tr>
+        {% else %}<tr><td colspan="4">Not evaluated yet.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+    <section class="panel" aria-labelledby="noise-h">
+      <div class="panel-h"><h2 id="noise-h">Labels versus policy</h2></div>
+      <div class="panel-b">
+        {% set n = mc.noise %}
+        {% if n %}
+        <p class="small">{{ n.noisy }} of the {{ n.n }} test claims carry a deliberately flipped label. Scoring each model against the policy's own answer instead of the noisy label shows how much of its “error” is the noise.</p>
+        <div class="table-wrap"><table class="table compact">
+          <thead><tr><th scope="col">Model</th><th scope="col" class="num">Against labels</th><th scope="col" class="num">Against policy</th><th scope="col" class="num">Follows policy on flipped labels</th></tr></thead>
+          <tbody>
+            <tr><td>Python</td><td class="num mono">{{ n.python.vs_labels|pct(1) }}</td><td class="num mono">{{ n.python.vs_policy|pct(1) }}</td><td class="num mono">{{ n.python.policy_on_noisy }} of {{ n.noisy }}</td></tr>
+            <tr><td>Teachable Machine</td><td class="num mono">{{ n.gtm.vs_labels|pct(1) }}</td><td class="num mono">{{ n.gtm.vs_policy|pct(1) }}</td><td class="num mono">{{ n.gtm.policy_on_noisy }} of {{ n.noisy }}</td></tr>
+          </tbody>
+        </table></div>
+        {% else %}<p class="small">Not evaluated yet.</p>{% endif %}
+      </div>
+    </section>
+  </div>
+
+  {% if mc.python %}
+  <section class="panel" aria-labelledby="leak-h">
+    <div class="panel-h"><h2 id="leak-h">Leakage audit</h2><span class="hint">Accuracy of a small decision tree on each feature alone; training stops above 90%</span></div>
+    <div class="panel-b">
+      <div class="influence">
+        {% for f, acc in mc.python.leakage[:10] %}
+          <div class="row-i"><span>{{ f|replace('_', ' ')|capitalize }}</span><span class="meter" role="img" aria-label="{{ acc|pct(1) }}"><i style="--p: {{ acc }}"></i></span><span class="v">{{ acc|pct(1) }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="tiny muted mt-2">No single field comes close to predicting the class on its own, so none is a relabelled answer. Version 1 of the project had one (100% accuracy); this audit is how that was caught.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if mc.gtm_errors %}
+  <section class="panel" aria-labelledby="err-h">
+    <div class="panel-h"><h2 id="err-h">Where the image model is wrong</h2><span class="hint">First {{ mc.gtm_errors|length }} misclassified test cards</span></div>
+    <div class="panel-b">
+      <ul class="plates">
+        {% for e in mc.gtm_errors %}
+          <li class="plate">
+            <img class="summary-card-img" src="{{ url_for('public.test_card', name=e.card_filename) }}" alt="Claim Summary Card {{ e.claim_id }}" width="600" height="600" loading="lazy">
+            <div class="small"><span class="id">{{ e.claim_id }}</span><br>Actual <b>{{ e.actual_class }}</b>, predicted <b>{{ e.gtm_predicted }}</b></div>
+            <div class="tiny muted">Scenario: {{ e.scenario|replace('+noise', ' (flipped label)')|replace('_', ' ') }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="panel" aria-labelledby="lim-h">
+    <div class="panel-h"><h2 id="lim-h">Limitations</h2></div>
+    <div class="panel-b">
+      <ul class="bullets measure">
+        <li>The claims are synthetic, generated from our own warranty policies. Real claims will need retraining and new calibration.</li>
+        <li>The image model reads the Claim Summary Card, which shows facts against policy limits. If an administrator changes a limit that the card draws, the image model must be retrained on new cards.</li>
+        <li>Neither model decides a claim on its own. When they disagree or are unsure, the claim goes to a person.</li>
+        <li>Rare situations, such as reporting a fault very late, have few training examples; the rule engine catches them instead.</li>
+        <li>Scores describe these test claims only. They are not a guarantee for any single claim.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+{% endblock %}

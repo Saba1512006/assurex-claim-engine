@@ -1,0 +1,14 @@
+{# 3×3 confusion matrix as a CSS grid: rows = actual class, columns = predicted; diagonal outlined. #}
+{% macro cmx(matrix, label) -%}
+{% if matrix %}
+<div class="cmx" role="table" aria-label="{{ label }} confusion matrix, rows actual, columns predicted">
+  <span class="axis" role="presentation">Rows: actual · columns: predicted</span>
+  <span role="columnheader"></span>{% for c in matrix.labels %}<span class="h" role="columnheader">{{ c|replace(' Claim', '') }}</span>{% endfor %}
+  {% for row in matrix.rows %}
+    <span class="h" role="rowheader">{{ matrix.labels[loop.index0]|replace(' Claim', '') }}</span>
+    {% set r = loop.index0 %}
+    {% for n, w in row %}<span class="c {{ 'diag' if loop.index0 == r }} {{ 'dark' if w > 0.55 }}" role="cell" style="--w: {{ w }}">{{ n }}</span>{% endfor %}
+  {% endfor %}
+</div>
+{% else %}<p class="small muted">Not evaluated yet.</p>{% endif %}
+{%- endmacro %}

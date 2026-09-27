@@ -22,7 +22,7 @@ from sqlalchemy import and_, false, or_, select
 
 from src.security import rbac
 
-PUBLIC_ENDPOINTS = {"static", "public.index", "public.blog", "public.health", "public.model_card", "public.test_card",
+PUBLIC_ENDPOINTS = {"static", "public.index", "public.blog", "public.health", "public.model_card", "public.test_card", "api.demo_evaluate",
                     "auth.login", "auth.register", "auth.logout"}
 PASSWORD_CHANGE_ALLOWED = {"auth.profile", "auth.logout", "static"}
 

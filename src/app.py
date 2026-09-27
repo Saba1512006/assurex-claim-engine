@@ -17,6 +17,7 @@ from src.web import register_template_helpers  # noqa: E402
 def create_app(config_class=Config) -> Flask:
     app = Flask(__name__, template_folder=str(BASE_DIR / "templates"), static_folder=str(BASE_DIR / "static"))
     app.config.from_object(config_class)
+    app.json.sort_keys = False                      # probability dicts keep the fixed class order (Valid, Invalid, Manual Review)
     Path(app.config["UPLOAD_DIR"]).mkdir(parents=True, exist_ok=True)
 
     harden(app)

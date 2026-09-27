@@ -7,7 +7,7 @@ from pathlib import Path
 import markdown
 from flask import Blueprint, abort, current_app, g, jsonify, redirect, render_template, send_file, url_for
 
-from src.core.gtm_classifier_v2 import evaluation as gtm_evaluation, find_model_file
+from src.core.gtm_classifier_v2 import find_model_file
 from src.core.python_classifier import model_card as python_model_card
 from src.services import model_card_service
 
@@ -16,30 +16,21 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 BLOG = ROOT / "documentation" / "TECHNICAL_BLOG.md"
 TEST_CARDS = ROOT / "data" / "summary_cards" / "test"
 
-DEMO_ACCOUNTS = [
-    ("Customer", "customer@assurex.local", "CustomerPass123!", "Register products, file claims, track progress"),
-    ("Service-center staff", "staff@assurex.local", "StaffPass123!", "File claims for walk-in customers, log repairs"),
-    ("Claim reviewer", "reviewer@assurex.local", "ReviewerPass123!", "Work the manual-review queue and decide claims"),
-    ("Administrator", "admin@assurex.local", "AdminPass123!", "Dashboards, policies, models, access control"),
-]
-
-
-def measured_metrics() -> dict:
-    """Numbers shown on the landing page come from the saved evaluation files, never literals."""
-    card = python_model_card()
-    test = card.get("test", {})
-    gtm = gtm_evaluation().get("test", {})
-    return {"python_accuracy": test.get("accuracy"), "python_f1": test.get("f1_macro"),
-            "python_auc": test.get("roc_auc_ovr_macro"), "python_model": test.get("selected_model"),
-            "gtm_accuracy": gtm.get("gtm_accuracy"), "gtm_installed": find_model_file() is not None}
+ROLE_LINES = {
+    "customer": "Registers products, files claims with evidence and follows every stage.",
+    "service_center_staff": "Files claims for walk-in customers of their own center and records repairs.",
+    "claim_reviewer": "Works the queue of unclear claims and decides them with a written reason.",
+    "administrator": "Watches model health, edits policies and thresholds, manages access and the audit trail.",
+}
 
 
 @public_bp.get("/")
 def index():
     if g.get("user"):
         return redirect(url_for("auth.home"))
-    return render_template("public/index.html", metrics=measured_metrics(),
-                           demo_accounts=DEMO_ACCOUNTS if current_app.config.get("SHOW_DEMO_ACCOUNTS", True) else [])
+    from src.security import rbac
+    roles = [(rbac.policy()["roles"][r]["label"], ROLE_LINES[r]) for r in ROLE_LINES if r in rbac.policy()["roles"]]
+    return render_template("public/index.html", mc=model_card_service.build(), roles=roles)
 
 
 @public_bp.get("/blog")
