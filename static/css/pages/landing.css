@@ -199,23 +199,10 @@
   .hero-copy { padding-top: 0; }
 }
 
-/* ---------------------------------------------------------------- hero backdrop: the dual inference engine
-   Two engine cores on the live check's top corners feed the decision core above it; a spine runs down behind the
-   card to the policy engine and the three outcomes below it. Everything is faint and slow; the card is lightly
-   translucent so the structure reads as depth behind it, and the layer fades out before the headline column. */
-.hero-copy { position: relative; z-index: 2; }
-.hero-visual { position: relative; z-index: 1; }
-.hero .hero-instrument { position: relative; z-index: 1; background: rgba(21, 32, 43, .9);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, .05), 0 30px 60px -28px rgba(0, 0, 0, .7), 0 0 80px -30px rgba(63, 184, 174, .25); }
-.engines { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-.engines svg { position: absolute; left: -190px; width: calc(100% + 380px); overflow: visible; }
-.engines-top { top: -150px; height: 420px; }
-.engines-bottom { top: calc(100% - 40px); height: 180px; }
-.engines-spine { position: absolute; left: 50%; top: -46px; bottom: -22px; width: 1px; translate: -.5px 0; overflow: hidden;
-  background: linear-gradient(180deg, rgba(63, 184, 174, .5), rgba(75, 95, 168, .28) 50%, rgba(63, 184, 174, .4)); }
-.engines-spine::after { content: ""; position: absolute; left: 0; top: -60px; width: 1px; height: 60px;
-  background: linear-gradient(180deg, transparent, #3FB8AE, transparent); animation: eng-drop 3.6s cubic-bezier(.45, 0, .55, 1) 1.4s infinite; }
-
+/* ---------------------------------------------------------------- hero strip: the dual inference engine
+   Under the headline and metrics: the two engine cores feed the decision core between them, which hands down to the
+   policy engine and the outcomes. Faint and slow, so it reads as the system running rather than as content. */
+.hero-engines { display: block; width: 100%; max-width: 600px; height: auto; margin-top: calc(var(--s2) * -1); overflow: visible; }
 .eng-guides { fill: none; stroke: #15202B; stroke-width: 1; }
 .eng-guides circle, .eng-guides line { stroke: rgba(120, 150, 175, .12); }
 .eng { --c: #3FB8AE; --c-soft: rgba(63, 184, 174, .22); }
@@ -255,6 +242,8 @@
 
 .eng-tele text, .eng-tele-t, .eng-out text { font: 500 9px/1 var(--mono); letter-spacing: .12em; fill: rgba(233, 238, 243, .42); }
 .eng-tele .hi { fill: rgba(233, 238, 243, .62); }
+.eng-tele .eng-name { font-weight: 600; letter-spacing: .2em; }
+.eng-tele .eng-name.py { fill: #3FB8AE; } .eng-tele .eng-name.tm { fill: #8EA0E6; }
 .eng-tele-t.dim { fill: rgba(233, 238, 243, .3); }
 .pol-ring { fill: rgba(13, 20, 27, .8); stroke: rgba(142, 160, 230, .5); stroke-width: 1; }
 .pol-rules { --c: #8EA0E6; }
@@ -272,14 +261,10 @@
 @keyframes eng-scan { from { transform: translateY(0); } to { transform: translateY(28px); } }
 @keyframes eng-breathe { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
 @keyframes eng-ping { 0% { opacity: .55; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(1.7); } }
-@keyframes eng-drop { from { top: -60px; } to { top: 100%; } }
 @media (prefers-reduced-motion: reduce) {
-  .engines *, .engines-spine::after { animation: none !important; }
-  .engines-spine::after { display: none; }
+  .hero-engines * { animation: none !important; }
 }
-/* short screens: the free band above the card is thin, so the structure shrinks toward the card's edges */
-@media (min-width: 1081px) and (max-height: 760px) {
-  .engines-top { transform: scale(.74); transform-origin: 50% 150px; }
-  .engines-bottom { transform: scale(.8); transform-origin: 50% 40px; }
-}
-@media (max-width: 1080px) { .engines { display: none; } .hero .hero-instrument { background: var(--bench-2); } }
+/* the strip gives way before the hero stops fitting one screen, and on phones where its labels would be too small */
+@media (min-width: 1081px) and (max-height: 760px) { .hero-engines { max-width: 460px; } }
+@media (min-width: 1081px) and (max-height: 660px) { .hero-engines { max-width: 380px; margin-top: calc(var(--s3) * -1); } }
+@media (max-width: 560px) { .hero-engines { display: none; } }

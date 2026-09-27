@@ -27,8 +27,9 @@
         {{ metric('%.1f'|format(mc.gtm.accuracy * 100) if mc.gtm else none, '%', 'Teachable Machine, test accuracy') }}
         {{ metric(test_n, '', 'Test claims neither model saw in training') }}
       </div>
+      {% include "public/_engines.html" %}
     </div>
-    <div class="hero-visual">{% include "public/_engines.html" %}{{ instrument(bench, cases) }}</div>
+    <div class="hero-visual">{{ instrument(bench, cases) }}</div>
   </div>
 </section>
 
