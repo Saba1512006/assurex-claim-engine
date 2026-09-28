@@ -259,7 +259,7 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 ## Links
 
 * Live deployment: https://assurex.pythonanywhere.com (see *Known limitations* for the free-tier model runtime)
-* Demonstration video (.mp4): *to be added* — recording script in [`documentation/DEMO_VIDEO_SCRIPT.md`](documentation/DEMO_VIDEO_SCRIPT.md)
+* Demonstration video (.mp4): *link to be added* — voice-over script with timestamps in [`documentation/DEMO_VOICEOVER.md`](documentation/DEMO_VOICEOVER.md)
 * Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
 * Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
