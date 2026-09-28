@@ -66,8 +66,8 @@ def create_app(config_class=Config) -> Flask:
     def _rate_limited(e):
         import time
         from src.app_security import limiter
-        hit = limiter.current_limit
-        wait = max(1, int(hit.reset_at - time.time())) if hit else 60
+        hit = getattr(limiter, "current_limit", None)                 # absent on older Flask-Limiter releases
+        wait = max(1, int(hit.reset_at - time.time())) if getattr(hit, "reset_at", None) else 60
         back = request.referrer if (request.referrer or "").startswith(request.host_url) else None
         return _page(429, "Too many attempts", f"You reached the limit of {getattr(e, 'description', 'requests')}. "
                      "The countdown shows when you can try again.", retry_in=wait,
