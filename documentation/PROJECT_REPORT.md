@@ -2,6 +2,15 @@
 
 NextWave AI & ML · Aptech Limited · Version 2.0 (September 2026)
 
+**Group NN_DevStorm** · Batch 2609E2' · Faculty: Sir Minhaj
+
+| Student ID | Name | Role in the project |
+|---|---|---|
+| Student1525913 | Saba Noor | Team lead · integration, frontend direction, QA, documentation |
+| Student1524867 | Muhammad Sami | Backend and ML pipeline developer · deployment |
+| Student1509222 | Muhammad Ghanyan | Frontend design (Figma, colour palette, mobile checks) |
+| Student1505677 | Muhammad Sami ur Rehman | Testing (sample claims, Chrome and mobile) |
+
 ## 1. Problem definition
 
 Manufacturers and service centers receive warranty claims that must be checked against purchase proof,

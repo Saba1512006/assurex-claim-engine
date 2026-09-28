@@ -5,7 +5,7 @@
 | Item | Requirement |
 |---|---|
 | Operating system | Windows 10/11, macOS 12+, Ubuntu 20.04+ (any OS with Python) |
-| Python | 3.10, 3.11 or 3.12 (3.11 recommended; `scikit-learn==1.9.1` is pinned so the saved model loads) |
+| Python | 3.11 or 3.12 (3.11 recommended). `scikit-learn==1.9.1` is pinned so the saved model loads, and it is not published for Python 3.10 |
 | Git | any recent version |
 | Optional | Tesseract OCR (reads *image* receipts); Chromium via Playwright (only to re-render report diagrams) |
 

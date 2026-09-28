@@ -9,6 +9,24 @@ model** scores the structured claim record, a **Google Teachable Machine** image
 policy, and a config-driven **decision table** turns all of it into *Likely Valid*, *Likely Invalid* or
 *Manual Review Required*. Anything uncertain goes to a human reviewer, and every step is recorded.
 
+## Team NN_DevStorm
+
+| | |
+|---|---|
+| Group | **NN_DevStorm** |
+| Project | AssureX Claim Engine — NextWave AI and ML (Aptech Limited) |
+| Batch | 2609E2' |
+| Faculty | Sir Minhaj |
+
+| Student ID | Name | Role in the project |
+|---|---|---|
+| Student1525913 | Saba Noor | Team lead · integration, frontend direction, QA, documentation |
+| Student1524867 | Muhammad Sami | Backend and ML pipeline developer · deployment |
+| Student1509222 | Muhammad Ghanyan | Frontend design (Figma, colour palette, mobile checks) |
+| Student1505677 | Muhammad Sami ur Rehman | Testing (sample claims, Chrome and mobile) |
+
+Who did what: [`documentation/TEAM_CONTRIBUTIONS.md`](documentation/TEAM_CONTRIBUTIONS.md).
+
 ![Architecture](documentation/diagrams/architecture.png)
 
 ---
@@ -31,7 +49,7 @@ dataset carries 4% deliberate label noise (reviewer disagreement), so ~96% is th
 
 ## Quick start
 
-Requirements: Python 3.10–3.12, Git. Works on Windows, macOS and Linux.
+Requirements: Python 3.11 or 3.12 (3.11 recommended), Git. Works on Windows, macOS and Linux.
 
 ```bash
 git clone https://github.com/Saba1512006/assurex-claim-engine.git
@@ -102,8 +120,8 @@ Public sign-up creates **customer** accounts only. Other roles are invited by an
 | Try other thresholds safely | Admin › *What-if simulator* |
 | Evaluate many records at once | Admin › *Batch evaluation* (CSV in the training-split format) |
 | Choose what customers see | Admin › *Policies* › *What customers see* (model probabilities on or off) |
-| Track a claim | Claim page › *Track*, or the 8-stage bar at the top of the claim page |
-| Export a claim report | Claim page › *Report (PDF)*; bulk **CSV or Excel (.xlsx)** from Admin › *Overview*, *Analytics*, *Audit* and claim *Search* |
+| Track a claim | Claim page › *Track progress*, or the 8-stage bar at the top of the claim page |
+| Export a claim report | Claim page › *Download report (PDF)*; bulk **CSV or Excel (.xlsx)** from Admin › *Overview*, *Analytics*, *Audit* and claim *Search* |
 
 ### The 11 SRS demonstration cases
 
@@ -259,13 +277,14 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 ## Links
 
 * Live deployment: https://assurex.pythonanywhere.com (see *Known limitations* for the free-tier model runtime)
-* Demonstration video (.mp4): *link to be added* — voice-over script with timestamps in [`documentation/DEMO_VOICEOVER.md`](documentation/DEMO_VOICEOVER.md)
+* Demonstration video (.mp4, 1080p, narrated): `demo_video/AssureX_Demo.mp4` in the submitted project folder, also downloadable from the repository: https://github.com/Saba1512006/assurex-claim-engine/blob/demo-video/AssureX_Demo.mp4 — chapters and narration script in [`documentation/DEMO_VOICEOVER.md`](documentation/DEMO_VOICEOVER.md)
 * Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
 * Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
 * Installation & troubleshooting: [`documentation/INSTALLATION.md`](documentation/INSTALLATION.md)
 * Teachable Machine evidence: [`documentation/GTM_EVIDENCE.md`](documentation/GTM_EVIDENCE.md)
 * Test cases: [`documentation/TEST_CASES.md`](documentation/TEST_CASES.md) · results: [`reports/test_results.txt`](reports/test_results.txt)
+* SRS submission checklist (where every deliverable is): [`documentation/SUBMISSION_CHECKLIST.md`](documentation/SUBMISSION_CHECKLIST.md)
 * Team contribution record: [`documentation/TEAM_CONTRIBUTIONS.md`](documentation/TEAM_CONTRIBUTIONS.md)
 * AI tool declaration: [`AI_USAGE.md`](AI_USAGE.md)
 

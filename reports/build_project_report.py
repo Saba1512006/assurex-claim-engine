@@ -57,7 +57,10 @@ def table(lines, s, width):
     data = [[Paragraph(inline(c), s["head"] if i == 0 else s["cell"]) for c in r + [""] * (ncol - len(r))]
             for i, r in enumerate(rows)]
     # column widths proportional to content length (clamped), so "#" columns stay narrow
+    # and never narrower than the longest single word, so IDs and numbers are not broken mid-token
     lens = [min(60, max(4, max(len(r[c]) if c < len(r) else 0 for r in rows))) for c in range(ncol)]
+    words = [max((len(w) for r in rows if c < len(r) for w in r[c].split()), default=0) + 2 for c in range(ncol)]
+    lens = [max(n, w) for n, w in zip(lens, words)]
     widths = [width * n / sum(lens) for n in lens]
     t = Table(data, colWidths=widths, repeatRows=1)
     t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, 0), SOFT),

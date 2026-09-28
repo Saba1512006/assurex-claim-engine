@@ -24,3 +24,6 @@ desktop.ini
 database/*.db
 reports/model_comparison_val.csv
 model/teachable_machine/versions/
+
+# Demonstration video (kept on the demo-video branch, not in main)
+demo_video/*.mp4
