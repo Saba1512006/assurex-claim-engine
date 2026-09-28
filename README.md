@@ -126,9 +126,11 @@ threshold before changing it.
 
 | | |
 |---|---|
-| ![Landing page with the live bench](docs/screenshots/landing.png) | ![Verdict screen](docs/screenshots/verdict.png) |
-| ![Claim wizard reading a receipt](docs/screenshots/wizard-ocr.png) | ![Reviewer workbench](docs/screenshots/workbench.png) |
-| ![Customer dashboard](docs/screenshots/customer-dashboard.png) | ![What-if simulator](docs/screenshots/what-if.png) |
+| ![Landing page: live check and the dual-engine background](screenshots/01_landing.jpg) | ![Reviewer workbench](screenshots/11_reviewer_decision.jpg) |
+| ![Sign-in with evaluator accounts](screenshots/02_login.jpg) | ![Model card](screenshots/27_model_card.jpg) |
+
+More screens (claim verdicts, dashboards, admin tools, phone layout) are listed in
+[`screenshots/README.md`](screenshots/README.md).
 
 Quality, measured: axe-core finds no serious or critical WCAG 2 A/AA issue on 21 pages; Lighthouse gives
 99 performance and 100 accessibility, best practices and SEO on the landing, sign-in, model card and blog
