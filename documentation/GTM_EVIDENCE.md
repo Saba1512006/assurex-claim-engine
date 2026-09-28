@@ -6,6 +6,29 @@
 > replaced (see *Card design iterations*). The earlier `gtm_classifier.joblib` / `weights.bin` /
 > `metadata.json` files were a scikit-learn stand-in, not a Teachable Machine export, and were removed.
 
+## Project evidence (in place of a project link)
+
+The SRS accepts "Google Teachable Machine project link **or** permitted project evidence". The model was
+trained in the browser and exported directly; the browser project was not saved to Google Drive, so there is
+no shareable project link. The following evidence is submitted instead, and every item can be checked
+against the others:
+
+| Evidence | Where |
+|---|---|
+| Exported Teachable Machine model (TensorFlow Lite, float) | `model/teachable_machine/model_unquant.tflite`; its SHA-256 begins `514702678b8c`, which is the model version `gtm-514702678b8c` shown in the application and stored with every prediction |
+| Label file (the three classes, in Teachable Machine's order) | `model/teachable_machine/labels.txt` |
+| Screenshots of the three classes, training and in-browser testing | `screenshots/23_gtm_v3_training.png` (the three classes, 700 samples each, model trained), `screenshots/24_gtm_v3_preview_test.png` (preview test), `screenshots/25_gtm_v3_evaluation.png` (evaluation); first run: `screenshots/20_gtm_training.png`, `screenshots/22_gtm_evaluation.png` |
+| Class samples (Valid Claim, Invalid Claim, Manual Review) | the training cards in `data/summary_cards/train/{valid,invalid,manual_review}/` (700 per class) and the validation and test cards in `data/summary_cards/val/` and `data/summary_cards/test/` |
+| Training configuration and retraining details | *Training record* below (epochs 50, batch 16, learning rate 0.001; run 1 on v2 cards, run 2 on v3 cards) |
+| Evaluation on unseen cards | `model/teachable_machine/evaluation.json` (225 validation and 225 test cards: 97.3% and 93.8%) |
+| Incorrectly classified samples | `reports/gtm_misclassified_test.csv`, `reports/gtm_misclassified_val.csv` |
+| Comparison with the Python model | `reports/model_comparison_report.md` and `.csv` (225 test claims) |
+
+**Reproduce the figures:** `python notebooks/evaluate_gtm.py` re-scores the installed model on the 225
+validation and 225 test cards, or sign in as the administrator and use **Admin › Models › Run evaluation**. The
+test suite also re-scores the model on every run and fails if its accuracy differs from the recorded 93.8%
+(`tests/test_ml_integrity.py`).
+
 ## Claim Summary Cards
 
 | Item | Value |
