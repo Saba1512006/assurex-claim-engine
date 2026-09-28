@@ -60,21 +60,20 @@ decision table running inside this application. No external AI API is called at 
 ### Required team entries (SRS: modifications, testing and verifier name)
 
 The SRS requires the **team** to review, modify, test and understand AI output, and to name the member
-who verified it. These rows must be filled in by the team — they are deliberately left blank rather than
-written on the team's behalf:
+who verified it. Rows still blank are completed by the member who did that work:
 
 | Module | Modifications made by the team | Tests run by the team | Verified by (team member) |
 |---|---|---|---|
 | Dataset generator & cards (`dataset_generator/`) | | | |
 | Python model training (`notebooks/train_python_v2.py`) | | | |
 | Teachable Machine training & evaluation | | | |
-| Evaluation pipeline (`src/core/`) | | | |
-| Rule engine & policies (`src/rules/`, `policies/`) | | | |
+| Evaluation pipeline (`src/core/`) | Muhammad Sami wrote the first pipeline (OCR, comparison, decision engine) before the v2 upgrade; the team kept the v2 decision table and thresholds after review | Deployed and ran the app on PythonAnywhere and locally; Saba Noor compared the live-check results with the model card figures | Muhammad Sami, Saba Noor |
+| Rule engine & policies (`src/rules/`, `policies/`) | Muhammad Sami wrote the original rule set, multi-category policies, serial verification and contradiction/duplicate checks; kept as the basis of the config-driven v2 rules | Created the `sample_claims/` suite covering the SRS demonstration cases | Muhammad Sami |
 | Security & access control (`src/security/`, `config/rbac.json`) | | | |
-| Web interface (`templates/`, `static/`) | | | |
+| Web interface (`templates/`, `static/`) | Muhammad Sami tuned the live check card height and hero padding (28 Sept); Saba Noor requested and reviewed every page change | Ran the app locally on Windows and checked each page for all four roles | Saba Noor |
 | Frontend rebuild features (verdict, workbench, what-if, batch, model card) | | | |
-| Styling pass, input rules, lockout countdown, hero background (27–28 Sept) | | | |
-| Documentation & report | | | |
+| Styling pass, input rules, lockout countdown, hero background (27–28 Sept) | Saba Noor specified each change and asked for corrections after testing (menu scrolling, notifications link, footer layout, hero placement, text clipping, lockout time) | Typed digits into name fields and letters into phone fields, locked an account with five wrong passwords and watched the countdown, checked the landing page at several window sizes | Saba Noor |
+| Documentation & report | Saba Noor corrected links, figures and wording; the blog was published on Medium from her account | Checked every figure against `reports/` and the model files | Saba Noor |
 
 ## 3. Other tools
 
