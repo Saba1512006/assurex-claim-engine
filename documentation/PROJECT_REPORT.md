@@ -11,6 +11,13 @@ NextWave AI & ML · Aptech Limited · Version 2.0 (September 2026)
 | Student1509222 | Muhammad Ghanyan | Frontend design (Figma, colour palette, mobile checks) |
 | Student1505677 | Muhammad Sami ur Rehman | Testing (sample claims, Chrome and mobile) |
 
+| Link | |
+|---|---|
+| Live application | https://assurex.pythonanywhere.com (free-tier model runtime: see §34 *Limitations*) |
+| GitHub repository | https://github.com/Saba1512006/assurex-claim-engine |
+| Demonstration video | https://github.com/Saba1512006/assurex-claim-engine/blob/demo-video/AssureX_Demo.mp4 |
+| Technical blog | https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c |
+
 ## 1. Problem definition
 
 Manufacturers and service centers receive warranty claims that must be checked against purchase proof,
