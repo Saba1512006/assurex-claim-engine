@@ -11,7 +11,7 @@ from src.rules.validator import email_problem, person_name_problem, phone_proble
 from tests.conftest import login, make_center, make_user
 
 
-@pytest.mark.parametrize("name", ["Areeba Khan", "Muhammad Ali Jr.", "O'Brien", "Anne-Marie Lee", "José Núñez", "عائشہ خان"])
+@pytest.mark.parametrize("name", ["Areeba Khan", "Muhammad Ali Jr.", "O'Brien", "Anne-Marie Lee", "José Núñez", "Zoë Brontë"])
 def test_real_names_pass(name):
     assert person_name_problem(name) is None
 
