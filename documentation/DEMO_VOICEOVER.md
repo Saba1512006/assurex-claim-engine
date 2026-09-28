@@ -1,78 +1,95 @@
-# Demonstration video — voice-over script
+# Demonstration video — narration
 
-Video: `AssureX_Demo.mp4` (1280 × 720, 7 min 33 s, no audio). Record your voice over it in any editor
-(for example Clipchamp on Windows: import the video, *Record → Audio*, speak along with the captions, export as .mp4).
-Each line starts at the time shown; the on-screen caption says the same thing, so reading the line as the caption
-appears keeps the voice in step. Chapter cards stay on screen for about three seconds.
+Video: `AssureX_Demo.mp4` (1920 × 1080, 30 fps, 11 min 22 s, H.264 with AAC audio), recorded from the running
+application against a freshly seeded database. Also delivered as two parts for upload limits: part 1 is 0:00–5:12 (up to Part 4), part 2 is
+5:12–11:22.
 
-| Time | On screen | Say |
+* **Narration:** English, generated with the open-source Kokoro text-to-speech model (voice `af_heart`) from the script
+  below, and placed at the timestamps shown. Declared in `AI_USAGE.md` §3.
+* **On screen:** every narrated step also has a caption, and the element being discussed is outlined, so the video can
+  be followed with the sound off.
+* **Nothing is staged:** every claim, prediction and decision is produced live by the application; the recording is
+  unedited.
+
+## Chapters
+
+| Time | Chapter |
+|---|---|
+| 0:04 | Title card: Warranty claims, checked twice |
+| 0:29 | PART 1 · The live check |
+| 1:32 | PART 2 · Customer journey |
+| 3:36 | PART 3 · The decision |
+| 5:13 | PART 4 · Demonstration cases |
+| 6:57 | PART 5 · Manual review |
+| 7:50 | PART 6 · Administration |
+| 9:15 | PART 7 · Beyond the requirements |
+| 10:57 | Closing card: Two models. One rulebook. |
+
+## Script
+
+| Time | On screen | Narration |
 |---|---|---|
-| 0:03 | **ASSUREX CLAIM ENGINE Warranty claims, checked twice** (title card) | Welcome to AssureX Claim Engine. Every warranty claim is checked twice, by a Python model and a Teachable Machine image model, and a person decides whenever they are unsure. |
-| 0:10 | **PART 1 The live check** (title card) | Part 1: The live check. The landing page runs real sample claims through the complete pipeline. |
-| 0:14 | caption | AssureX Claim Engine: every warranty claim is checked by two independent models and a warranty policy engine. |
-| 0:19 | caption | The live check runs a real sample claim through the whole pipeline. |
-| 0:22 | caption | Clean fault: both models predict Valid Claim; no blocking rule fires; Likely Valid (rule D07). |
-| 0:31 | caption | Liquid damage: excluded cause confirmed by a technician; a hard-fail rule gives Likely Invalid (rule D01). |
-| 0:39 | caption | Filed 4 days into the grace period: low confidence, Uncertain Result, so the claim goes to a person. |
-| 0:46 | caption | Behind the card: the Python model and the vision model feed the decision core, the policy engine and the outcome. |
-| 0:51 | **PART 2 Customer journey** (title card) | Part 2: Customer journey. Registration, product and warranty registration with OCR, claim creation, evidence upload and submission. |
-| 0:56 | caption | User registration: a customer creates an account (every field is validated in the browser and on the server). |
-| 1:09 | caption | Login with the new account. |
-| 1:14 | caption | The customer dashboard: products, warranties, claims and pending actions. |
-| 1:19 | caption | Product registration: upload the purchase receipt; OCR reads it. |
-| 1:23 | caption | OCR extraction: product, model, serial number, purchase date, price, retailer and invoice number are filled in. |
-| 1:28 | caption | Extracted-data verification: the customer checks each field before saving. |
-| 1:35 | caption | Warranty registration: the category sets the warranty length; standard or extended cover. |
-| 1:40 | caption | The product and its warranty: coverage dates, status and documents. |
-| 1:47 | caption | Claim creation: choose the product. |
-| 1:52 | caption | Fault details: category, cause, the date it started, and a description. |
-| 2:00 | caption | Receipt and document upload: the receipt is read again and compared with the registered product. |
-| 2:05 | caption | OCR check: the serial number on the receipt matches the registered product. |
-| 2:11 | caption | Supporting evidence: warranty card, damage photo and serial-number photo. |
-| 2:15 | caption | Review the claim, then submit. |
-| 2:26 | **PART 3 The decision** (title card) | Part 3: The decision. Python prediction, Claim Summary Card, Teachable Machine prediction, model comparison, warranty rules and the final decision. |
-| 2:30 | caption | Data pre-processing turns the claim into model features; the Python model scores all three classes. |
-| 2:34 | caption | Python model confidence for Valid, Invalid and Manual Review. |
-| 2:37 | caption | The Claim Summary Card is generated and Google Teachable Machine classifies it, with its own three confidences. |
-| 2:41 | caption | Comparison: predicted-class match, the top-class confidence difference (Δ) and the consistency status. |
-| 2:47 | caption | Warranty-rule execution: 16 checks from the category policy, with the decision table's reason. |
-| 2:53 | caption | The image model saw only claim facts: the card never shows a prediction or a decision. |
-| 2:59 | caption | Missing documents, contradictions and duplicate indicators are listed with the evidence. |
-| 3:09 | caption | Claim status tracking: eight stages from filing to closing. |
-| 3:15 | caption | Report generation: a PDF with the claim, the evidence, both predictions, the rules and the decision. |
-| 3:18 | **PART 4 Demonstration cases** (title card) | Part 4: Demonstration cases. Valid, invalid and manual-review claims, missing documents, contradictions, a boundary date and a model disagreement. |
-| 3:31 | caption | One valid claim: both models agree Valid and no rule blocks it: Likely Valid. |
-| 3:36 | caption | One invalid claim: a hard-fail warranty rule decides it: Likely Invalid. |
-| 3:41 | caption | One manual-review claim: a manual-review rule sends it to a person. |
-| 3:47 | caption | Missing-document detection: the mandatory receipt is missing, so the claim waits (rule D03). |
-| 3:56 | caption | Contradiction and duplicate detection: conflicting evidence sends the claim to review (rule D02). |
-| 4:05 | caption | Tricky boundary case: filed 4 days into the 7-day grace period; low confidence, Uncertain Result. |
-| 4:10 | caption | Model disagreement: Python says Invalid, Teachable Machine says Valid, so a person decides. |
-| 4:14 | **PART 5 Manual review** (title card) | Part 5: Manual review. The reviewer queue, the three-column workbench and a decision with a written override. |
-| 4:26 | caption | Manual-review routing: the reviewer's queue, with filters and risk levels. |
-| 4:32 | caption | The reviewer workbench: evidence, both models' scores and the warranty facts side by side. |
-| 4:38 | caption | Reviewer comments or override: approve with a written reason; it is kept in the audit trail. |
-| 4:47 | caption | The decision is recorded, the customer is notified and the claim status changes. |
-| 4:50 | **PART 6 Administration** (title card) | Part 6: Administration. Dashboard, analytics, configurable warranty policies, model management and the audit trail. |
-| 5:04 | caption | Administrator dashboard: claims, automation rate, model agreement and review workload. |
-| 5:10 | caption | Charts: claims per week, recommendations, model agreement and confidence. |
-| 5:19 | caption | Analytics: frequent faults, rejection reasons, category trends and model evidence. |
-| 5:28 | caption | Warranty policies are configuration: coverage, grace periods, exclusions and rule severity, with version history. |
-| 5:37 | caption | Models: both installed with versions; the Teachable Machine export is installed and evaluated here. |
-| 5:42 | caption | The audit trail records every login, upload, prediction, decision and override. |
-| 5:48 | caption | Access control: roles, record scopes, invitations and blocked attempts. |
-| 5:51 | **PART 7 Beyond the requirements** (title card) | Part 7: Beyond the requirements. What-if simulation, batch evaluation, explainability, policy versioning, input safety and a public model card. |
-| 5:57 | caption | What-if simulator: try a stricter confidence threshold on all 225 stored test decisions before changing it. |
-| 6:03 | caption | The automation rate, review load and accuracy update instantly; nothing is saved until Apply. |
-| 6:09 | caption | Batch evaluation: upload claim records and run them through the real pipeline, chunk by chunk. |
-| 6:25 | caption | 30 unseen test claims evaluated: accuracy against the labels, with a downloadable CSV. |
-| 6:35 | caption | Explainability: which inputs moved the Python model, and which card tiles drove the image model. |
-| 6:41 | caption | Policy changes are previewed and versioned; a change to a limit shown on the card warns that the image model needs retraining. |
-| 6:47 | caption | Input safety: names take no digits, phone numbers take no letters; checked in the browser and on the server. |
-| 6:58 | caption | Sign-in protection: five wrong passwords pause the account for one minute, with a live countdown. |
-| 7:11 | caption | The public model card: both models' metrics, confusion matrices and errors, read from the evaluation files. |
-| 7:19 | caption | The technical blog, also published on Medium. |
-| 7:24 | **ASSUREX CLAIM ENGINE Two models. One rulebook.** (title card) | That is AssureX: two models, one rulebook, and a person whenever they are unsure. The Python model scores 89.3 percent and Teachable Machine 93.8 percent on 225 claims neither model saw in training, and the project is covered by 295 automated tests and 34 browser tests. Thank you for watching. |
-
-Recorded from the running application with both models installed (Python `v2.0.0`, Teachable Machine
-`gtm-514702678b8c`) on a freshly seeded database; every screen is the real application, nothing is mocked.
+| 0:05 | **Title card: Warranty claims, checked twice** | Hi, and welcome to Assure X, a warranty claim engine built for TechWiz 7. Every claim is checked twice: once by a Python machine learning model, and once by a Google Teachable Machine image model. A configurable warranty policy engine then turns those results into a decision, and whenever the system is unsure, a person decides. |
+| 0:30 | **PART 1 · The live check** | Let's start with the landing page, and its live check. |
+| 0:37 | The live check runs a real sample claim through the whole pipeline | Right on the home page, this live check runs a real sample claim through the complete pipeline, the same code the product uses. |
+| 0:45 | Clean fault: both models say Valid, no rule blocks it, so the claim is Likely Valid | Here's a clean fault. Both models predict Valid Claim, and no warranty rule blocks it, so the recommendation is Likely Valid. |
+| 0:56 | Liquid damage: an excluded cause confirmed by a technician gives Likely Invalid | Now liquid damage. That cause is excluded by the policy, and a technician confirmed it, so a hard-fail rule makes it Likely Invalid. |
+| 1:08 | Filed four days into the grace period: Uncertain Result, so a person reviews it | And this one was filed four days into the grace period. Confidence drops, the result is uncertain, so the claim goes to a person instead of being auto-decided. |
+| 1:22 | Behind the card: two models feed the decision core, the policy engine and the outcome | Behind the card, you can see the flow: the Python model and the vision model feed a decision core, which applies the warranty policy and produces the outcome. |
+| 1:33 | **PART 2 · Customer journey** | Part two: the customer journey. We'll register, add a product with O C R, and file a claim from start to finish. |
+| 1:44 | User registration: every field is validated in the browser and on the server | First, a new customer creates an account. Every field is validated, both in the browser and again on the server. |
+| 1:56 | Sign in with the new account | Now we sign in with the new account. |
+| 2:01 | The customer dashboard: products, warranties, claims and pending actions | This is the customer dashboard. Products, warranties, claims, and anything waiting on the customer, all in one place. |
+| 2:11 | Product registration: upload the purchase receipt and OCR reads it | To register a product, the customer simply uploads the purchase receipt, and O C R reads it. |
+| 2:18 | OCR fills in product, model, serial number, purchase date, price, retailer and invoice number | In a moment, the product name, model, serial number, purchase date, price, retailer and invoice number are all filled in automatically. |
+| 2:28 | The customer checks each extracted field before saving | The customer checks each extracted field before anything is saved. |
+| 2:36 | The category sets the warranty length: standard or extended cover | The category sets the warranty length, with standard or extended cover. |
+| 2:44 | The product and its warranty: coverage dates, status and documents | And here's the registered product, with its warranty coverage dates, status and documents. |
+| 2:52 | Claim creation: choose the product | Now let's file a claim. Step one: choose the product. |
+| 2:58 | Fault details: category, cause, start date and a description | Step two: the fault. Its category, the cause, when it started, and a short description. |
+| 3:06 | Upload the receipt: it is read again and compared with the registered product | Step three: documents. The receipt is read again, and compared with the product on record. |
+| 3:13 | OCR check: the serial number on the receipt matches the registered product | The serial number on the receipt matches the registered product, so this check passes. |
+| 3:19 | Supporting evidence: warranty card, damage photo and serial-number photo | We add the supporting evidence: the warranty card, a photo of the damage, and a photo of the serial number. |
+| 3:28 | Review the claim, then submit | Finally, a quick review, and we submit. |
+| 3:37 | **PART 3 · The decision** | Part three: the decision. This is the heart of the system. |
+| 3:44 | The verdict: the recommendation, both models and the consistency check | Within a couple of seconds, the claim is decided. At the top is the recommendation, and the time the whole pipeline took. |
+| 3:53 | Python model: confidence for Valid, Invalid and Manual Review | On the left is the Python model. The claim's data is pre-processed into features, and the model gives a confidence for each of the three classes. |
+| 4:04 | Teachable Machine: classifies the Claim Summary Card, with its own three confidences | On the right is Google Teachable Machine. It classifies an image, the Claim Summary Card, and gives its own three confidences. |
+| 4:14 | Comparison: do the classes match, the confidence difference, and the consistency status | In the middle, the two models are compared: do the predicted classes match, how far apart are their confidences, and are they consistent? |
+| 4:25 | Why this decision: the warranty rules and the decision-table row that matched | Below that, why this decision. Every warranty rule from the category policy is listed, with the decision table row that matched. |
+| 4:35 | What moved the Python model: each input's effect on the prediction | For explainability, this shows which inputs moved the Python model, and by how much. |
+| 4:42 | What the image model saw: claim facts only, never a prediction or a decision | And this is exactly what the image model saw. The card shows claim facts only, never a prediction or a decision. The shaded tiles show which parts drove its answer. |
+| 4:57 | Claim status tracking: eight stages from filing to closing | The customer can track the claim through eight stages, from filing to closing. |
+| 5:05 | Report generation: a PDF with the claim, evidence, both predictions, rules and decision | And with one click, a P D F report is generated, with the claim, the evidence, both predictions, the rules and the decision. |
+| 5:14 | **PART 4 · Demonstration cases** | Part four: the demonstration cases. Valid, invalid, manual review, missing documents, contradictions, a boundary date, and a model disagreement. |
+| 5:37 | Valid claim: both models agree Valid and no rule blocks it: Likely Valid | A valid claim. Both models agree it's valid, no rule blocks it, so it's Likely Valid. |
+| 5:47 | Invalid claim: a hard-fail warranty rule decides it: Likely Invalid | An invalid claim. A hard-fail warranty rule decides it, so it's Likely Invalid. |
+| 5:57 | Manual-review claim: a manual-review rule sends it to a person | A manual review claim. A review rule fires, so a person has to look at it. |
+| 6:05 | Missing documents: the mandatory receipt is missing, so the claim waits | Missing document detection. The mandatory receipt isn't there, so the claim waits for more information, and the customer is told exactly what's needed. |
+| 6:20 | Contradiction detection: conflicting evidence sends the claim to review | Contradiction detection. The dates and the evidence don't agree with each other, so the claim is routed to review. |
+| 6:32 | Boundary case: filed four days into a seven-day grace period | A tricky boundary case. It was filed four days into a seven-day grace period. The confidence is low, so the result is uncertain. |
+| 6:46 | Model disagreement: Python says Invalid, Teachable Machine says Valid, so a person decides | And a model disagreement. Python says invalid, Teachable Machine says valid. When the models disagree, the system never guesses. A person decides. |
+| 6:58 | **PART 5 · Manual review** | Part five: manual review. |
+| 7:11 | The reviewer queue: filters, risk levels and waiting time | Claims that need a person land in the reviewer's queue, with filters and risk levels. |
+| 7:19 | The workbench: evidence, both models' scores and the warranty facts side by side | Let's open the disagreement case. The workbench puts the evidence, both models' scores and the warranty facts side by side. |
+| 7:31 | Approve with a written comment, and a written reason for the override | The reviewer approves it, and writes a comment. Because this overrides the automated result, a written reason is required. |
+| 7:42 | The decision is recorded, the customer is notified and the status changes | The decision is recorded, the customer is notified, and the claim's status changes. The override is kept in the audit trail. |
+| 7:51 | **PART 6 · Administration** | Part six: administration. |
+| 8:05 | Administrator dashboard: claims, automation rate, model agreement and workload | The administrator dashboard shows claim volume, the automation rate, model agreement and the review workload. |
+| 8:15 | Charts: claims per week, recommendations, model agreement and confidence | The charts break down claims per week, recommendations, model agreement and confidence. |
+| 8:24 | Analytics: frequent faults, rejection reasons, category trends and model evidence | Analytics shows the most frequent faults, the reasons claims are rejected, trends per category, and the evidence for both models. |
+| 8:35 | Warranty policies are configuration: coverage, grace periods, exclusions and rule severity | Warranty policies are configuration, not code. Coverage, grace periods, excluded causes and rule severity can all be changed here, with version history. |
+| 8:48 | Models: both installed with versions; the Teachable Machine export is uploaded and evaluated here | On the models page, both models are installed with their versions. A new Teachable Machine export can be uploaded and evaluated right here. |
+| 9:00 | The audit trail: every login, upload, prediction, decision and override | The audit trail records every login, upload, prediction, decision and override. |
+| 9:08 | Access control: roles, record scopes, invitations and blocked attempts | And access control manages roles, which records each role can see, invitations, and blocked attempts. |
+| 9:16 | **PART 7 · Beyond the requirements** | Part seven: going beyond the requirements. |
+| 9:24 | What-if simulator: try a stricter threshold on 225 stored test decisions | The what-if simulator lets an administrator try a stricter confidence threshold on all 225 stored test decisions, before changing anything. |
+| 9:35 | Automation rate, review load and accuracy update instantly; nothing is saved until Apply | Watch the automation rate, the review load and the accuracy update instantly. Nothing is saved until you press apply. |
+| 9:45 | Batch evaluation: run uploaded claim records through the real pipeline | Batch evaluation runs a file of claim records through the real pipeline, chunk by chunk. |
+| 9:53 | 30 unseen test claims evaluated: accuracy against the labels, with a downloadable CSV | Thirty unseen test claims, evaluated, with accuracy against their labels, and a downloadable C S V. |
+| 10:03 | Policy changes are previewed and versioned before they apply | Policy changes are previewed and versioned. And if a change affects a limit shown on the card, the system warns that the image model needs retraining. |
+| 10:16 | Input safety: names take no digits and phone numbers take no letters | Input safety: names can't contain digits, and phone numbers can't contain letters. This is enforced in the browser and on the server. |
+| 10:27 | Sign-in protection: five wrong passwords pause the account for one minute | Sign-in is protected too. After five wrong passwords, the account is paused for one minute, with a live countdown. |
+| 10:38 | The public model card: metrics, confusion matrices and errors for both models | Finally, the public model card. Both models' metrics, confusion matrices and errors, read directly from the evaluation files. |
+| 10:49 | The technical blog, also published on Medium | And there's a technical blog explaining how it was built, also published on Medium. |
+| 10:58 | **Closing card: Two models. One rulebook.** | The Python model reaches eighty-nine point three percent, and Teachable Machine ninety-three point eight percent, on two hundred and twenty-five unseen test claims. Backed by two hundred and ninety-five automated tests. Two models, one rulebook, and a person whenever it matters. Thank you for watching. |

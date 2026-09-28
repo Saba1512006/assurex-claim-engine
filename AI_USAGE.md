@@ -83,6 +83,7 @@ who verified it:
 | Chart.js, Bootstrap Icons, Alpine.js (CSP build), IBM Plex fonts | Front-end libraries and fonts, self-hosted in `static/vendor/` |
 | Playwright, axe-core (axe-playwright-python), Lighthouse | Browser testing, accessibility and performance audits (development only) |
 | Mermaid | Rendering the report diagrams from `documentation/diagrams/*.mmd` |
+| Kokoro text-to-speech (open-source, voice `af_heart`) | English narration of the demonstration video, generated from the script in `documentation/DEMO_VOICEOVER.md`; the team wrote and checked the script against the application |
 
 Images: the demo "damage" and "serial" photos created by `database/seed.py` are synthetic drawings made
 with Pillow, labelled as such on the image. No AI-generated imagery is used in the application.
