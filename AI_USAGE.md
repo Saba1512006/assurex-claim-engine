@@ -45,6 +45,18 @@ decision table running inside this application. No external AI API is called at 
 | What it did **not** do | Change the Claim Summary Card design or either model (tests re-render the test cards and fail if Teachable Machine accuracy could drop; the batch evaluator reproduces 89.3% and 93.8% on the test split); decide any claim at runtime |
 | Testing performed by the tool | 225 automated tests including a route × role matrix over every guarded route; 13 browser journeys on a live seeded server with axe-core accessibility checks on 21 pages; Lighthouse on the public pages; screenshots at 1440, 1024 and 390 px |
 
+## 2c. Claude Code (Anthropic) — styling pass, input rules and deployment fixes
+
+| Field | Declaration |
+|---|---|
+| Tool | Claude Code (Anthropic), an AI coding assistant |
+| Date | 27–28 September 2026 |
+| Purpose | Visual polish requested by the team, form input rules, sign-in lockout countdown, landing-page hero background, dependency fixes for deployment, and updating the documentation to the final state |
+| Prompt / type of assistance | The team's instructions, given one change at a time (for example "no numbers in name fields", "show a timer when sign-in is locked", "premium navbar and footer", "preloader like the logo"). Code generation, CSS, tests, browser screenshots, running the test suites |
+| Files / modules affected | `templates/` (navbar, footer, base, landing, auth, dashboards, claim detail, workbench, notifications), `static/css/`, `static/js/` (`app.js`, `instrument.js`, `hero_engine.js`, `hero_engine_math.js`), `static/img/brand/`, `src/rules/validator.py`, `src/api/auth.py`, `src/api/access.py`, `src/api/products.py`, `src/app.py`, `config/rbac.json` (lockout minutes), `requirements.txt`, `tests/` (`test_input_rules.py`, `test_hero_engine_math.py`, `tests/js/`, `tests/e2e/test_hero_engine.py`), README and `documentation/` |
+| What it did **not** do | Change either model, the dataset or the Claim Summary Card (the accuracy guards re-score both models on every test run: 89.3% and 93.8%); decide any claim at runtime |
+| Testing performed by the tool | 295 automated tests and 34 browser tests (overlap, contrast and pixel checks of the hero background at five widths, input rules, lockout countdown, accessibility with axe) |
+
 ### Required team entries (SRS: modifications, testing and verifier name)
 
 The SRS requires the **team** to review, modify, test and understand AI output, and to name the member
@@ -61,6 +73,7 @@ written on the team's behalf:
 | Security & access control (`src/security/`, `config/rbac.json`) | | | |
 | Web interface (`templates/`, `static/`) | | | |
 | Frontend rebuild features (verdict, workbench, what-if, batch, model card) | | | |
+| Styling pass, input rules, lockout countdown, hero background (27–28 Sept) | | | |
 | Documentation & report | | | |
 
 ## 3. Other tools

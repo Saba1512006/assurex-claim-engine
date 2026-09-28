@@ -1,7 +1,54 @@
 # Development log (SRS §1.8 item 3)
 
 Entries record work completed, problems encountered, model failures, changes made and tests performed.
-Earlier days are in the Git history; team members should add their own entries below.
+They are written from the Git history (`git log`); team members can add their own notes under each day.
+
+## Commit activity by day
+
+| Day | Commits | Accounts |
+|---|---|---|
+| 23 September 2026 | 3 | Muhammad Sami |
+| 24 September 2026 | 18 | Muhammad Sami |
+| 25 September 2026 | 15 | Muhammad Sami |
+| 26 September 2026 | 19 | Muhammad Sami (13), Saba1512006 (6) |
+| 27 September 2026 | 59 | Saba1512006 |
+| 28 September 2026 | 6 | Muhammad Sami (3), Saba1512006 (3) |
+
+## 23 September 2026 — first working version
+
+**Work completed**
+- Deployment files (gunicorn, Procfile, `render.yaml`); architecture diagram; database state synced.
+- Product lookup mismatch fixed in the claim wizard; document upload inside the wizard.
+- LICENSE, the `sample_claims/` suite, screenshots and export fixes; password confirmation on sign-up.
+
+## 24 September 2026 — SRS functional requirements
+
+**Work completed**
+- Multi-role registration, profile management and navigation (SRS 1.6 i–ii); product registration and the
+  common warranty interface (iii–iv); receipt/invoice upload and OCR extraction (v–vi); extracted-data
+  verification and warranty tracking (vii–viii); expiry alerts and claim registration by staff and users
+  (ix–x); claim information, fault evidence upload and repair history (xi–xiii).
+- Document organisation, data validation and pre-processing (xiv–xvi); algorithm comparison on the admin
+  dashboard (xviii); Claim Summary Card endpoint, Teachable Machine preview and prediction comparison UI.
+- Confidence comparison with consistency thresholds; the warranty rule set; multi-category policies,
+  serial verification from four sources and contradiction detection; missing-document and duplicate checks.
+
+**Problems encountered and fixed**
+- Quick-login reference error; a Jinja2 syntax error in the claim inspection page; demo claims not kept for
+  the reviewer workbench; test clean-up leaking between tests.
+
+## 25 September 2026 — decisions, dashboards and deployment fixes
+
+**Work completed**
+- Claim summary, preparation assistance and the final decision engine; decision explanation, manual-review
+  workflow and reviewer override audit trail; claim tracking and notifications; admin duplicate alerts,
+  search and analytics; reporting and audit coverage; model version tracking and error handling.
+- UI clean-up (navbar, signed-in welcome card, user-facing labels).
+
+**Problems encountered and fixed**
+- PythonAnywhere startup failures: a missing `typing.Any` import and the `reportlab` import at start-up.
+- Cross-platform model loading; strict OCR receipt validation (unreadable invoice images refused); a
+  500 error in the intake wizard; OCR mock fallback.
 
 ## 26 September 2026 — v2 upgrade (AI-assisted, see AI_USAGE.md)
 
@@ -74,5 +121,60 @@ Earlier days are in the Git history; team members should add their own entries b
   disagree.
 - Teachable Machine error analysis: 12 of its 14 test errors are deliberately flipped labels.
 
-**Open items**
-- Republish the blog; redeploy and re-seed the live site; complete the team rows in `AI_USAGE.md`.
+
+## 27 September 2026 — frontend rebuild, styling and input rules (AI-assisted, see AI_USAGE.md)
+
+**Work completed**
+- Teachable Machine v3 results recorded (93.8% test accuracy) with evaluation screenshots, misclassified
+  samples and the comparison report; accuracy guards for both models in the test suite; technical blog
+  published on Medium and linked; seeded model-disagreement case; demo video script.
+- Frontend rebuilt from the team's written brief: design tokens and app shell, verdict screen with agreement
+  meter, landing live bench, model card, claim wizard with autosave and OCR split view, reviewer workbench,
+  admin overview, what-if simulator, batch evaluator, policy editor with history, analytics, audit, access
+  and models pages.
+- Styling pass: premium navbar, sign-in and register with the card scanner, dashboards with KPI cards and
+  validated chart colours, claim detail and workbench, new AssureX logo, footer, back-to-top button, animated
+  preloader, and a hero engine background that follows the live check.
+- Input rules on every form: no digits in names, cities, brands or retailers; no letters in phone or number
+  fields; strict email format — enforced in the browser and on the server.
+- Sign-in pause shortened to one minute after five wrong passwords, with a live countdown on the sign-in and
+  rate-limit pages.
+
+**Problems encountered and fixed**
+- The Notifications item in the account menu opened the profile page; the account menu did not scroll on
+  short screens; the admin menu had lost the Models, What-if and Batch links.
+- Training-card download failed on Windows.
+- A blurred, translucent card over the animated background made the live check slow enough to fail its browser
+  test; the blur was removed.
+- The rate-limit (5 per minute) message conflicted with the "15-minute lockout" hint; both now say one minute.
+
+**Tests performed**
+- 295 automated tests and 34 browser tests (route × role matrix, accessibility with axe, no overlap of the
+  hero background with text at five screen widths, text contrast, input rules and lockout countdown).
+
+## 28 September 2026 — deployment
+
+**Work completed**
+- Live check card height and hero padding tuned on the landing page (Muhammad Sami).
+- Requirements: `tflite-runtime` on Linux and `ai-edge-litert` on Windows (Muhammad Sami).
+- The rate-limit page made compatible with older Flask-Limiter releases; scikit-learn pinned back to 1.9.1
+  so the saved Python model loads (Saba1512006). Work from a separate fork was merged into the main
+  repository.
+
+**Problems encountered**
+- On the PythonAnywhere free account both models showed as *Unavailable*: the account runs Python 3.10,
+  whose newest scikit-learn (1.7.2) cannot load the model trained with 1.9.1, and the TFLite runtime was
+  not installed. Creating a Python 3.11 virtualenv failed on the account's system image, and installing the
+  TFLite runtime hit the 512 MB disk quota.
+- Render needed a payment card even for the free instance, so it was not used.
+- Claims on the live site therefore go to manual review (the designed fallback). The full pipeline runs
+  locally with the pinned requirements; see *Known limitations* in the README.
+
+**Tests performed**
+- 295 automated tests and 34 browser tests pass locally with Python 3.11 and scikit-learn 1.9.1
+  (`reports/test_results.txt`).
+
+## Open items
+- Record and link the demonstration video (.mp4).
+- Complete the team rows in `AI_USAGE.md` and `documentation/TEAM_CONTRIBUTIONS.md`.
+- Add the Teachable Machine project link to `documentation/GTM_EVIDENCE.md`.

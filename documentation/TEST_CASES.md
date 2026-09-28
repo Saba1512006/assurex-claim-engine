@@ -1,6 +1,6 @@
 # Test cases (SRS deliverable 8)
 
-Run everything: `python -m pytest -q` → **226 passed** (about 80 s); the browser suite `python -m pytest -m e2e tests/e2e` → **13 passed** (about 70 s). Every test is automated; the table
+Run everything: `python -m pytest -q` → **295 passed** (about 60 s); the browser suite `python -m pytest -m e2e tests/e2e` → **34 passed** (about 140 s). Every test is automated; the table
 maps each SRS test category to the functions that cover it (`file :: function`).
 
 | SRS category | What is checked | Tests |
@@ -31,6 +31,8 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 | **Frontend contracts** | Stored verdict payload complete and consistent (fixed class order, scores sum to 1, decision re-derivable); JSON envelope and error codes; cross-customer 404 on every claim URL; verdict animates once; no `\|safe` on data, inline styles or un-nonce'd scripts in any template; icon subset complete | `test_frontend_contracts :: *` |
 | **Live bench, what-if, batch** | Demo endpoint runs the real pipeline, writes nothing, 400 on unknown cases, 429 on the 11th call; what-if is read-only, reproduces all 225 stored decisions at current thresholds, apply saves a new audited version; batch validates rows, runs a chunk per call, writes no claims, exports CSV, 429 on the 4th upload | `test_frontend_contracts :: test_demo_*, test_what_if_*, test_batch_*` |
 | **Wizard autosave and workbench** | Draft created once and reused on submit; another customer's draft is never reused; workbench only for reviewers, next-claim order, decisions return to the workbench through the open-redirect guard | `test_frontend_contracts :: test_wizard_autosave_*, test_workbench_*` |
+| **Input rules** | Names, cities, brands, retailers and providers take no digits; phone numbers take no letters; emails are well formed (server-side, 20+ good/bad cases); malformed login email is refused without counting as an attempt; the account pauses for one minute after five wrong passwords and the page counts down; the rate-limit page shows a countdown | `test_input_rules :: *` |
+| **Hero engine (landing)** | Layout math (zone inflation, Bézier–rect intersection, rerouting, tiers, outcome mapping) as Node unit tests; in the browser: no engine part overlaps text or the card at 1440/1280/1024/768/390 px, foreground opacity stays 1, text contrast ≥ 4.5:1 over the rendered background, foreground pixels identical with and without the layer, the lit outcome follows the live check, reduced motion is still | `test_hero_engine_math :: *` (runs `tests/js/*.test.mjs`), `tests/e2e/test_hero_engine.py :: *` |
 | **Browser journeys (e2e)** | Landing bench, persona sign-in, receipt prefill, wizard with OCR split view, reviewer keyboard flow and double-submit guard, what-if and batch, session revoked on role change, reduced motion, 390 px without sideways scroll, axe WCAG 2 A/AA on 21 pages; any console error fails the test | `tests/e2e/test_journeys.py :: *` |
 
 ## Hidden-test readiness checklist
@@ -43,7 +45,7 @@ maps each SRS test category to the functions that cover it (`file :: function`).
 - [x] Rules, thresholds and routing are configuration, editable in the admin UI and validated on save.
 - [x] A missing or broken model can never crash a request or silently decide a claim.
 - [x] Every prediction is stored with both model versions, the card hash and the decision trace.
-- [x] 226 tests pass on a clean checkout (`python -m pytest -q`), and the 13 browser journeys pass (`python -m pytest -m e2e tests/e2e`).
+- [x] 295 tests pass on a clean checkout (`python -m pytest -q`), and the 34 browser tests pass (`python -m pytest -m e2e tests/e2e`).
 
 ## Manual checks performed
 

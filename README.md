@@ -43,7 +43,7 @@ python database/seed.py             # creates the database + demo data, writes .
 python src/app.py                   # http://127.0.0.1:5000
 ```
 
-Run the tests: `python -m pytest -q` (226 tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
+Run the tests: `python -m pytest -q` (295 tests, plus 34 browser tests; latest results in [`reports/test_results.txt`](reports/test_results.txt)).
 Browser suite (13 journeys with accessibility checks):
 `pip install -r requirements-dev.txt && python -m playwright install chromium && python -m pytest -m e2e tests/e2e`.
 Production: `gunicorn wsgi:app` (Render uses `render.yaml`; PythonAnywhere's WSGI file imports `application`
@@ -51,7 +51,7 @@ from `wsgi.py`). Set `SECRET_KEY` in the environment — the app refuses to star
 
 ### Testing the deployed application
 
-1. Open https://assurexai.pythonanywhere.com. **Try a real claim** on the landing page runs three sample
+1. Open https://assurex.pythonanywhere.com. **Try a real claim** on the landing page runs three sample
    claims through both models and the rules live, without signing in. **Model card** shows how both models
    were measured.
 2. **Sign in**: one click on an evaluator account on the sign-in page.
@@ -249,10 +249,14 @@ documentation/     project report, blog, evidence, installation, test cases, dia
   the details. PDF receipts with a text layer are read without Tesseract.
 * SQLite is the default database; use `DATABASE_URL` (e.g. PostgreSQL) and a shared rate-limit store
   (`RATELIMIT_STORAGE_URI`) for multi-worker production.
+* The saved Python model needs scikit-learn 1.9.1, which needs Python 3.11 or newer. The PythonAnywhere
+  free account used for the live demo runs Python 3.10 (scikit-learn ≤ 1.7.2) with a 512 MB disk quota, so
+  both models can show as *Unavailable* there and claims then go to manual review, as designed. The full
+  pipeline runs locally with the pinned requirements (Python 3.11, see `documentation/INSTALLATION.md`).
 
 ## Links
 
-* Live deployment: https://assurexai.pythonanywhere.com (redeploy and re-seed after pulling this version)
+* Live deployment: https://assurex.pythonanywhere.com (see *Known limitations* for the free-tier model runtime)
 * Demonstration video (.mp4): *to be added* — recording script in [`documentation/DEMO_VIDEO_SCRIPT.md`](documentation/DEMO_VIDEO_SCRIPT.md)
 * Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))

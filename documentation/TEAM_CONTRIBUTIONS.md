@@ -8,8 +8,11 @@ the team** — it is the team's own statement of who did what, so it is delibera
 
 | GitHub account | Commits |
 |---|---|
-| sami2515 (Muhammad Sami) | 49 |
-| Saba1512006 (Saba Noor) | 15 |
+| Saba1512006 (Saba Noor) | 68 |
+| sami2515 (Muhammad Sami) | 52 |
+
+Counted on 28 September 2026 (120 commits, 23–28 September); per-day activity is in
+`documentation/DEVELOPMENT_LOG.md`.
 
 Regenerate before submitting: `git shortlog -sne main`. Every member should have commits under their own
 account.

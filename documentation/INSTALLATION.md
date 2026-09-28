@@ -70,11 +70,15 @@ Without Tesseract, image receipts are still accepted and the user types the deta
 ```bash
 python src/app.py                     # development server: http://127.0.0.1:5000
 gunicorn wsgi:app --workers 2         # production (Linux/macOS)
-python -m pytest -q                   # 199 automated tests
+python -m pytest -q                   # 295 automated tests (+ 34 browser tests: -m e2e tests/e2e)
 ```
 
 PythonAnywhere: point the WSGI file at the project and `from wsgi import application`; set `SECRET_KEY`
-in the WSGI file or a `.env`, then run `python database/seed.py --if-empty` once in a console.
+in the WSGI file or a `.env`, then run `python database/seed.py --if-empty` once in a console. Use a
+**Python 3.11** web app and virtualenv: the saved Python model needs `scikit-learn==1.9.1`, which is not
+published for Python 3.10. On Linux the image model needs `ai-edge-litert` or `tflite-runtime`. Free
+accounts have a 512 MB disk quota; install with `pip install --no-cache-dir` and keep `numpy<2` if the
+system packages were built against NumPy 1.x.
 Render: `render.yaml` builds, seeds an empty database and generates `SECRET_KEY` automatically.
 
 ## Folder setup
@@ -88,7 +92,7 @@ Everything needed is in the repository. Created at runtime: `data/uploads/` (doc
 |---|---|
 | `RuntimeError: SECRET_KEY is not set` | Run `python database/seed.py` once, or set `SECRET_KEY` |
 | Sign-in works but you're immediately signed out (local http) | Use `python src/app.py` (it disables the secure-cookie flag for http). Behind https nothing needs changing. |
-| “Python model could not be loaded” | Install the pinned `scikit-learn==1.9.1`, or retrain with `python notebooks/train_python_v2.py` |
+| “Python model could not be loaded” / models *Unavailable* on the live site | Install the pinned `scikit-learn==1.9.1` (Python 3.11+), or retrain with `python notebooks/train_python_v2.py` |
 | Every claim ends in Manual Review | The Teachable Machine model isn't installed yet (Admin › Models shows the status) |
 | “No TensorFlow Lite runtime installed” | `pip install ai-edge-litert` (or `tflite-runtime` / `tensorflow`) |
 | Receipt photo: “no text found” | Install Tesseract or upload a PDF; you can also enter the details by hand |

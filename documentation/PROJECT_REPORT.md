@@ -318,12 +318,12 @@ noisy labels — i.e. the combination is sound once the second model is in place
 
 ## 31. Testing strategy
 
-225 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
+295 automated pytest tests across unit (rules, detectors, OCR patterns, consistency, RBAC policy),
 integration (full HTTP journeys through the real app, DB and file store), boundary, negative, security,
 database, model and demonstration cases; surprise-modification scenarios are tests too. A generated route ×
 role matrix calls every guarded route (68 route/method pairs) as each role and signed out and compares the
 answer with `config/rbac.json`. Accuracy guards re-render the test cards with the current code and fail if
-the image model's accuracy could drop. A separate browser suite (`python -m pytest -m e2e tests/e2e`, 13
+the image model's accuracy could drop. A separate browser suite (`python -m pytest -m e2e tests/e2e`, 34
 tests) runs the main journeys on a live seeded server with the real models, checks accessibility with axe,
 keyboard use, reduced motion, phone width and session revocation, and fails on any console error. Catalogue:
 `documentation/TEST_CASES.md`; screenshots in `docs/screenshots/`.
@@ -332,7 +332,8 @@ keyboard use, reduced motion, phone width and session revocation, and fails on a
 
 Deny-by-default RBAC with record scopes and separation of duties; out-of-scope records return 404; user
 state reloaded per request with session versioning (role change/disable signs out everywhere); idle timeout;
-generic login errors, five-attempt lockout, session rotation, rate-limited sign-in; public sign-up limited to
+generic login errors, five-attempt lockout (one minute, with a countdown on the sign-in page), session rotation,
+rate-limited sign-in; server-side input rules (no digits in names, no letters in phone numbers, strict email format); public sign-up limited to
 customers; forced password change for invited users; CSRF tokens on all forms; strict CSP, clickjacking and
 MIME-sniffing protection; uploads validated by magic bytes, stored under random names outside the web root
 and served only through permission checks; CSV formula-injection guard; parameterised queries via the ORM;
@@ -353,6 +354,8 @@ restrict database backups, and define a retention period for closed claims and u
 * Image OCR requires Tesseract on the server.
 * Duplicate text similarity is lexical (≥ 90% sequence match), not semantic.
 * SQLite and in-memory rate limits suit a single server; use PostgreSQL/Redis for multiple workers.
+* The saved Python model needs scikit-learn 1.9.1 (Python 3.11+). On the free PythonAnywhere account used for the
+  live demo (Python 3.10, 512 MB disk) the models can be unavailable, and claims then go to manual review.
 
 ## 35. Future enhancements
 

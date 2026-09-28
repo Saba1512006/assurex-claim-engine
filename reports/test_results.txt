@@ -1,10 +1,10 @@
 AssureX Claim Engine — automated test results
 Command : python -m pytest -q -rA
-Date    : 2026-09-27 (UTC)
+Date    : 2026-09-28 (UTC)
 Python  : 3.11.15 · scikit-learn 1.9.1 · Linux
-Result  : 226 passed, 13 deselected in 50.04s
+Result  : 295 passed, 34 deselected in 59.86s
 Browser : python -m pytest -m e2e tests/e2e -rA
-Result  : 13 passed in 69.56s (0:01:09)
+Result  : 34 passed in 140.65s (0:02:20)
 
 Per test (file :: test):
   PASSED tests/test_demonstration_cases.py::test_all_eleven_cases_present
@@ -74,6 +74,69 @@ Per test (file :: test):
   PASSED tests/test_frontend_contracts.py::test_icon_subset_contains_every_icon_the_app_uses
   PASSED tests/test_frontend_contracts.py::test_text_responses_are_gzipped_only_when_accepted
   PASSED tests/test_frontend_contracts.py::test_training_cards_zip_is_valid_and_its_temp_file_is_closed_after_sending
+  PASSED tests/test_hero_engine_math.py::test_hero_engine_layout_math
+  PASSED tests/test_input_rules.py::test_real_names_pass[Areeba Khan]
+  PASSED tests/test_input_rules.py::test_real_names_pass[Muhammad Ali Jr.]
+  PASSED tests/test_input_rules.py::test_real_names_pass[O'Brien]
+  PASSED tests/test_input_rules.py::test_real_names_pass[Anne-Marie Lee]
+  PASSED tests/test_input_rules.py::test_real_names_pass[Jos\xe9 N\xfa\xf1ez]
+  PASSED tests/test_input_rules.py::test_real_names_pass[\u0639\u0627\u0626\u0634\u06c1 \u062e\u0627\u0646]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[Areeba123]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[Ali 2]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[12345]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[Ali_Khan]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[Ali@Khan]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[A]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[-Ali]
+  PASSED tests/test_input_rules.py::test_names_with_digits_symbols_or_bad_length_fail[xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]
+  PASSED tests/test_input_rules.py::test_word_fields_accept_letters_and_punctuation[]
+  PASSED tests/test_input_rules.py::test_word_fields_accept_letters_and_punctuation[Karachi]
+  PASSED tests/test_input_rules.py::test_word_fields_accept_letters_and_punctuation[Metro Fix & Care (Pvt.) Ltd]
+  PASSED tests/test_input_rules.py::test_word_fields_accept_letters_and_punctuation[Saddar/Clifton]
+  PASSED tests/test_input_rules.py::test_word_fields_accept_letters_and_punctuation[Hi-Tech]
+  PASSED tests/test_input_rules.py::test_word_fields_refuse_digits_and_symbols[Karachi 75]
+  PASSED tests/test_input_rules.py::test_word_fields_refuse_digits_and_symbols[Store 1]
+  PASSED tests/test_input_rules.py::test_word_fields_refuse_digits_and_symbols[4U Mobiles]
+  PASSED tests/test_input_rules.py::test_word_fields_refuse_digits_and_symbols[Shop#]
+  PASSED tests/test_input_rules.py::test_word_fields_refuse_digits_and_symbols[-Store]
+  PASSED tests/test_input_rules.py::test_phones_pass[]
+  PASSED tests/test_input_rules.py::test_phones_pass[+92 300 1234567]
+  PASSED tests/test_input_rules.py::test_phones_pass[0300-1234567]
+  PASSED tests/test_input_rules.py::test_phones_pass[(042) 3576 1234]
+  PASSED tests/test_input_rules.py::test_phones_with_letters_or_wrong_length_fail[0300-12ab567]
+  PASSED tests/test_input_rules.py::test_phones_with_letters_or_wrong_length_fail[call me]
+  PASSED tests/test_input_rules.py::test_phones_with_letters_or_wrong_length_fail[+92 300 1234567 ext]
+  PASSED tests/test_input_rules.py::test_phones_with_letters_or_wrong_length_fail[123]
+  PASSED tests/test_input_rules.py::test_phones_with_letters_or_wrong_length_fail[1111111111111111]
+  PASSED tests/test_input_rules.py::test_product_form_refuses_digits_in_brand_retailer_and_provider
+  PASSED tests/test_input_rules.py::test_register_rejects_a_name_with_digits
+  PASSED tests/test_input_rules.py::test_profile_keeps_old_name_when_new_one_has_digits
+  PASSED tests/test_input_rules.py::test_invite_and_service_center_refuse_digits
+  PASSED tests/test_input_rules.py::test_good_emails_pass[name@example.com]
+  PASSED tests/test_input_rules.py::test_good_emails_pass[a.b+tag@mail.co.uk]
+  PASSED tests/test_input_rules.py::test_good_emails_pass[x_y-z@sub.domain.pk]
+  PASSED tests/test_input_rules.py::test_good_emails_pass[USER@EXAMPLE.ORG]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[plain]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@b]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@b.c]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a b@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@x..io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[.a@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a.@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a..b@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@-x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@x-.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@x.io.]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@x.1o]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a,b@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@x.io;b@y.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@x.io]
+  PASSED tests/test_input_rules.py::test_bad_emails_fail[a@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.io]
+  PASSED tests/test_input_rules.py::test_login_with_a_malformed_email_is_refused_without_counting
+  PASSED tests/test_input_rules.py::test_lockout_lasts_a_minute_and_the_page_counts_down
+  PASSED tests/test_input_rules.py::test_rate_limit_page_shows_a_countdown
   PASSED tests/test_ml_integrity.py::test_split_sizes_and_balance
   PASSED tests/test_ml_integrity.py::test_no_claim_in_two_splits
   PASSED tests/test_ml_integrity.py::test_card_mapping_respects_splits
@@ -111,6 +174,12 @@ Per test (file :: test):
   PASSED tests/test_ml_integrity.py::test_installed_teachable_machine_model_matches_its_evaluation
   PASSED tests/test_ml_integrity.py::test_teachable_machine_keeps_its_accuracy_on_freshly_rendered_cards
   PASSED tests/test_ml_integrity.py::test_exported_encoder_preprocessing_and_processed_data_match_the_model
+  PASSED tests/test_navigation.py::test_signed_in_person_can_open_the_website_and_stays_signed_in
+  PASSED tests/test_navigation.py::test_logo_and_account_menu_link_to_the_website
+  PASSED tests/test_navigation.py::test_signed_out_landing_still_offers_sign_in
+  PASSED tests/test_notifications.py::test_menu_link_opens_the_notifications_page
+  PASSED tests/test_notifications.py::test_lists_only_own_notifications_unread_first
+  PASSED tests/test_notifications.py::test_mark_read_from_the_page
   PASSED tests/test_pipeline.py::test_python_model_scores_all_three_classes
   PASSED tests/test_pipeline.py::test_without_teachable_machine_claim_goes_to_manual_review
   PASSED tests/test_pipeline.py::test_both_models_agree_valid_is_approved
@@ -235,6 +304,27 @@ Per test (file :: test):
   PASSED tests/test_workflow.py::test_excel_export_is_a_real_workbook_and_neutralises_formulas
 
 Browser journeys:
+  PASSED tests/e2e/test_hero_engine.py::test_engine_never_overlaps_the_foreground[1440-800]
+  PASSED tests/e2e/test_hero_engine.py::test_engine_never_overlaps_the_foreground[1280-720]
+  PASSED tests/e2e/test_hero_engine.py::test_engine_never_overlaps_the_foreground[1024-768]
+  PASSED tests/e2e/test_hero_engine.py::test_engine_never_overlaps_the_foreground[768-1024]
+  PASSED tests/e2e/test_hero_engine.py::test_engine_never_overlaps_the_foreground[390-844]
+  PASSED tests/e2e/test_hero_engine.py::test_foreground_keeps_full_opacity[1440-800]
+  PASSED tests/e2e/test_hero_engine.py::test_foreground_keeps_full_opacity[390-844]
+  PASSED tests/e2e/test_hero_engine.py::test_text_contrast_over_the_rendered_background
+  PASSED tests/e2e/test_hero_engine.py::test_foreground_pixels_are_identical_with_and_without_the_layer
+  PASSED tests/e2e/test_hero_engine.py::test_running_a_check_lights_the_matching_outcome
+  PASSED tests/e2e/test_hero_engine.py::test_reduced_motion_shows_a_still_diagram
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[idle-1440-800]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[idle-1280-720]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[idle-1024-768]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[idle-768-1024]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[idle-390-844]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[reduced-1440-800]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[reduced-1280-720]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[reduced-1024-768]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[reduced-768-1024]
+  PASSED tests/e2e/test_hero_engine.py::test_snapshots[reduced-390-844]
   PASSED tests/e2e/test_journeys.py::test_landing_bench_runs_the_real_pipeline
   PASSED tests/e2e/test_journeys.py::test_persona_sign_in_and_customer_dashboard
   PASSED tests/e2e/test_journeys.py::test_product_registration_reads_the_receipt
