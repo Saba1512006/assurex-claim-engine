@@ -27,6 +27,8 @@ policy, and a config-driven **decision table** turns all of it into *Likely Vali
 
 Who did what: [`documentation/TEAM_CONTRIBUTIONS.md`](documentation/TEAM_CONTRIBUTIONS.md).
 
+**Documentation:** everything the SRS asks for is collected in one document — [`documentation/AssureX_Project_Documentation.pdf`](documentation/AssureX_Project_Documentation.pdf) (also as [Word](documentation/AssureX_Project_Documentation.docx)).
+
 ![Architecture](documentation/diagrams/architecture.png)
 
 ---
@@ -280,7 +282,8 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 * Demonstration video (.mp4, 1080p, narrated): `demo_video/AssureX_Demo.mp4` in the submitted project folder, also downloadable from the repository: https://github.com/Saba1512006/assurex-claim-engine/blob/demo-video/AssureX_Demo.mp4 — chapters and narration script in [`documentation/DEMO_VOICEOVER.md`](documentation/DEMO_VOICEOVER.md)
 * Published blog (Medium): https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
 * Technical blog, current text: `/blog` in the app ([`documentation/TECHNICAL_BLOG.md`](documentation/TECHNICAL_BLOG.md))
-* Project report: [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
+* **Complete project documentation (every SRS deliverable in one document, 106 pages):** [`documentation/AssureX_Project_Documentation.pdf`](documentation/AssureX_Project_Documentation.pdf) · Word: [`documentation/AssureX_Project_Documentation.docx`](documentation/AssureX_Project_Documentation.docx) (rebuild: `python reports/build_documentation.py`)
+* Project report: [`reports/AssureX_Project_Report.pdf`](reports/AssureX_Project_Report.pdf) · source [`documentation/PROJECT_REPORT.md`](documentation/PROJECT_REPORT.md)
 * Installation & troubleshooting: [`documentation/INSTALLATION.md`](documentation/INSTALLATION.md)
 * Teachable Machine evidence: [`documentation/GTM_EVIDENCE.md`](documentation/GTM_EVIDENCE.md)
 * Test cases: [`documentation/TEST_CASES.md`](documentation/TEST_CASES.md) · results: [`reports/test_results.txt`](reports/test_results.txt)

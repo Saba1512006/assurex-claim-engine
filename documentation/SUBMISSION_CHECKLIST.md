@@ -4,11 +4,14 @@ Group **NN_DevStorm** · AssureX Claim Engine — NextWave AI and ML · Batch 26
 
 Each row follows SRS §1.10 *Project Deliverables* (items 1–16). Paths are relative to the project folder.
 
+**Start here:** `documentation/AssureX_Project_Documentation.pdf` contains every item below in 16 chapters (report, dataset, both models' evidence, comparison report, policies, test cases and results, installation, execution guide with screens, deployment, video, blog, security, AI usage, team record, this checklist).
+
 ## 16. Final submission checklist
 
 | SRS item | Where |
 |---|---|
-| Project report | `reports/AssureX_Project_Report.pdf` (source: `documentation/PROJECT_REPORT.md`) |
+| **Complete documentation (all deliverables in one file)** | `documentation/AssureX_Project_Documentation.pdf` (106 pages) and `.docx` — built by `python reports/build_documentation.py` |
+| Project report | `reports/AssureX_Project_Report.pdf` (source: `documentation/PROJECT_REPORT.md`); also chapter 1 of the complete documentation |
 | Public GitHub repository URL | https://github.com/Saba1512006/assurex-claim-engine |
 | Complete source code | `src/`, `templates/`, `static/`, `database/`, `config/`, `wsgi.py` |
 | Structured warranty claim dataset | `data/raw/common_warranty_claims_1500.csv`; splits `data/splits/{train,val,test}.csv` |

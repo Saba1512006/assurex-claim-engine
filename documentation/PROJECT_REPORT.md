@@ -188,7 +188,7 @@ plus a file store for documents and cards.
 
 ![Entity relationships](diagrams/erd.png)
 
-Fifteen tables. Key points: public identifiers (USR-, PRD-, CLM-, DOC-, EVL-) are random and unique;
+Sixteen tables. Key points: public identifiers (USR-, PRD-, CLM-, DOC-, EVL-) are random and unique;
 `claims` carries status, recommendation, decision rule and flags; `model_evaluations` stores the exact
 feature record, both predictions with all three confidences, model versions, card hash, thresholds and the
 decision trace — one row per run, never updated; `rule_validation_logs` stores every rule with its severity
