@@ -1,0 +1,25 @@
+AssureX Claim Engine — Deployment (Group NN_DevStorm)
+
+Public application URL:
+https://assurex.pythonanywhere.com
+
+Source code (public GitHub repository):
+https://github.com/Saba1512006/assurex-claim-engine
+
+Demonstration video (download):
+https://github.com/Saba1512006/assurex-claim-engine/blob/demo-video/AssureX_Demo.mp4
+
+Evaluator and administrator logins (demo data only):
+  Customer               customer@assurex.local     CustomerPass123!
+  Service-center staff   staff@assurex.local        StaffPass123!
+  Claim reviewer         reviewer@assurex.local     ReviewerPass123!
+  Administrator          admin@assurex.local        AdminPass123!
+
+Sample claim records: Source_Code/sample_claims/ (the 11 SRS demonstration cases); the seeded database
+contains the same eleven cases as real claims.
+
+Testing the application: see User_Guide.pdf, chapter 2 (Deployed application).
+
+Note: the free PythonAnywhere account runs Python 3.10 with a 512 MB disk quota, so both models can show as
+'Unavailable' there and claims then go to manual review. The full pipeline runs locally (Installation_Guide.pdf)
+and is shown working in Videos/Demonstration.mp4.

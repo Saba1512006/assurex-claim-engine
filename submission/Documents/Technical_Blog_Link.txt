@@ -1,0 +1,6 @@
+AssureX Claim Engine — Technical Blog (Group NN_DevStorm)
+
+Published blog (Medium):
+https://medium.com/@sabarajput672/building-assurex-two-models-one-rulebook-and-why-our-first-100-was-a-bug-bb8b9858b11c
+
+The same text is served by the application at /blog and kept in Source_Code/documentation/TECHNICAL_BLOG.md.

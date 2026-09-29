@@ -167,18 +167,20 @@ def policies_chapter() -> str:
     return "\n".join(parts)
 
 
-def comparison_chapter() -> str:
+def comparison_chapter(limit: int | None = 30) -> str:
     text = read("reports/model_comparison_report.md")
     text = text.split("## Per-claim results")[0]
     parts = [md(text, ROOT / "reports")]
     with open(ROOT / "reports/model_comparison_report.csv", encoding="utf-8") as f:
         rows = list(csv.reader(f))
     keep = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 18]
-    parts.append('<section class="wide"><h2>Per-claim results (first 30 of 225 unseen test claims)</h2>'
-                 "<p>All 225 claims with every column (warranty-rule result, missing documents, contradictions, "
-                 "duplicate indicators and the explanation of each disagreement) are in "
+    shown = rows[1:] if limit is None else rows[1:limit + 1]
+    title = f"all {len(shown)} unseen test claims" if limit is None else f"first {len(shown)} of {len(rows) - 1} unseen test claims"
+    parts.append(f'<section class="wide"><h2>Per-claim results ({title})</h2>'
+                 "<p>Every column, including the warranty-rule result, missing documents, contradictions, duplicate "
+                 "indicators and the explanation of each disagreement, is in "
                  "<code>reports/model_comparison_report.csv</code>.</p>")
-    parts.append(table([rows[0][i] for i in keep], [[r[i] for i in keep] for r in rows[1:31]], "tiny"))
+    parts.append(table([rows[0][i] for i in keep], [[r[i] for i in keep] for r in shown], "tiny"))
     parts.append("</section>")
     return "\n".join(parts)
 
@@ -247,7 +249,7 @@ def deployment_chapter() -> str:
               "| Health check | `/healthz` reports whether both models are loaded |\n"
               "| Free-tier limitation | The free PythonAnywhere account runs Python 3.10 with a 512 MB disk quota, so both "
               "models can show as *Unavailable* there and claims then go to manual review; the full pipeline runs "
-              "locally (chapter 8) and is shown in the demonstration video |\n\n"
+              "locally (see the installation instructions) and is shown in the demonstration video |\n\n"
               "## Testing the deployed application" + testing, ROOT)
 
 
@@ -307,39 +309,42 @@ section.wide { page: wide; break-before: page; }
 """
 
 
-def build_html() -> str:
-    chs = chapters()
-    team = table(["Student ID", "Name", "Role"], TEAM)
+ABSTRACT = (
+    "AssureX Claim Engine evaluates warranty claims for consumer electronics, home appliances and "
+    "industrial tools. A customer or service center registers a product from its receipt (read by OCR), files a "
+    "claim with evidence, and the application pre-processes the claim into model features. A calibrated Python "
+    "classification model (HistGradientBoosting, 89.3% test accuracy on 225 unseen claims) scores the structured "
+    "record; the same claim is drawn as a Claim Summary Card and classified by a Google Teachable Machine model "
+    "(93.8% test accuracy). The two predictions and their confidences are compared (Strong Match, Acceptable Match, "
+    "Weak Match, Model Disagreement, Uncertain Result), the category's warranty policy is executed from JSON "
+    "configuration, contradictions, missing documents and duplicates are detected, and a decision table produces "
+    "Likely Valid, Likely Invalid or Manual Review Required. Anything uncertain goes to a human reviewer, and every "
+    "step is recorded in an audit trail. The application has four roles (customer, service-center staff, claim "
+    "reviewer, administrator), 295 automated tests and 34 browser tests.")
+
+
+def build_html(chs=None, doc_title: str = "Project documentation", about: str | None = None) -> str:
+    """Cover, abstract, contents and numbered chapters as one printable HTML page."""
+    chs = chapters() if chs is None else chs
+    about = about or ("This document brings every deliverable of the SRS (§1.10) together: the project report, "
+                      "dataset, both models' evidence, the comparison report, warranty policies, test cases and "
+                      "results, installation and execution instructions with screens of the working application, "
+                      "deployment, the demonstration video, the technical blog, the AI usage declaration and the team "
+                      "contribution record.")
     cover = f"""<div class="cover">
 <div class="brand">APTECH LIMITED · NEXTWAVE AI AND ML</div>
 <h1 class="title">AssureX Claim Engine</h1>
-<div class="sub">Project documentation — warranty claims checked by a Python classification model, a Google
-Teachable Machine image model and a configurable warranty-rule engine</div>
+<div class="sub">{html.escape(doc_title)}</div>
 {table(["", ""], [("Group", "NN_DevStorm"), ("Batch", "2609E2'"), ("Faculty", "Sir Minhaj"),
                    ("Repository", REPO), ("Live application", "https://assurex.pythonanywhere.com"),
                    ("Date", date.today().strftime("%d %B %Y"))])}
-{team}
+{table(["Student ID", "Name", "Role"], TEAM)}
 </div>"""
-    abstract = md(
-        "## Abstract\n\nAssureX Claim Engine evaluates warranty claims for consumer electronics, home appliances and "
-        "industrial tools. A customer or service center registers a product from its receipt (read by OCR), files a "
-        "claim with evidence, and the application pre-processes the claim into model features. A calibrated Python "
-        "classification model (HistGradientBoosting, 89.3% test accuracy on 225 unseen claims) scores the structured "
-        "record; the same claim is drawn as a Claim Summary Card and classified by a Google Teachable Machine model "
-        "(93.8% test accuracy). The two predictions and their confidences are compared (Strong Match, Acceptable Match, "
-        "Weak Match, Model Disagreement, Uncertain Result), the category's warranty policy is executed from JSON "
-        "configuration, contradictions, missing documents and duplicates are detected, and a decision table produces "
-        "Likely Valid, Likely Invalid or Manual Review Required. Anything uncertain goes to a human reviewer, and every "
-        "step is recorded in an audit trail. The application has four roles (customer, service-center staff, claim "
-        "reviewer, administrator), 295 automated tests and 34 browser tests.\n\n"
-        "This document brings every deliverable of the SRS (§1.10) together: the project report, dataset, both "
-        "models' evidence, the comparison report, warranty policies, test cases and results, installation and "
-        "execution instructions with screens of the working application, deployment, the demonstration video, the "
-        "technical blog, the AI usage declaration and the team contribution record.", DOC)
-    toc = '<div class="toc"><h1>Contents</h1><ol>' + "".join(
-        f'<li><a href="#ch{i}">{html.escape(t)}</a></li>' for i, (t, _) in enumerate(chs, 1)) + "</ol></div>"
+    abstract = md(f"## Abstract\n\n{ABSTRACT}\n\n{about}", DOC)
+    toc = ('<div class="toc"><h1>Contents</h1><ol>' + "".join(
+        f'<li><a href="#ch{i}">{html.escape(t)}</a></li>' for i, (t, _) in enumerate(chs, 1)) + "</ol></div>") if len(chs) > 1 else ""
     body = "".join(f'<h1 id="ch{i}">{i}. {html.escape(t)}</h1>\n{h}\n' for i, (t, h) in enumerate(chs, 1))
-    return (f"<!doctype html><html><head><meta charset='utf-8'><title>AssureX Claim Engine — Project Documentation</title>"
+    return (f"<!doctype html><html><head><meta charset='utf-8'><title>AssureX Claim Engine — {html.escape(doc_title)}</title>"
             f"<style>{CSS}</style></head><body>{cover}{abstract}{toc}{body}</body></html>")
 
 
@@ -353,32 +358,39 @@ def _chromium(pw):
         raise
 
 
-def build() -> None:
+def render(page_html: str, out_pdf: Path, footer: str, out_docx: Path | None = None) -> None:
+    """Print the HTML to PDF with Chromium and, when LibreOffice is installed, convert it to Word."""
     from playwright.sync_api import sync_playwright
-    page_html = build_html()
+    out_pdf.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / "AssureX_Project_Documentation.html"
+        src = Path(tmp) / (out_pdf.stem + ".html")
         src.write_text(page_html, encoding="utf-8")
         with sync_playwright() as pw:
             b = _chromium(pw)
             pg = b.new_page()
             pg.goto(src.as_uri())
-            pg.pdf(path=str(OUT_PDF), prefer_css_page_size=True, print_background=True, display_header_footer=True,
+            pg.pdf(path=str(out_pdf), prefer_css_page_size=True, print_background=True, display_header_footer=True,
                    header_template="<span></span>",
                    footer_template='<div style="font-size:7pt;color:#64748b;width:100%;padding:0 16mm;display:flex;'
-                                   'justify-content:space-between"><span>AssureX Claim Engine — Project Documentation · '
+                                   f'justify-content:space-between"><span>AssureX Claim Engine — {html.escape(footer)} · '
                                    'Group NN_DevStorm</span><span>Page <span class="pageNumber"></span> of '
                                    '<span class="totalPages"></span></span></div>')
             b.close()
-        print("written", OUT_PDF, f"{OUT_PDF.stat().st_size / 1e6:.1f} MB")
+        print("written", out_pdf.relative_to(ROOT), f"{out_pdf.stat().st_size / 1e6:.1f} MB")
+        if out_docx is None:
+            return
         office = shutil.which("soffice") or shutil.which("libreoffice")
         if office:
             subprocess.run([office, "--headless", "--convert-to", "docx:MS Word 2007 XML", "--outdir", tmp, str(src)],
                            check=True, capture_output=True, timeout=600)
-            shutil.copy(Path(tmp) / "AssureX_Project_Documentation.docx", OUT_DOCX)
-            print("written", OUT_DOCX, f"{OUT_DOCX.stat().st_size / 1e6:.1f} MB")
+            shutil.copy(Path(tmp) / (out_pdf.stem + ".docx"), out_docx)
+            print("written", out_docx.relative_to(ROOT), f"{out_docx.stat().st_size / 1e6:.1f} MB")
         else:
             print("LibreOffice not found: Word file skipped")
+
+
+def build() -> None:
+    render(build_html(), OUT_PDF, "Project Documentation", OUT_DOCX)
 
 
 if __name__ == "__main__":

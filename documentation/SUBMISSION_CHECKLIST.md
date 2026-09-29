@@ -62,6 +62,24 @@ Each row follows SRS §1.10 *Project Deliverables* (items 1–16). Paths are rel
   can show as *Unavailable* there and claims then go to manual review. The full pipeline runs locally
   (`documentation/INSTALLATION.md`) and is shown working in the demonstration video.
 
+## Submission package (faculty layout)
+
+```
+AssureX-Claim-Engine-Submission/
+├── Source_Code/      the project (README.md, AI_USAGE.md, requirements.txt, LICENSE, src/ … config/)
+├── Documents/        Project_Report.pdf, Python_Model_Report.pdf, Teachable_Machine_Report.pdf,
+│                     Model_Comparison_Report.pdf, Test_Cases.xlsx, Test_Results.pdf, Installation_Guide.pdf,
+│                     User_Guide.pdf, Technical_Blog_Link.txt, Team_Contributions.md, Deployment_URL.txt
+└── Videos/           Demonstration.mp4
+```
+
+* The documents are generated from the project's sources into `submission/Documents/`:
+  `python reports/build_submission_documents.py`.
+* On Windows, one command builds the whole folder and its zip on the Desktop (the video must first be in
+  `demo_video/AssureX_Demo.mp4`):
+  `powershell -ExecutionPolicy Bypass -File scripts\make_submission.ps1`.
+  It leaves out `venv/`, `.git/`, caches, the local database and `.env`.
+
 ## Sharing the project folder
 
 Before uploading the folder (for example to Google Drive), leave out `venv/` (machine-specific, several
