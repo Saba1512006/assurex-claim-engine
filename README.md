@@ -287,7 +287,7 @@ documentation/     project report, blog, evidence, installation, test cases, dia
 * Installation & troubleshooting: [`documentation/INSTALLATION.md`](documentation/INSTALLATION.md)
 * Teachable Machine evidence: [`documentation/GTM_EVIDENCE.md`](documentation/GTM_EVIDENCE.md)
 * Test cases: [`documentation/TEST_CASES.md`](documentation/TEST_CASES.md) · results: [`reports/test_results.txt`](reports/test_results.txt)
-* Submission package in the faculty layout (Source_Code / Documents / Videos): documents in [`submission/Documents/`](submission/Documents/), assembled with `scripts\make_submission.ps1`
+* Submission package in the faculty layout (Source_Code / Documents / Videos): the reports are in the package's `Documents/` folder (generated in the repository under [`submission/Documents/`](submission/Documents/)), the video in `Videos/Demonstration.mp4`; assembled with `scripts\make_submission.ps1`
 * SRS submission checklist (where every deliverable is): [`documentation/SUBMISSION_CHECKLIST.md`](documentation/SUBMISSION_CHECKLIST.md)
 * Team contribution record: [`documentation/TEAM_CONTRIBUTIONS.md`](documentation/TEAM_CONTRIBUTIONS.md)
 * AI tool declaration: [`AI_USAGE.md`](AI_USAGE.md)
